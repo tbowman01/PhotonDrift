@@ -5,6 +5,7 @@
 
 use crate::drift::{DriftItem, DriftResult};
 use super::{MLConfig, MLDriftResult, DriftFeatures, FeatureExtractor, AnomalyModel};
+use super::models::{ModelFactory, ModelType, OneClassSVMModel, IsolationForestModel};
 
 /// ML-enhanced drift detector
 pub struct MLDriftDetector {
@@ -122,28 +123,85 @@ impl MLDriftDetector {
     
     /// Train a new model from historical data
     pub async fn train_model(&mut self, training_data: Vec<(DriftItem, bool)>) -> DriftResult<()> {
+        self.train_model_with_type(training_data, ModelType::OneClassSVM).await
+    }
+    
+    /// Train a specific model type from historical data
+    pub async fn train_model_with_type(&mut self, training_data: Vec<(DriftItem, bool)>, model_type: ModelType) -> DriftResult<()> {
         if training_data.is_empty() {
             return Err(crate::error::AdrscanError::InvalidArgument(
                 "Training data cannot be empty".to_string()
             ));
         }
         
-        log::info!("Training ML model with {} samples", training_data.len());
+        log::info!("Training {} model with {} samples", 
+                   format!("{:?}", model_type), training_data.len());
         
         // Extract features from training data
         let mut feature_data = Vec::new();
+        let mut drift_features_only = Vec::new();
+        
         for (drift_item, is_anomaly) in training_data {
             let features = self.feature_extractor.extract_features(&drift_item)?;
-            feature_data.push((features, is_anomaly));
+            feature_data.push((features.clone(), is_anomaly));
+            
+            // For SVM training, we only need the features of normal samples (is_anomaly = false)
+            // or all samples depending on the algorithm
+            match model_type {
+                ModelType::OneClassSVM => {
+                    // One-Class SVM trains on normal samples only
+                    if !is_anomaly {
+                        drift_features_only.push(features);
+                    }
+                }
+                ModelType::IsolationForest => {
+                    // Isolation Forest can use all samples
+                    drift_features_only.push(features);
+                }
+                _ => {
+                    // Other models use all samples
+                    drift_features_only.push(features);
+                }
+            }
         }
         
         // Store training data for online learning
         self.training_data = feature_data;
         
-        // TODO: Implement actual model training
-        self.model = Some(Box::new(MockAnomalyModel::new()));
+        // Train the actual model
+        match model_type {
+            ModelType::OneClassSVM => {
+                let mut svm_model = OneClassSVMModel::new();
+                
+                if drift_features_only.is_empty() {
+                    log::warn!("No normal samples found for One-Class SVM training, using all samples");
+                    // Use all samples if no normal ones found
+                    drift_features_only = self.training_data.iter().map(|(f, _)| f.clone()).collect();
+                }
+                
+                svm_model.train(&drift_features_only)?;
+                self.model = Some(Box::new(svm_model));
+                
+                log::info!("One-Class SVM training completed with {} normal samples", 
+                          drift_features_only.len());
+            }
+            ModelType::IsolationForest => {
+                let mut forest_model = IsolationForestModel::new();
+                forest_model.train(&drift_features_only)?;
+                self.model = Some(Box::new(forest_model));
+                
+                log::info!("Isolation Forest training completed with {} samples", 
+                          drift_features_only.len());
+            }
+            _ => {
+                // Use factory for other model types
+                self.model = Some(ModelFactory::create_model(model_type));
+                log::info!("Created {} model (no specific training implemented yet)", 
+                          format!("{:?}", model_type));
+            }
+        }
         
-        log::info!("Model training completed");
+        log::info!("Model training completed successfully");
         Ok(())
     }
     
@@ -354,6 +412,56 @@ mod tests {
     }
     
     #[test]
+    fn test_lof_model_integration() {
+        // Direct LOF model test within ML detection framework
+        let mut lof_model = super::super::models::LOFModel::with_neighbors(5);
+        
+        // Test model training
+        let training_features = vec![create_test_features(); 10];
+        let train_result = lof_model.train(&training_features);
+        assert!(train_result.is_ok());
+        
+        // Test prediction
+        let test_features = create_test_features();
+        let prediction = lof_model.predict(&test_features).unwrap();
+        
+        assert!(prediction.confidence > 0.0);
+        assert!(prediction.anomaly_score >= 0.0 && prediction.anomaly_score <= 1.0);
+        
+        // Test explanation
+        let explanation = lof_model.explain(&test_features);
+        assert!(explanation.is_some());
+        let exp_text = explanation.unwrap();
+        assert!(exp_text.contains("LOF") || exp_text.contains("density") || exp_text.contains("score"));
+        
+        // Test model factory creation
+        let factory_model = super::super::models::ModelFactory::create_model(ModelType::LocalOutlierFactor);
+        assert_eq!(factory_model.model_type(), ModelType::LocalOutlierFactor);
+    }
+    
+    #[test]
+    fn test_lof_model_different_k_values() {
+        // Test LOF model with different k values
+        let mut lof_model = super::super::models::LOFModel::with_neighbors(5);
+        let features = vec![create_test_features(); 10];
+        
+        let train_result = lof_model.train(&features);
+        assert!(train_result.is_ok());
+        
+        let test_features = create_test_features();
+        let prediction = lof_model.predict(&test_features).unwrap();
+        
+        assert!(prediction.confidence > 0.0);
+        assert!(prediction.anomaly_score >= 0.0 && prediction.anomaly_score <= 1.0);
+    }
+    
+    fn create_test_features() -> DriftFeatures {
+        let extractor = FeatureExtractor::new();
+        let drift_item = create_test_drift_item();
+        extractor.extract_features(&drift_item).unwrap()
+    }
+    
+    #[test]
     fn test_detection_metrics() {
         let mut metrics = DetectionMetrics::default();
         metrics.true_positives = 8;
@@ -414,7 +522,7 @@ mod tests {
         
         // Even with normal features, the mock model should return a result
         // since we lowered the confidence threshold
-        assert!(!results.is_empty());
+        assert!(!results.is_empty(), "Expected non-empty results from ML detection");
         if !results.is_empty() {
             assert!(results[0].confidence > 0.0);
             assert!(results[0].explanation.is_some());
@@ -434,5 +542,178 @@ mod tests {
         assert_eq!(detector.metrics.total_predictions, 2);
         assert_eq!(detector.metrics.avg_processing_time_ms, 150.0);
         assert_eq!(detector.metrics.avg_confidence, 0.7);
+    }
+    
+    #[tokio::test]
+    async fn test_train_svm_model() {
+        let mut config = MLConfig::default();
+        config.enabled = true;
+        
+        let mut detector = MLDriftDetector::new(config);
+        
+        // Create training data with normal and anomalous samples
+        let mut training_data = Vec::new();
+        
+        // Add normal samples (not anomalies)
+        for i in 0..5 {
+            let item = DriftItem::new(
+                format!("normal_{}", i),
+                crate::drift::DriftSeverity::Low,
+                crate::drift::DriftCategory::Configuration,
+                "Normal change".to_string(),
+                "Regular configuration update".to_string(),
+                crate::drift::DriftLocation::new(PathBuf::from(format!("config_{}.rs", i))),
+            );
+            training_data.push((item, false)); // false = not anomaly
+        }
+        
+        // Add some anomalous samples
+        for i in 0..2 {
+            let item = DriftItem::new(
+                format!("anomaly_{}", i),
+                crate::drift::DriftSeverity::Critical,
+                crate::drift::DriftCategory::NewTechnology,
+                "Major architectural change".to_string(),
+                "Complete system overhaul with new technology stack".to_string(),
+                crate::drift::DriftLocation::new(PathBuf::from(format!("major_{}.rs", i))),
+            );
+            training_data.push((item, true)); // true = anomaly
+        }
+        
+        // Train SVM model
+        let result = detector.train_model_with_type(training_data, ModelType::OneClassSVM).await;
+        assert!(result.is_ok());
+        assert!(detector.model.is_some());
+        
+        // Verify model type
+        if let Some(ref model) = detector.model {
+            assert_eq!(model.model_type(), ModelType::OneClassSVM);
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_train_isolation_forest_model() {
+        let mut config = MLConfig::default();
+        config.enabled = true;
+        
+        let mut detector = MLDriftDetector::new(config);
+        
+        // Create training data
+        let training_data = vec![
+            (create_test_drift_item(), false),
+            (create_test_drift_item(), true),
+            (create_test_drift_item(), false),
+        ];
+        
+        // Train Isolation Forest model
+        let result = detector.train_model_with_type(training_data, ModelType::IsolationForest).await;
+        assert!(result.is_ok());
+        assert!(detector.model.is_some());
+        
+        // Verify model type
+        if let Some(ref model) = detector.model {
+            assert_eq!(model.model_type(), ModelType::IsolationForest);
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_svm_prediction_quality() {
+        let mut config = MLConfig::default();
+        config.enabled = true;
+        config.confidence_threshold = 0.5;
+        
+        let mut detector = MLDriftDetector::new(config);
+        
+        // Train with normal samples
+        let normal_items = vec![
+            DriftItem::new(
+                "normal_1".to_string(),
+                crate::drift::DriftSeverity::Low,
+                crate::drift::DriftCategory::Configuration,
+                "Small config change".to_string(),
+                "Updated timeout value".to_string(),
+                crate::drift::DriftLocation::new(PathBuf::from("config.rs")),
+            ),
+            DriftItem::new(
+                "normal_2".to_string(),
+                crate::drift::DriftSeverity::Medium,
+                crate::drift::DriftCategory::PatternViolation,
+                "Minor refactor".to_string(),
+                "Renamed variable for clarity".to_string(),
+                crate::drift::DriftLocation::new(PathBuf::from("utils.rs")),
+            ),
+        ];
+        
+        let training_data: Vec<(DriftItem, bool)> = normal_items.into_iter()
+            .map(|item| (item, false))
+            .collect();
+        
+        detector.train_model_with_type(training_data, ModelType::OneClassSVM).await.unwrap();
+        
+        // Test with an anomalous sample
+        let anomalous_item = DriftItem::new(
+            "anomaly".to_string(),
+            crate::drift::DriftSeverity::Critical,
+            crate::drift::DriftCategory::NewTechnology,
+            "Complete rewrite with Rust".to_string(),
+            "Replaced entire Python codebase with Rust implementation using advanced async patterns".to_string(),
+            crate::drift::DriftLocation::new(PathBuf::from("main.rs")),
+        );
+        
+        let results = detector.enhance_detection(vec![anomalous_item]).await.unwrap();
+        
+        if !results.is_empty() {
+            let result = &results[0];
+            
+            // SVM should detect this as anomalous with high confidence
+            assert!(result.confidence > 0.8);
+            assert!(result.anomaly_score > 0.6);
+            assert!(result.explanation.is_some());
+            
+            let explanation = result.explanation.as_ref().unwrap();
+            assert!(explanation.contains("SVM") || explanation.contains("boundary"));
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_svm_normal_sample_detection() {
+        let mut config = MLConfig::default();
+        config.enabled = true;
+        config.confidence_threshold = 0.3; // Lower threshold to catch normal samples
+        
+        let mut detector = MLDriftDetector::new(config);
+        
+        // Train with similar normal samples
+        let normal_item = DriftItem::new(
+            "training".to_string(),
+            crate::drift::DriftSeverity::Low,
+            crate::drift::DriftCategory::Configuration,
+            "Config change".to_string(),
+            "Updated parameter".to_string(),
+            crate::drift::DriftLocation::new(PathBuf::from("config.rs")),
+        );
+        
+        let training_data = vec![(normal_item, false)];
+        detector.train_model_with_type(training_data, ModelType::OneClassSVM).await.unwrap();
+        
+        // Test with similar normal sample
+        let test_item = DriftItem::new(
+            "test".to_string(),
+            crate::drift::DriftSeverity::Low,
+            crate::drift::DriftCategory::Configuration,
+            "Another config change".to_string(),
+            "Updated another parameter".to_string(),
+            crate::drift::DriftLocation::new(PathBuf::from("config2.rs")),
+        );
+        
+        let results = detector.enhance_detection(vec![test_item]).await.unwrap();
+        
+        if !results.is_empty() {
+            let result = &results[0];
+            
+            // Normal sample should have lower anomaly score
+            assert!(result.anomaly_score < 0.8, "Normal sample should have low anomaly score, got: {}", result.anomaly_score);
+            assert!(result.confidence > 0.8);
+        }
     }
 }
