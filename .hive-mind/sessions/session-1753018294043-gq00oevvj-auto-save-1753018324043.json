@@ -1,0 +1,81 @@
+{
+  "sessionId": "session-1753018294043-gq00oevvj",
+  "checkpointId": "checkpoint-1753018324043-1f0tcsjgp",
+  "checkpointName": "auto-save-1753018324043",
+  "timestamp": "2025-07-20T13:32:04.044Z",
+  "data": {
+    "timestamp": "2025-07-20T13:32:04.043Z",
+    "changeCount": 5,
+    "changesByType": {
+      "swarm_created": [
+        {
+          "type": "swarm_created",
+          "data": {
+            "swarmId": "swarm-1753018294042-9ynrtjkwq",
+            "swarmName": "hive-1753018294038",
+            "objective": "analyze and coordinate development of the ./plans/research/*.pdf establish gh issues management, then determine the next steps, create issues, and work the next highest priority task",
+            "workerCount": 8
+          },
+          "timestamp": "2025-07-20T13:31:34.043Z"
+        }
+      ],
+      "agent_activity": [
+        {
+          "type": "agent_activity",
+          "data": {
+            "agentId": "worker-swarm-1753018294042-9ynrtjkwq-0",
+            "activity": "spawned",
+            "data": {
+              "type": "researcher",
+              "name": "Researcher Worker 1"
+            }
+          },
+          "timestamp": "2025-07-20T13:31:34.044Z"
+        },
+        {
+          "type": "agent_activity",
+          "data": {
+            "agentId": "worker-swarm-1753018294042-9ynrtjkwq-1",
+            "activity": "spawned",
+            "data": {
+              "type": "coder",
+              "name": "Coder Worker 2"
+            }
+          },
+          "timestamp": "2025-07-20T13:31:34.044Z"
+        },
+        {
+          "type": "agent_activity",
+          "data": {
+            "agentId": "worker-swarm-1753018294042-9ynrtjkwq-2",
+            "activity": "spawned",
+            "data": {
+              "type": "analyst",
+              "name": "Analyst Worker 3"
+            }
+          },
+          "timestamp": "2025-07-20T13:31:34.044Z"
+        },
+        {
+          "type": "agent_activity",
+          "data": {
+            "agentId": "worker-swarm-1753018294042-9ynrtjkwq-3",
+            "activity": "spawned",
+            "data": {
+              "type": "tester",
+              "name": "Tester Worker 4"
+            }
+          },
+          "timestamp": "2025-07-20T13:31:34.045Z"
+        }
+      ]
+    },
+    "statistics": {
+      "tasksProcessed": 0,
+      "tasksCompleted": 0,
+      "memoryUpdates": 0,
+      "agentActivities": 4,
+      "consensusDecisions": 0
+    }
+  }
+}

@@ -1,0 +1,77 @@
+name: Research Spike
+description: Investigation or research task with time-boxed effort
+title: "[SPIKE] "
+labels: ["research", "spike"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for research tasks, proof of concepts, or investigations.
+
+  - type: textarea
+    id: research-question
+    attributes:
+      label: Research Question
+      description: What question or problem are we investigating?
+      placeholder: What do we need to learn or validate?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context & Background
+      description: Why is this research needed?
+      placeholder: Background information and motivation...
+    validations:
+      required: true
+
+  - type: textarea
+    id: research-goals
+    attributes:
+      label: Research Goals
+      description: What are we trying to achieve?
+      placeholder: |
+        - [ ] Goal 1
+        - [ ] Goal 2
+        - [ ] Goal 3
+    validations:
+      required: true
+
+  - type: dropdown
+    id: timebox
+    attributes:
+      label: Time Box
+      description: Maximum time to spend on this research
+      options:
+        - 1-2 hours
+        - Half day
+        - 1 day
+        - 2 days
+        - 1 week
+    validations:
+      required: true
+
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: Expected Deliverables
+      description: What outputs do we expect from this research?
+      placeholder: |
+        - Research summary document
+        - Proof of concept code
+        - Recommendation report
+        - Technical analysis
+
+  - type: dropdown
+    id: research-priority
+    attributes:
+      label: Priority
+      description: How urgent is this research?
+      options:
+        - Critical - Blocking other work
+        - High - Needed soon
+        - Medium - Important but not urgent
+        - Low - Nice to have
+    validations:
+      required: true
