@@ -1,0 +1,43 @@
+{
+  "name": "adrscan-wasm",
+  "version": "0.1.0",
+  "description": "WebAssembly module for ADRScan - Architecture Decision Record management and drift detection",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "adrscan_bg.wasm",
+    "adrscan.js",
+    "adrscan.d.ts",
+    "README.md"
+  ],
+  "keywords": [
+    "adr",
+    "architecture",
+    "documentation",
+    "drift-detection",
+    "wasm",
+    "webassembly"
+  ],
+  "author": "tbowman01",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tbowman01/PhotonDrift.git"
+  },
+  "homepage": "https://github.com/tbowman01/PhotonDrift",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  },
+  "scripts": {
+    "build": "wasm-pack build --target nodejs --out-dir wasm",
+    "build:web": "wasm-pack build --target web --out-dir wasm-web",
+    "build:bundler": "wasm-pack build --target bundler --out-dir wasm-bundler",
+    "test": "node test.js"
+  }
+}

@@ -52,10 +52,10 @@ adrscan index
 - [ ] **[Issue #5](https://github.com/tbowman01/PhotonDrift/issues/5)**: `index` command
 - [ ] **[Issue #6](https://github.com/tbowman01/PhotonDrift/issues/6)**: Configuration system
 
-### Phase 2 - Drift Detection 📋 *Planned*
-- [ ] **[Issue #7](https://github.com/tbowman01/PhotonDrift/issues/7)**: Drift detection engine
-- [ ] **[Issue #8](https://github.com/tbowman01/PhotonDrift/issues/8)**: `diff` command
-- [ ] **[Issue #9](https://github.com/tbowman01/PhotonDrift/issues/9)**: `propose` command
+### Phase 2 - Drift Detection ✅ *Completed*
+- [x] **[Issue #7](https://github.com/tbowman01/PhotonDrift/issues/7)**: Drift detection engine
+- [x] **[Issue #8](https://github.com/tbowman01/PhotonDrift/issues/8)**: `diff` command
+- [x] **[Issue #9](https://github.com/tbowman01/PhotonDrift/issues/9)**: `propose` command
 
 ### Phase 3 - WASM & GitHub Action 🔧 *Planned*
 - [ ] **[Issue #10](https://github.com/tbowman01/PhotonDrift/issues/10)**: WebAssembly module

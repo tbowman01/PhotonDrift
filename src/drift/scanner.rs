@@ -3,7 +3,7 @@
 //! This module provides functionality to scan codebases and detect
 //! technologies, frameworks, and architectural patterns.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Instant;
 use walkdir::WalkDir;
 use sha2::{Sha256, Digest};
@@ -13,9 +13,7 @@ use crate::drift::{
     DriftResult,
     PatternMatcher,
     Snapshot,
-    SnapshotEntry,
     SnapshotEntryType,
-    TechnologyMatch,
 };
 use crate::config::DetectionPattern;
 use crate::error::AdrscanError;
@@ -256,11 +254,11 @@ impl CodebaseScanner {
         
         // Check for specific filenames first
         match filename.as_str() {
-            name if name.contains("test") || name.contains("spec") => SnapshotEntryType::Test,
-            "dockerfile" | "docker-compose.yml" | "docker-compose.yaml" => SnapshotEntryType::Infrastructure,
-            "makefile" | "rakefile" | "build.gradle" | "pom.xml" => SnapshotEntryType::Build,
-            "cargo.toml" | "package.json" | "requirements.txt" | "composer.json" => SnapshotEntryType::Configuration,
-            name if name.ends_with(".md") || name.ends_with(".rst") || name.ends_with(".txt") => SnapshotEntryType::Documentation,
+            name if name.contains("test") || name.contains("spec") => return SnapshotEntryType::Test,
+            "dockerfile" | "docker-compose.yml" | "docker-compose.yaml" => return SnapshotEntryType::Infrastructure,
+            "makefile" | "rakefile" | "build.gradle" | "pom.xml" => return SnapshotEntryType::Build,
+            "cargo.toml" | "package.json" | "requirements.txt" | "composer.json" => return SnapshotEntryType::Configuration,
+            name if name.ends_with(".md") || name.ends_with(".rst") || name.ends_with(".txt") => return SnapshotEntryType::Documentation,
             _ => {}
         }
         
