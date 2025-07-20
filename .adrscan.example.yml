@@ -1,0 +1,63 @@
+# ADRScan Configuration Example
+# This file shows all available configuration options for ADRScan
+
+# Directory where ADR files are stored
+adr_dir: docs/adr
+
+# File patterns to include when scanning for ADRs and architectural elements
+include_patterns:
+  - "**/*.md"          # Markdown files (ADRs)
+  - "**/*.rs"          # Rust source files
+  - "**/*.py"          # Python source files
+  - "**/*.js"          # JavaScript files
+  - "**/*.ts"          # TypeScript files
+  - "**/*.java"        # Java source files
+  - "**/*.tf"          # Terraform files
+  - "**/*.yml"         # YAML configuration files
+  - "**/*.yaml"        # YAML configuration files
+  - "**/*.json"        # JSON configuration files
+
+# File patterns to exclude from scanning
+exclude_patterns:
+  - "**/target/**"     # Rust build directory
+  - "**/node_modules/**" # Node.js dependencies
+  - "**/.git/**"       # Git metadata
+  - "**/build/**"      # Generic build directory
+  - "**/dist/**"       # Distribution directory
+
+# Location of the snapshot file for drift detection
+snapshot_file: .adrscan_snapshot.json
+
+# ADR template configuration
+template:
+  # Template format: "madr" for MADR format, "custom" for custom template
+  format: madr
+  # Path to custom template file (required if format is "custom")
+  # custom_path: templates/custom-adr.md
+
+# Drift detection configuration
+drift:
+  # Enable/disable drift detection
+  enabled: true
+  
+  # Patterns for detecting architectural elements in code
+  detection_patterns:
+    - name: "Database Dependencies"
+      file_pattern: "**/Cargo.toml"
+      content_pattern: "(postgres|mysql|sqlite|mongodb)"
+      category: "database"
+    
+    - name: "Cloud Provider"
+      file_pattern: "**/*.tf"
+      content_pattern: "(aws|azure|gcp|google)"
+      category: "cloud"
+    
+    - name: "Web Framework"
+      file_pattern: "**/package.json"
+      content_pattern: "(express|fastify|koa|hapi)"
+      category: "framework"
+    
+    - name: "Authentication Library"
+      file_pattern: "**/*.{js,ts,py,rs}"
+      content_pattern: "(jwt|oauth|passport|auth0)"
+      category: "authentication"
