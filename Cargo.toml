@@ -47,6 +47,12 @@ tokio = { version = "1.0", features = ["full"], optional = true }
 # Cryptographic hashing for file content
 sha2 = "0.10"
 
+# Machine Learning dependencies (conditional on ml feature)
+smartcore = { version = "0.3", optional = true }
+ndarray = { version = "0.15", optional = true }
+rand = { version = "0.8", optional = true }
+nalgebra = { version = "0.32", optional = true }
+
 # WebAssembly bindings (only for WASM target)
 wasm-bindgen = { version = "0.2", optional = true }
 js-sys = { version = "0.3", optional = true }
@@ -56,7 +62,7 @@ console_error_panic_hook = { version = "0.1", optional = true }
 [features]
 default = ["tokio"]
 wasm = ["wasm-bindgen", "js-sys", "web-sys", "console_error_panic_hook"]
-ml = []
+ml = ["smartcore", "ndarray", "rand", "nalgebra"]
 [dev-dependencies]
 tempfile = "3.8"
 assert_cmd = "2.0"
