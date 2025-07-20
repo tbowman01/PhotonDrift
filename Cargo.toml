@@ -1,12 +1,12 @@
 [package]
 name = "adrscan"
-version = "0.1.0"
+version = "0.2.0-alpha.20250720"
 edition = "2021"
 authors = ["tbowman01"]
-description = "Architecture Decision Record (ADR) management and drift detection CLI tool"
+description = "AI-powered Architecture Decision Record (ADR) management with ML-enhanced drift detection"
 license = "MIT"
 repository = "https://github.com/tbowman01/PhotonDrift"
-keywords = ["adr", "architecture", "documentation", "cli", "drift-detection"]
+keywords = ["adr", "architecture", "documentation", "cli", "drift-detection", "ml", "ai"]
 categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
