@@ -1,0 +1,60 @@
+[package]
+name = "adrscan"
+version = "0.1.0"
+edition = "2021"
+authors = ["tbowman01"]
+description = "Architecture Decision Record (ADR) management and drift detection CLI tool"
+license = "MIT"
+repository = "https://github.com/tbowman01/PhotonDrift"
+keywords = ["adr", "architecture", "documentation", "cli", "drift-detection"]
+categories = ["command-line-utilities", "development-tools"]
+
+[dependencies]
+# CLI framework
+clap = { version = "4.4", features = ["derive", "color"] }
+
+# Serialization and configuration
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+toml = "0.8"
+
+# File system and path handling
+walkdir = "2.4"
+glob = "0.3"
+
+# Markdown and frontmatter parsing
+pulldown-cmark = "0.9"
+yaml-front-matter = "0.1"
+
+# Error handling and logging
+anyhow = "1.0"
+thiserror = "1.0"
+log = "0.4"
+env_logger = "0.10"
+
+# JSON handling
+serde_json = "1.0"
+
+# Date and time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Regular expressions for pattern matching
+regex = "1.10"
+
+[dev-dependencies]
+tempfile = "3.8"
+assert_cmd = "2.0"
+predicates = "3.0"
+
+[lib]
+name = "adrscan"
+path = "src/lib.rs"
+
+[[bin]]
+name = "adrscan"
+path = "src/main.rs"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

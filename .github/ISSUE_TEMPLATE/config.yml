@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussion
+    url: https://github.com/tbowman01/PhotonDrift/discussions
+    about: General questions and community discussions
+  - name: 📚 Documentation
+    url: https://github.com/tbowman01/PhotonDrift/blob/main/docs/REQUIREMENTS_SUMMARY.md
+    about: Project requirements and architecture documentation
+  - name: 🚀 Development Guide
+    url: https://github.com/tbowman01/PhotonDrift/blob/main/docs/DEVELOPMENT.md
+    about: Development workflow and contribution guidelines
