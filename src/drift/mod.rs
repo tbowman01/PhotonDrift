@@ -13,7 +13,7 @@ pub use detector::DriftDetector;
 pub use patterns::{TechnologyMatch, PatternMatcher};
 pub use report::{DriftReport, DriftItem, DriftSeverity, DriftCategory, DriftLocation, ScanStatistics};
 pub use scanner::CodebaseScanner;
-pub use snapshot::{Snapshot, SnapshotEntry, SnapshotEntryType, SnapshotComparison};
+pub use snapshot::{Snapshot, SnapshotEntryType};
 
 use crate::error::AdrscanError;
 use crate::config::DetectionPattern;

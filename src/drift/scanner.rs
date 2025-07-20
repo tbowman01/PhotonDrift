@@ -50,6 +50,7 @@ impl CodebaseScanner {
     }
     
     /// Configure the scanner with custom settings
+    #[allow(dead_code)] // Planned for scanner configuration
     pub fn with_config(
         mut self,
         include_extensions: Vec<String>,
