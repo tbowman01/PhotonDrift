@@ -248,7 +248,7 @@ impl IndexCommand {
     }
 
     /// Generate default index content
-    fn generate_default_index(&self, entries: &[AdrIndexEntry], adr_dir: &PathBuf) -> Result<String> {
+    fn generate_default_index(&self, entries: &[AdrIndexEntry], _adr_dir: &PathBuf) -> Result<String> {
         let mut content = String::new();
         
         // Header
@@ -334,7 +334,7 @@ impl IndexCommand {
     }
 
     /// Generate index using custom template
-    fn generate_custom_index(&self, entries: &[AdrIndexEntry], template_path: &PathBuf, adr_dir: &PathBuf) -> Result<String> {
+    fn generate_custom_index(&self, entries: &[AdrIndexEntry], template_path: &PathBuf, _adr_dir: &PathBuf) -> Result<String> {
         let template_content = std::fs::read_to_string(template_path)
             .map_err(|e| AdrscanError::Io(e))?;
 

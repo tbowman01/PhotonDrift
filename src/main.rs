@@ -3,6 +3,7 @@ use std::process;
 
 mod commands;
 mod config;
+mod drift;
 mod error;
 mod parser;
 

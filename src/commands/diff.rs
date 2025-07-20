@@ -1,8 +1,9 @@
 use clap::Args;
 use std::path::PathBuf;
+#[cfg(feature = "tokio")]
 use tokio::runtime::Runtime;
 
-use crate::{config::Config, error::AdrscanError, drift::DriftEngine};
+use crate::{config::Config, error::AdrscanError, drift::{DriftEngine, DriftReport, DriftSeverity}};
 type Result<T> = std::result::Result<T, AdrscanError>;
 
 #[derive(Args)]
@@ -29,6 +30,7 @@ pub struct DiffCommand {
 }
 
 impl DiffCommand {
+    #[cfg(feature = "tokio")]
     pub fn execute(&self, config: &Config) -> Result<()> {
         log::info!("Performing drift detection...");
         
@@ -87,7 +89,7 @@ impl DiffCommand {
             
             // Exit with error code if critical drift is found
             let critical_count = drift_report.severity_summary
-                .get(&crate::drift::DriftSeverity::Critical)
+                .get(&DriftSeverity::Critical)
                 .unwrap_or(&0);
             
             if *critical_count > 0 {
@@ -100,7 +102,7 @@ impl DiffCommand {
     }
     
     /// Print a human-readable console report
-    fn print_console_report(&self, report: &crate::drift::DriftReport) {
+    fn print_console_report(&self, report: &DriftReport) {
         println!("🔍 Architectural Drift Detection Report");
         println!("=======================================");
         println!();
@@ -117,18 +119,18 @@ impl DiffCommand {
         // Severity breakdown
         println!("🚨 Severity Breakdown:");
         for severity in [
-            crate::drift::DriftSeverity::Critical,
-            crate::drift::DriftSeverity::High,
-            crate::drift::DriftSeverity::Medium,
-            crate::drift::DriftSeverity::Low,
+            DriftSeverity::Critical,
+            DriftSeverity::High,
+            DriftSeverity::Medium,
+            DriftSeverity::Low,
         ] {
             let count = report.severity_summary.get(&severity).unwrap_or(&0);
             if *count > 0 {
                 let icon = match severity {
-                    crate::drift::DriftSeverity::Critical => "🔴",
-                    crate::drift::DriftSeverity::High => "🟠",
-                    crate::drift::DriftSeverity::Medium => "🟡",
-                    crate::drift::DriftSeverity::Low => "🔵",
+                    DriftSeverity::Critical => "🔴",
+                    DriftSeverity::High => "🟠",
+                    DriftSeverity::Medium => "🟡",
+                    DriftSeverity::Low => "🔵",
                     _ => "⚪",
                 };
                 println!("  {} {}: {}", icon, severity, count);
@@ -146,8 +148,8 @@ impl DiffCommand {
         }
         
         // Show critical and high priority items
-        let critical_items = report.items_by_severity(&crate::drift::DriftSeverity::Critical);
-        let high_items = report.items_by_severity(&crate::drift::DriftSeverity::High);
+        let critical_items = report.items_by_severity(&DriftSeverity::Critical);
+        let high_items = report.items_by_severity(&DriftSeverity::High);
         
         if !critical_items.is_empty() {
             println!("🔴 Critical Issues:");
@@ -194,6 +196,7 @@ mod tests {
     use crate::drift::{DriftReport, DriftItem, DriftSeverity, DriftCategory, DriftLocation};
     use crate::config::{Config, TemplateConfig, DriftConfig};
 
+    #[allow(dead_code)]
     fn create_test_config(adr_dir: &PathBuf) -> Config {
         Config {
             adr_dir: adr_dir.clone(),
@@ -211,6 +214,7 @@ mod tests {
         }
     }
 
+    #[allow(dead_code)]
     fn create_test_adr(dir: &PathBuf, filename: &str, content: &str) -> PathBuf {
         let file_path = dir.join(filename);
         fs::write(&file_path, content).unwrap();

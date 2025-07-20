@@ -1,0 +1,339 @@
+name: 'ADRScan Drift Detection'
+description: 'Detect architectural drift by comparing your codebase against Architecture Decision Records (ADRs)'
+author: 'tbowman01'
+
+branding:
+  icon: 'search'
+  color: 'blue'
+
+inputs:
+  adr-directory:
+    description: 'Directory containing Architecture Decision Records'
+    required: false
+    default: './docs/adr'
+  
+  target-directory:
+    description: 'Directory to scan for architectural drift'
+    required: false
+    default: '.'
+  
+  severity-threshold:
+    description: 'Minimum severity level to report (low, medium, high, critical)'
+    required: false
+    default: 'medium'
+  
+  fail-on-drift:
+    description: 'Fail the workflow if architectural drift is detected'
+    required: false
+    default: 'true'
+  
+  create-issues:
+    description: 'Automatically create GitHub issues for detected drift'
+    required: false
+    default: 'false'
+  
+  output-format:
+    description: 'Output format for drift report (console, json, yaml)'
+    required: false
+    default: 'console'
+  
+  github-token:
+    description: 'GitHub token for creating issues and PR comments'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  drift-detected:
+    description: 'Boolean indicating if architectural drift was detected'
+  
+  drift-count:
+    description: 'Number of drift items found'
+  
+  report-path:
+    description: 'Path to the generated drift report file'
+  
+  summary:
+    description: 'Human-readable summary of drift detection results'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+
+    - name: Cache Rust dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target/
+        key: ${{ runner.os }}-adrscan-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-adrscan-
+
+    - name: Install ADRScan
+      shell: bash
+      run: |
+        echo "🚀 Installing ADRScan..."
+        
+        # For now, install from source (later will use prebuilt binaries)
+        if [ ! -f "${{ github.action_path }}/target/release/adrscan" ]; then
+          cd "${{ github.action_path }}"
+          cargo build --release
+        fi
+        
+        # Add to PATH
+        echo "${{ github.action_path }}/target/release" >> $GITHUB_PATH
+        
+        # Verify installation
+        adrscan --version
+
+    - name: Initialize ADR directory if needed
+      shell: bash
+      run: |
+        if [ ! -d "${{ inputs.adr-directory }}" ]; then
+          echo "⚠️ ADR directory not found: ${{ inputs.adr-directory }}"
+          echo "Creating basic ADR structure..."
+          mkdir -p "${{ inputs.adr-directory }}"
+          adrscan init "${{ inputs.adr-directory }}"
+          echo "✅ ADR directory initialized"
+        else
+          echo "✅ ADR directory found: ${{ inputs.adr-directory }}"
+          
+          # Count existing ADRs
+          ADR_COUNT=$(find "${{ inputs.adr-directory }}" -name "*.md" | wc -l)
+          echo "Found $ADR_COUNT ADR files"
+        fi
+
+    - name: Run ADR inventory
+      shell: bash
+      run: |
+        echo "📋 Running ADR inventory..."
+        adrscan inventory \
+          --adr-dir "${{ inputs.adr-directory }}" \
+          --format json > adr-inventory.json
+        
+        echo "Inventory completed - $(jq length adr-inventory.json 2>/dev/null || echo "0") ADRs found"
+
+    - name: Perform drift detection
+      id: drift-detection
+      shell: bash
+      run: |
+        echo "🔍 Starting architectural drift detection..."
+        
+        # Create baseline snapshot if it doesn't exist
+        SNAPSHOT_FILE=".adrscan-snapshot.json"
+        
+        # Run drift detection
+        set +e  # Don't exit on failure
+        adrscan diff \
+          --adr-dir "${{ inputs.adr-directory }}" \
+          --directory "${{ inputs.target-directory }}" \
+          --format json \
+          --save-snapshot "$SNAPSHOT_FILE" > drift-report.json
+        
+        DRIFT_EXIT_CODE=$?
+        set -e
+        
+        # Analyze results
+        if [ $DRIFT_EXIT_CODE -eq 0 ]; then
+          echo "✅ No architectural drift detected"
+          echo "drift-detected=false" >> $GITHUB_OUTPUT
+          echo "drift-count=0" >> $GITHUB_OUTPUT
+        else
+          echo "⚠️ Architectural drift detected"
+          echo "drift-detected=true" >> $GITHUB_OUTPUT
+          
+          # Count drift items
+          DRIFT_COUNT=$(jq '.total_items // 0' drift-report.json 2>/dev/null || echo "0")
+          echo "drift-count=$DRIFT_COUNT" >> $GITHUB_OUTPUT
+          echo "Found $DRIFT_COUNT drift items"
+        fi
+        
+        echo "report-path=drift-report.json" >> $GITHUB_OUTPUT
+
+    - name: Generate drift summary
+      if: steps.drift-detection.outputs.drift-detected == 'true'
+      shell: bash
+      run: |
+        echo "📊 Generating drift summary..."
+        
+        # Create human-readable summary
+        CRITICAL=$(jq '.severity_summary.Critical // 0' drift-report.json 2>/dev/null || echo "0")
+        HIGH=$(jq '.severity_summary.High // 0' drift-report.json 2>/dev/null || echo "0")
+        MEDIUM=$(jq '.severity_summary.Medium // 0' drift-report.json 2>/dev/null || echo "0")
+        LOW=$(jq '.severity_summary.Low // 0' drift-report.json 2>/dev/null || echo "0")
+        TOTAL=$(jq '.total_items // 0' drift-report.json 2>/dev/null || echo "0")
+        
+        SUMMARY="🔍 Architectural Drift Detection Results:
+        Total Items: $TOTAL
+        Critical: $CRITICAL | High: $HIGH | Medium: $MEDIUM | Low: $LOW"
+        
+        echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
+        echo "$SUMMARY"
+
+    - name: Generate ADR proposals
+      if: steps.drift-detection.outputs.drift-detected == 'true'
+      shell: bash
+      run: |
+        echo "📝 Generating ADR proposals..."
+        
+        adrscan propose \
+          --drift-file drift-report.json \
+          --adr-dir "${{ inputs.adr-directory }}" \
+          --dry-run > adr-proposals.txt || true
+        
+        if [ -s adr-proposals.txt ]; then
+          echo "✅ ADR proposals generated"
+          echo "Preview of generated proposals:"
+          head -20 adr-proposals.txt
+        else
+          echo "ℹ️ No ADR proposals generated"
+        fi
+
+    - name: Create GitHub issues for drift
+      if: inputs.create-issues == 'true' && steps.drift-detection.outputs.drift-detected == 'true'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        echo "🐛 Creating GitHub issues for detected drift..."
+        
+        if ! command -v gh &> /dev/null; then
+          echo "⚠️ GitHub CLI not available, skipping issue creation"
+          exit 0
+        fi
+        
+        # Create issues for critical and high severity items
+        jq -c '.items[] | select(.severity == "Critical" or .severity == "High")' drift-report.json 2>/dev/null | while read -r item; do
+          TITLE=$(echo "$item" | jq -r '.title' 2>/dev/null || echo "Architectural Drift Detected")
+          SEVERITY=$(echo "$item" | jq -r '.severity' 2>/dev/null || echo "High")
+          CATEGORY=$(echo "$item" | jq -r '.category' 2>/dev/null || echo "Unknown")
+          DESCRIPTION=$(echo "$item" | jq -r '.description' 2>/dev/null || echo "Drift detected")
+          LOCATION=$(echo "$item" | jq -r '.location.file_path' 2>/dev/null || echo "Unknown")
+          
+          ISSUE_BODY="## 🔍 Architectural Drift Detected
+        
+        **Severity:** $SEVERITY  
+        **Category:** $CATEGORY  
+        **Location:** \`$LOCATION\`
+        
+        ### Description
+        $DESCRIPTION
+        
+        ### Recommended Actions
+        1. Review the architectural decision documented in your ADRs
+        2. If the change is intentional, update the relevant ADR
+        3. If the change violates architecture, consider reverting
+        4. Update team on architectural changes if approved
+        
+        ### Detection Details
+        - **Detected by:** ADRScan GitHub Action
+        - **Commit:** ${{ github.sha }}
+        - **Branch:** ${{ github.ref_name }}
+        - **Date:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+        
+        ---
+        *This issue was automatically created by [ADRScan](https://github.com/tbowman01/PhotonDrift)*"
+          
+          gh issue create \
+            --title "[$SEVERITY] $TITLE" \
+            --body "$ISSUE_BODY" \
+            --label "architectural-drift,$SEVERITY,automated" || true
+        done
+
+    - name: Comment on PR with results
+      if: github.event_name == 'pull_request'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        if ! command -v gh &> /dev/null; then
+          echo "⚠️ GitHub CLI not available, skipping PR comment"
+          exit 0
+        fi
+        
+        if [ "${{ steps.drift-detection.outputs.drift-detected }}" == "true" ]; then
+          # Drift detected - add warning comment
+          TOTAL=$(jq '.total_items // 0' drift-report.json 2>/dev/null || echo "0")
+          CRITICAL=$(jq '.severity_summary.Critical // 0' drift-report.json 2>/dev/null || echo "0")
+          HIGH=$(jq '.severity_summary.High // 0' drift-report.json 2>/dev/null || echo "0")
+          
+          COMMENT="## ⚠️ Architectural Drift Detected
+        
+        ADRScan has detected potential architectural drift in this pull request.
+        
+        **Summary:**
+        - 📊 Total drift items: **$TOTAL**
+        - 🔴 Critical: **$CRITICAL**
+        - 🟠 High: **$HIGH**
+        - 🟡 Medium: $(jq '.severity_summary.Medium // 0' drift-report.json 2>/dev/null || echo "0")
+        - 🟢 Low: $(jq '.severity_summary.Low // 0' drift-report.json 2>/dev/null || echo "0")
+        
+        ### 🎯 Next Steps
+        1. Review the detected drift items
+        2. Update relevant ADRs if changes are intentional
+        3. Ensure architectural decisions are properly documented
+        
+        <details>
+        <summary>📋 View detailed drift report</summary>
+        
+        \`\`\`json
+        $(cat drift-report.json 2>/dev/null || echo "{}")
+        \`\`\`
+        
+        </details>
+        
+        ---
+        🤖 *Automated by [ADRScan](https://github.com/tbowman01/PhotonDrift)*"
+          
+          gh pr comment ${{ github.event.number }} --body "$COMMENT" || true
+        else
+          # No drift - add success comment
+          COMMENT="## ✅ No Architectural Drift Detected
+        
+          ADRScan has verified that this pull request does not introduce architectural drift.
+          
+          All changes appear to be consistent with documented architectural decisions.
+          
+          ---
+          🤖 *Automated by [ADRScan](https://github.com/tbowman01/PhotonDrift)*"
+          
+          gh pr comment ${{ github.event.number }} --body "$COMMENT" || true
+        fi
+
+    - name: Fail on drift (if configured)
+      if: inputs.fail-on-drift == 'true' && steps.drift-detection.outputs.drift-detected == 'true'
+      shell: bash
+      run: |
+        echo "❌ Failing workflow due to detected architectural drift"
+        echo "Total drift items: ${{ steps.drift-detection.outputs.drift-count }}"
+        echo ""
+        echo "To allow the workflow to continue despite drift, set:"
+        echo "  fail-on-drift: false"
+        echo ""
+        echo "Review the drift report and update your ADRs as needed."
+        exit 1
+
+    - name: Upload artifacts
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: adrscan-drift-report
+        path: |
+          drift-report.json
+          adr-inventory.json
+          adr-proposals.txt
+          .adrscan-snapshot.json
+        retention-days: 30
+
+    - name: Success summary
+      if: steps.drift-detection.outputs.drift-detected == 'false'
+      shell: bash
+      run: |
+        echo "✅ ADRScan completed successfully"
+        echo "No architectural drift detected in this codebase"
+        echo "Your architecture appears to be well-maintained! 🎉"
