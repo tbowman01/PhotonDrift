@@ -46,3 +46,7 @@ pkg/
 # Environment
 .env
 .env.local
+
+# Swarm memory and coordination
+.swarm/
+.hive-mind/
