@@ -11,7 +11,7 @@ pub mod parser;
 
 // WebAssembly module (only compiled for wasm32 target)
 #[cfg(all(target_arch = "wasm32", feature = "wasm"))]
-pub mod wasm_simple;
+pub mod wasm;
 
 pub use config::Config;
 pub use error::AdrscanError;

@@ -4,8 +4,7 @@
 //! current codebase state against ADRs and baseline snapshots.
 
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
-use chrono::Utc;
+use std::path::{Path, PathBuf};
 
 use crate::drift::{
     DriftResult,
@@ -14,14 +13,11 @@ use crate::drift::{
     DriftSeverity,
     DriftCategory,
     DriftLocation,
+    ScanStatistics,
     Snapshot,
-    SnapshotComparison,
-    TechnologyMatch,
-    PatternMatcher,
 };
 use crate::config::DetectionPattern;
 use crate::parser::AdrParser;
-use crate::error::AdrscanError;
 
 /// Core drift detection engine
 pub struct DriftDetector {
@@ -269,7 +265,14 @@ impl DriftDetector {
         self.detect_uncovered_technologies(current_snapshot, adr_decisions, &mut report).await?;
         
         // 4. Set final statistics
-        report.scan_stats = current_snapshot.statistics.clone();
+        report.scan_stats = ScanStatistics {
+            files_scanned: current_snapshot.statistics.files_scanned,
+            lines_analyzed: current_snapshot.statistics.lines_of_code,
+            scan_duration_ms: current_snapshot.statistics.scan_duration_ms,
+            patterns_matched: current_snapshot.statistics.technologies_detected,
+            adrs_analyzed: adr_decisions.len(),
+            file_types: current_snapshot.statistics.file_types.clone(),
+        };
         
         Ok(report)
     }
@@ -464,6 +467,7 @@ impl Default for DriftDetector {
 mod tests {
     use super::*;
     use std::fs;
+    use std::path::Path;
     use tempfile::TempDir;
     use crate::drift::{Snapshot, SnapshotEntry, SnapshotEntryType};
 
@@ -625,7 +629,7 @@ We will not use MongoDB. Use PostgreSQL instead.
         );
         
         // Add MongoDB technology entry to the snapshot
-        let mut mongo_entry = SnapshotEntry {
+        let mongo_entry = SnapshotEntry {
             id: "tech_mongo_1".to_string(),
             entry_type: SnapshotEntryType::Technology,
             file_path: "src/database.rs".to_string(),

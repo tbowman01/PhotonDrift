@@ -362,7 +362,8 @@ impl PatternMatcher {
             confidence += 0.1;
         }
         
-        confidence.clamp(0.0, 1.0)
+        let result: f64 = confidence;
+        result.max(0.0).min(1.0)
     }
 }
 
