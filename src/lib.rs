@@ -8,6 +8,7 @@ pub mod config;
 pub mod drift;
 pub mod error;
 pub mod parser;
+pub mod ml;
 
 // WebAssembly module (only compiled for wasm32 target)
 #[cfg(all(target_arch = "wasm32", feature = "wasm"))]
