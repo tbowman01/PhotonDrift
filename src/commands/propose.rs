@@ -1,5 +1,6 @@
 use clap::Args;
 use std::path::PathBuf;
+#[cfg(feature = "tokio")]
 use tokio::runtime::Runtime;
 use chrono::Utc;
 
@@ -47,6 +48,7 @@ pub struct ProposeCommand {
 }
 
 impl ProposeCommand {
+    #[cfg(feature = "tokio")]
     pub fn execute(&self, config: &Config) -> Result<()> {
         log::info!("Generating ADR proposals...");
         
@@ -488,13 +490,37 @@ Proposed - Generated from drift detection
     
     /// Extract technology name from drift item title
     fn extract_technology_from_title(&self, title: &str) -> String {
-        // Simple extraction - look for technology keywords
+        // Look for technology keywords in the title
         let words: Vec<&str> = title.split_whitespace().collect();
-        for word in words {
-            if word.len() > 3 && (word.chars().any(|c| c.is_uppercase()) || word.contains("SQL") || word.contains("js")) {
-                return word.to_string();
+        
+        // Common patterns for technology extraction
+        let tech_keywords = [
+            "Redis", "MongoDB", "PostgreSQL", "MySQL", "SQLite", "React", "Vue", "Angular",
+            "Docker", "Kubernetes", "Rust", "Python", "JavaScript", "TypeScript", "Java",
+            "Spring", "Django", "Flask", "Express", "GraphQL", "REST", "Nginx", "Apache"
+        ];
+        
+        // First, look for exact technology matches
+        for word in &words {
+            let clean_word = word.trim_end_matches(':').trim_end_matches(',').trim_end_matches('.');
+            for tech in &tech_keywords {
+                if clean_word.eq_ignore_ascii_case(tech) {
+                    return tech.to_string();
+                }
             }
         }
+        
+        // Fallback: look for capitalized words that aren't common words
+        let common_words = ["Uncovered", "New", "Technology", "Framework", "Database", "Library", "Service", "Short"];
+        for word in words {
+            let clean_word = word.trim_end_matches(':').trim_end_matches(',').trim_end_matches('.');
+            if clean_word.len() > 3 && 
+               clean_word.chars().next().map_or(false, |c| c.is_uppercase()) &&
+               !common_words.contains(&clean_word) {
+                return clean_word.to_string();
+            }
+        }
+        
         "Unknown Technology".to_string()
     }
     
@@ -1413,7 +1439,10 @@ Detected in: {{DETECTED_FILE}}
         fs::create_dir_all(&adr_dir).unwrap();
         
         // Create an existing ADR file that would conflict
-        let existing_path = adr_dir.join("0001-test-technology.md");
+        // Use the same naming logic as the generate_adr_proposal function
+        let cmd = ProposeCommand { drift_file: None, template: None, directory: None, adr_dir: None, severity: None, category: None, dry_run: false, force: false };
+        let title_slug = cmd.slugify("Test technology");
+        let existing_path = adr_dir.join(format!("0001-{}.md", title_slug));
         fs::write(&existing_path, "existing content").unwrap();
         
         let config = create_test_config(&adr_dir);

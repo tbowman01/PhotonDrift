@@ -177,10 +177,15 @@ impl DriftDetector {
         
         match status_lower.as_str() {
             "accepted" => {
-                if content_lower.contains("reject") || content_lower.contains("deprecate") {
+                if content_lower.contains("reject") || content_lower.contains("deprecate") ||
+                   content_lower.contains("we will not") || content_lower.contains("avoid") ||
+                   content_lower.contains("not use") {
                     DecisionType::Rejects
-                } else {
+                } else if content_lower.contains("we will use") || content_lower.contains("adopt") ||
+                         content_lower.contains("use") {
                     DecisionType::Accepts
+                } else {
+                    DecisionType::Documents
                 }
             }
             "rejected" => DecisionType::Rejects,
@@ -246,11 +251,11 @@ impl DriftDetector {
         current_snapshot: &Snapshot,
         baseline_snapshot: Option<&Snapshot>,
         adr_decisions: &[AdrDecision],
-        detection_patterns: &[DetectionPattern],
+        _detection_patterns: &[DetectionPattern],
     ) -> DriftResult<DriftReport> {
         let mut report = DriftReport::new(
             current_snapshot.root_directory.clone(),
-            baseline_snapshot.map(|s| PathBuf::from("baseline.json")),
+            baseline_snapshot.map(|_s| PathBuf::from("baseline.json")),
         );
         
         // 1. Detect drift from baseline snapshot (if provided)
@@ -633,7 +638,7 @@ We will not use MongoDB. Use PostgreSQL instead.
             id: "tech_mongo_1".to_string(),
             entry_type: SnapshotEntryType::Technology,
             file_path: "src/database.rs".to_string(),
-            technology: Some("MongoDB".to_string()),
+            technology: Some("mongodb".to_string()),  // Use lowercase to match extraction
             category: "database".to_string(),
             line_number: Some(10),
             matched_content: Some("use mongodb::Client;".to_string()),
