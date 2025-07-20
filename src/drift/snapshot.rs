@@ -223,14 +223,12 @@ impl Snapshot {
     }
     
     /// Add metadata
-    #[allow(dead_code)] // Planned for snapshot metadata tracking
     pub fn with_metadata(mut self, key: String, value: String) -> Self {
         self.metadata.insert(key, value);
         self
     }
     
     /// Save snapshot to file
-    #[allow(dead_code)] // Planned for snapshot persistence
     pub fn save(&self, path: &Path) -> DriftResult<()> {
         let json = serde_json::to_string_pretty(self)
             .map_err(|e| AdrscanError::SerializationError(e.to_string()))?;
@@ -305,7 +303,6 @@ impl Snapshot {
     }
     
     /// Get entries by category
-    #[allow(dead_code)] // Planned for enhanced filtering
     pub fn entries_by_category(&self, category: &str) -> Vec<&SnapshotEntry> {
         self.entries.iter()
             .filter(|e| e.category == category)
@@ -322,7 +319,6 @@ impl Snapshot {
 
 /// Result of comparing two snapshots
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Planned for snapshot comparison feature
 pub struct SnapshotComparison {
     /// The baseline snapshot (older)
     pub baseline: Snapshot,
@@ -340,7 +336,6 @@ pub struct SnapshotComparison {
     pub modified_entries: Vec<(SnapshotEntry, SnapshotEntry)>,
 }
 
-#[allow(dead_code)] // Planned for snapshot comparison feature  
 impl SnapshotComparison {
     /// Get summary of changes
     pub fn summary(&self) -> String {

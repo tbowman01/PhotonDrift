@@ -10,13 +10,12 @@ pub mod scanner;
 pub mod snapshot;
 
 pub use detector::DriftDetector;
-pub use patterns::{TechnologyMatch, PatternMatcher};
-pub use report::{DriftReport, DriftItem, DriftSeverity, DriftCategory, DriftLocation, ScanStatistics};
+pub use patterns::{DetectionPattern, TechnologyMatch};
+pub use report::{DriftReport, DriftItem, DriftSeverity, DriftCategory};
 pub use scanner::CodebaseScanner;
-pub use snapshot::{Snapshot, SnapshotEntryType};
+pub use snapshot::{Snapshot, SnapshotEntry};
 
 use crate::error::AdrscanError;
-use crate::config::DetectionPattern;
 use std::path::Path;
 
 /// Result type for drift detection operations

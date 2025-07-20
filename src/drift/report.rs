@@ -181,13 +181,11 @@ impl DriftReport {
     }
     
     /// Get items by category
-    #[allow(dead_code)] // Planned for enhanced filtering UI
     pub fn items_by_category(&self, category: &DriftCategory) -> Vec<&DriftItem> {
         self.items.iter().filter(|item| &item.category == category).collect()
     }
     
     /// Generate a summary string
-    #[allow(dead_code)] // Planned for enhanced reporting
     pub fn summary(&self) -> String {
         format!(
             "Drift Report Summary:\n\
@@ -286,14 +284,12 @@ impl DriftLocation {
     }
     
     /// Set column number
-    #[allow(dead_code)] // Planned for enhanced location tracking
     pub fn with_column(mut self, column: usize) -> Self {
         self.column_number = Some(column);
         self
     }
     
     /// Set code snippet
-    #[allow(dead_code)] // Planned for enhanced location tracking
     pub fn with_snippet(mut self, snippet: String) -> Self {
         self.snippet = Some(snippet);
         self

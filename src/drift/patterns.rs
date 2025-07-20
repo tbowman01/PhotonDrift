@@ -35,12 +35,10 @@ pub struct TechnologyMatch {
 }
 
 /// Built-in technology detection patterns
-#[allow(dead_code)] // Planned for default pattern loading
 pub struct BuiltinPatterns;
 
 impl BuiltinPatterns {
     /// Get default patterns for common technologies
-    #[allow(dead_code)] // Planned for default pattern loading
     pub fn default_patterns() -> Vec<DetectionPattern> {
         vec![
             // Database Technologies
@@ -212,7 +210,6 @@ impl BuiltinPatterns {
     }
     
     /// Get patterns for Python projects
-    #[allow(dead_code)] // Planned for language-specific pattern loading
     pub fn python_patterns() -> Vec<DetectionPattern> {
         vec![
             DetectionPattern {
@@ -243,7 +240,6 @@ impl BuiltinPatterns {
     }
     
     /// Get patterns for Java projects
-    #[allow(dead_code)] // Planned for language-specific pattern loading
     pub fn java_patterns() -> Vec<DetectionPattern> {
         vec![
             DetectionPattern {
@@ -307,7 +303,6 @@ impl PatternMatcher {
     }
     
     /// Check if a file path matches any pattern
-    #[allow(dead_code)] // Planned for pattern-based file filtering
     pub fn matches_file(&self, file_path: &Path) -> Vec<&DetectionPattern> {
         let path_str = file_path.to_string_lossy();
         self.compiled_patterns
@@ -367,14 +362,12 @@ impl PatternMatcher {
             confidence += 0.1;
         }
         
-        let result: f64 = confidence;
-        result.max(0.0).min(1.0)
+        confidence.clamp(0.0, 1.0)
     }
 }
 
 impl TechnologyMatch {
     /// Check if this match is likely in a comment
-    #[allow(dead_code)] // Planned for enhanced match filtering
     pub fn is_likely_comment(&self) -> bool {
         let trimmed = self.context.trim_start();
         trimmed.starts_with('#') || 
@@ -384,7 +377,6 @@ impl TechnologyMatch {
     }
     
     /// Get a short description of this match
-    #[allow(dead_code)] // Planned for enhanced reporting
     pub fn description(&self) -> String {
         format!(
             "{} detected in {} at line {} (confidence: {:.1}%)",
