@@ -16,7 +16,7 @@ clap = { version = "4.4", features = ["derive", "color"] }
 # Serialization and configuration
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
-toml = "0.9"
+toml = "0.8"
 
 # File system and path handling
 walkdir = "2.4"
@@ -28,7 +28,7 @@ yaml-front-matter = "0.1"
 
 # Error handling and logging
 anyhow = "1.0"
-thiserror = "2.0"
+thiserror = "1.0"
 log = "0.4"
 env_logger = "0.11"
 
@@ -41,12 +41,21 @@ chrono = { version = "0.4", features = ["serde"] }
 # Regular expressions for pattern matching
 regex = "1.10"
 
-# Async runtime for drift detection
-tokio = { version = "1.0", features = ["full"] }
+# Async runtime for drift detection (not compatible with WASM)
+tokio = { version = "1.0", features = ["full"], optional = true }
 
 # Cryptographic hashing for file content
 sha2 = "0.10"
 
+# WebAssembly bindings (only for WASM target)
+wasm-bindgen = { version = "0.2", optional = true }
+js-sys = { version = "0.3", optional = true }
+web-sys = { version = "0.3", optional = true }
+console_error_panic_hook = { version = "0.1", optional = true }
+
+[features]
+default = ["tokio"]
+wasm = ["wasm-bindgen", "js-sys", "web-sys", "console_error_panic_hook"]
 [dev-dependencies]
 tempfile = "3.8"
 assert_cmd = "2.0"
@@ -55,6 +64,7 @@ predicates = "3.0"
 [lib]
 name = "adrscan"
 path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
 
 [[bin]]
 name = "adrscan"

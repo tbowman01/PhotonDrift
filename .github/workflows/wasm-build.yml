@@ -1,0 +1,146 @@
+name: WASM Build and Publish
+
+on:
+  push:
+    branches: [ main, feature/wasm-module ]
+    paths:
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'wasm/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'Cargo.toml' 
+      - 'wasm/**'
+  release:
+    types: [ published ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-wasm:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+    
+    - name: Install wasm-pack
+      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        registry-url: 'https://registry.npmjs.org'
+    
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target/
+        key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Build WASM module (Node.js target)
+      run: wasm-pack build --target nodejs --out-dir wasm --scope adrscan
+    
+    - name: Build WASM module (Web target)  
+      run: wasm-pack build --target web --out-dir wasm-web --scope adrscan
+    
+    - name: Build WASM module (Bundler target)
+      run: wasm-pack build --target bundler --out-dir wasm-bundler --scope adrscan
+    
+    - name: Copy package.json and index.js
+      run: |
+        cp wasm/package.json wasm/
+        cp wasm/index.js wasm/
+    
+    - name: Install NPM dependencies
+      run: cd wasm && npm install
+    
+    - name: Run WASM tests
+      run: cd wasm && npm test
+    
+    - name: Upload WASM artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: wasm-modules
+        path: |
+          wasm/
+          wasm-web/
+          wasm-bundler/
+    
+    - name: Publish to NPM (on release)
+      if: github.event_name == 'release'
+      run: |
+        cd wasm
+        npm publish --access public
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  test-wasm-integration:
+    needs: build-wasm
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Download WASM artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: wasm-modules
+    
+    - name: Run integration tests
+      run: |
+        cd wasm
+        npm install
+        node -e "
+          const { ADRScan, utils } = require('./index.js');
+          console.log('WASM module loaded successfully');
+          console.log('Version:', utils.version());
+          console.log('Features:', utils.features());
+          
+          // Test basic functionality
+          const scanner = new ADRScan({
+            adrDir: './docs/adr',
+            templateFormat: 'madr'
+          });
+          
+          console.log('ADRScan instance created successfully');
+        "
+
+  benchmark-wasm:
+    needs: build-wasm
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Download WASM artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: wasm-modules
+    
+    - name: Run performance benchmarks
+      run: |
+        echo "WASM performance benchmarks would run here"
+        echo "Comparing WASM vs native performance"

@@ -1,0 +1,52 @@
+name: ADRScan - Comprehensive Architecture Check
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: '0 2 * * 1'  # Weekly on Monday at 2 AM UTC
+
+jobs:
+  adrscan-full:
+    runs-on: ubuntu-latest
+    name: Full Architecture Analysis
+    
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for better analysis
+    
+    - name: Run ADRScan with Issue Creation
+      uses: tbowman01/PhotonDrift@main
+      id: adrscan
+      with:
+        adr-directory: './docs/adr'
+        target-directory: '.'
+        severity-threshold: 'medium'
+        fail-on-drift: ${{ github.event_name == 'pull_request' }}
+        create-issues: ${{ github.event_name != 'pull_request' }}
+        output-format: 'json'
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Post-scan summary
+      if: always()
+      run: |
+        echo "ADRScan Results:"
+        echo "Drift Detected: ${{ steps.adrscan.outputs.drift-detected }}"
+        echo "Drift Count: ${{ steps.adrscan.outputs.drift-count }}"
+        echo "Report Path: ${{ steps.adrscan.outputs.report-path }}"
+    
+    - name: Notify team on critical drift (Slack/Discord/etc.)
+      if: steps.adrscan.outputs.drift-detected == 'true' && github.event_name == 'push'
+      run: |
+        # Add your notification logic here
+        echo "Critical architectural drift detected on main branch"
+        echo "Consider immediate review of architectural decisions"

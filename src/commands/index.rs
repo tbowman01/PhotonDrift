@@ -36,6 +36,7 @@ pub struct IndexCommand {
 /// Represents an ADR entry in the index
 #[derive(Debug, Clone)]
 pub struct AdrIndexEntry {
+    #[allow(dead_code)] // Used for future file operations
     pub file_path: PathBuf,
     pub relative_path: String,
     pub id: Option<String>,
@@ -44,8 +45,11 @@ pub struct AdrIndexEntry {
     pub status: String,
     pub date: Option<NaiveDate>,
     pub deciders: Vec<String>,
+    #[allow(dead_code)] // Planned for enhanced templates
     pub tags: Vec<String>,
+    #[allow(dead_code)] // Planned for enhanced templates  
     pub supersedes: Vec<String>,
+    #[allow(dead_code)] // Planned for enhanced templates
     pub relates_to: Vec<String>,
 }
 
@@ -248,7 +252,7 @@ impl IndexCommand {
     }
 
     /// Generate default index content
-    fn generate_default_index(&self, entries: &[AdrIndexEntry], adr_dir: &PathBuf) -> Result<String> {
+    fn generate_default_index(&self, entries: &[AdrIndexEntry], _adr_dir: &PathBuf) -> Result<String> {
         let mut content = String::new();
         
         // Header
@@ -334,7 +338,7 @@ impl IndexCommand {
     }
 
     /// Generate index using custom template
-    fn generate_custom_index(&self, entries: &[AdrIndexEntry], template_path: &PathBuf, adr_dir: &PathBuf) -> Result<String> {
+    fn generate_custom_index(&self, entries: &[AdrIndexEntry], template_path: &PathBuf, _adr_dir: &PathBuf) -> Result<String> {
         let template_content = std::fs::read_to_string(template_path)
             .map_err(|e| AdrscanError::Io(e))?;
 

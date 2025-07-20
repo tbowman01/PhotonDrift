@@ -4,8 +4,7 @@
 //! current codebase state against ADRs and baseline snapshots.
 
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
-use chrono::Utc;
+use std::path::{Path, PathBuf};
 
 use crate::drift::{
     DriftResult,
@@ -14,21 +13,20 @@ use crate::drift::{
     DriftSeverity,
     DriftCategory,
     DriftLocation,
+    ScanStatistics,
     Snapshot,
-    SnapshotComparison,
-    TechnologyMatch,
-    PatternMatcher,
 };
 use crate::config::DetectionPattern;
 use crate::parser::AdrParser;
-use crate::error::AdrscanError;
 
 /// Core drift detection engine
 pub struct DriftDetector {
     /// Threshold for determining technology significance
+    #[allow(dead_code)] // Planned for advanced drift scoring
     significance_threshold: f64,
     
     /// Maximum number of drift items to report per category
+    #[allow(dead_code)] // Planned for result limiting
     max_items_per_category: usize,
 }
 
@@ -48,6 +46,7 @@ pub struct AdrDecision {
     pub mentioned_technologies: Vec<String>,
     
     /// Categories this ADR covers
+    #[allow(dead_code)] // Planned for enhanced filtering and analysis
     pub categories: Vec<String>,
     
     /// Decision type (accepts, rejects, supersedes, etc.)
@@ -79,6 +78,7 @@ impl DriftDetector {
     }
     
     /// Configure the drift detector
+    #[allow(dead_code)] // Planned for advanced configuration
     pub fn with_config(mut self, significance_threshold: f64, max_items_per_category: usize) -> Self {
         self.significance_threshold = significance_threshold;
         self.max_items_per_category = max_items_per_category;
@@ -181,10 +181,15 @@ impl DriftDetector {
         
         match status_lower.as_str() {
             "accepted" => {
-                if content_lower.contains("reject") || content_lower.contains("deprecate") {
+                if content_lower.contains("reject") || content_lower.contains("deprecate") ||
+                   content_lower.contains("we will not") || content_lower.contains("avoid") ||
+                   content_lower.contains("not use") {
                     DecisionType::Rejects
-                } else {
+                } else if content_lower.contains("we will use") || content_lower.contains("adopt") ||
+                         content_lower.contains("use") {
                     DecisionType::Accepts
+                } else {
+                    DecisionType::Documents
                 }
             }
             "rejected" => DecisionType::Rejects,
@@ -250,11 +255,11 @@ impl DriftDetector {
         current_snapshot: &Snapshot,
         baseline_snapshot: Option<&Snapshot>,
         adr_decisions: &[AdrDecision],
-        detection_patterns: &[DetectionPattern],
+        _detection_patterns: &[DetectionPattern],
     ) -> DriftResult<DriftReport> {
         let mut report = DriftReport::new(
             current_snapshot.root_directory.clone(),
-            baseline_snapshot.map(|s| PathBuf::from("baseline.json")),
+            baseline_snapshot.map(|_s| PathBuf::from("baseline.json")),
         );
         
         // 1. Detect drift from baseline snapshot (if provided)
@@ -269,7 +274,14 @@ impl DriftDetector {
         self.detect_uncovered_technologies(current_snapshot, adr_decisions, &mut report).await?;
         
         // 4. Set final statistics
-        report.scan_stats = current_snapshot.statistics.clone();
+        report.scan_stats = ScanStatistics {
+            files_scanned: current_snapshot.statistics.files_scanned,
+            lines_analyzed: current_snapshot.statistics.lines_of_code,
+            scan_duration_ms: current_snapshot.statistics.scan_duration_ms,
+            patterns_matched: current_snapshot.statistics.technologies_detected,
+            adrs_analyzed: adr_decisions.len(),
+            file_types: current_snapshot.statistics.file_types.clone(),
+        };
         
         Ok(report)
     }
@@ -464,8 +476,9 @@ impl Default for DriftDetector {
 mod tests {
     use super::*;
     use std::fs;
+    use std::path::Path;
     use tempfile::TempDir;
-    use crate::drift::{Snapshot, SnapshotEntry, SnapshotEntryType};
+    use crate::drift::snapshot::{Snapshot, SnapshotEntry, SnapshotEntryType};
 
     fn create_test_adr(dir: &Path, filename: &str, content: &str) -> PathBuf {
         let file_path = dir.join(filename);
@@ -625,11 +638,11 @@ We will not use MongoDB. Use PostgreSQL instead.
         );
         
         // Add MongoDB technology entry to the snapshot
-        let mut mongo_entry = SnapshotEntry {
+        let mongo_entry = SnapshotEntry {
             id: "tech_mongo_1".to_string(),
             entry_type: SnapshotEntryType::Technology,
             file_path: "src/database.rs".to_string(),
-            technology: Some("MongoDB".to_string()),
+            technology: Some("mongodb".to_string()),  // Use lowercase to match extraction
             category: "database".to_string(),
             line_number: Some(10),
             matched_content: Some("use mongodb::Client;".to_string()),

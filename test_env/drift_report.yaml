@@ -1,0 +1,32 @@
+timestamp: 2025-07-20T20:43:07.112947126Z
+scanned_directory: /workspaces/PhotonDrift
+baseline_snapshot: null
+total_items: 0
+category_summary: {}
+severity_summary: {}
+items: []
+scan_stats:
+  files_scanned: 206
+  lines_analyzed: 26170
+  scan_duration_ms: 91
+  patterns_matched: 0
+  adrs_analyzed: 3
+  file_types:
+    pdf: 4
+    ps1: 1
+    db-wal: 1
+    rs: 20
+    lock: 1
+    toml: 1
+    yml: 18
+    unknown: 6
+    yaml: 1
+    json: 19
+    db-shm: 1
+    bat: 1
+    db: 4
+    js: 2
+    sh: 3
+    md: 113
+    txt: 10
+
