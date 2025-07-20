@@ -19,6 +19,7 @@ pub enum AdrscanError {
     DriftError(String),
 
     #[error("Feature not implemented: {0}")]
+    #[allow(dead_code)] // Planned for unimplemented features
     NotImplemented(String),
 
     #[error("Invalid argument: {0}")]
@@ -31,6 +32,7 @@ pub enum AdrscanError {
     DirectoryNotFound(String),
 
     #[error("Permission denied: {0}")]
+    #[allow(dead_code)] // Planned for permission checking
     PermissionDenied(String),
 
     #[error("Serialization error: {0}")]

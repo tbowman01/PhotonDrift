@@ -63,12 +63,19 @@ pub struct DetectionPattern {
 /// Configuration overrides that can be applied from command line or environment variables
 #[derive(Debug, Clone, Default)]
 pub struct ConfigOverrides {
+    #[allow(dead_code)] // Planned for CLI integration
     pub adr_dir: Option<PathBuf>,
+    #[allow(dead_code)] // Planned for CLI integration
     pub include_patterns: Option<Vec<String>>,
+    #[allow(dead_code)] // Planned for CLI integration
     pub exclude_patterns: Option<Vec<String>>,
+    #[allow(dead_code)] // Planned for CLI integration
     pub snapshot_file: Option<PathBuf>,
+    #[allow(dead_code)] // Planned for CLI integration
     pub template_format: Option<String>,
+    #[allow(dead_code)] // Planned for CLI integration
     pub template_custom_path: Option<PathBuf>,
+    #[allow(dead_code)] // Planned for CLI integration
     pub drift_enabled: Option<bool>,
 }
 
@@ -136,6 +143,7 @@ impl Config {
     }
 
     /// Load configuration with additional overrides
+    #[allow(dead_code)] // Planned for CLI integration
     pub fn load_with_overrides(config_path: Option<&Path>, overrides: &ConfigOverrides) -> Result<Self> {
         let mut config = Self::load_base_config(config_path)?;
         
@@ -270,6 +278,7 @@ impl Config {
     }
 
     /// Apply configuration overrides
+    #[allow(dead_code)] // Planned for CLI integration
     fn apply_overrides(&mut self, overrides: &ConfigOverrides) {
         if let Some(ref adr_dir) = overrides.adr_dir {
             self.adr_dir = adr_dir.clone();
@@ -393,6 +402,7 @@ impl Config {
     }
 
     /// Create a sample configuration file
+    #[allow(dead_code)] // Planned for CLI integration
     pub fn create_sample_config(path: &Path, format: &str) -> Result<()> {
         let config = Self::default();
         
@@ -413,6 +423,7 @@ impl Config {
     }
 
     /// Get configuration from environment variables only (for testing/debugging)
+    #[allow(dead_code)] // Planned for CLI integration
     pub fn from_env() -> Result<Self> {
         let mut config = Self::default();
         config.apply_env_overrides()?;

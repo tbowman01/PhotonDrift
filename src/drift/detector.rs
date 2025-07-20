@@ -22,9 +22,11 @@ use crate::parser::AdrParser;
 /// Core drift detection engine
 pub struct DriftDetector {
     /// Threshold for determining technology significance
+    #[allow(dead_code)] // Planned for advanced drift scoring
     significance_threshold: f64,
     
     /// Maximum number of drift items to report per category
+    #[allow(dead_code)] // Planned for result limiting
     max_items_per_category: usize,
 }
 
@@ -44,6 +46,7 @@ pub struct AdrDecision {
     pub mentioned_technologies: Vec<String>,
     
     /// Categories this ADR covers
+    #[allow(dead_code)] // Planned for enhanced filtering and analysis
     pub categories: Vec<String>,
     
     /// Decision type (accepts, rejects, supersedes, etc.)
@@ -75,6 +78,7 @@ impl DriftDetector {
     }
     
     /// Configure the drift detector
+    #[allow(dead_code)] // Planned for advanced configuration
     pub fn with_config(mut self, significance_threshold: f64, max_items_per_category: usize) -> Self {
         self.significance_threshold = significance_threshold;
         self.max_items_per_category = max_items_per_category;
@@ -474,7 +478,7 @@ mod tests {
     use std::fs;
     use std::path::Path;
     use tempfile::TempDir;
-    use crate::drift::{Snapshot, SnapshotEntry, SnapshotEntryType};
+    use crate::drift::snapshot::{Snapshot, SnapshotEntry, SnapshotEntryType};
 
     fn create_test_adr(dir: &Path, filename: &str, content: &str) -> PathBuf {
         let file_path = dir.join(filename);

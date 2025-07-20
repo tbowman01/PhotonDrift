@@ -40,6 +40,7 @@ pub struct AdrMetadata {
 #[derive(Debug, Clone)]
 pub struct AdrDocument {
     /// File path
+    #[allow(dead_code)] // Planned for enhanced file tracking
     pub path: std::path::PathBuf,
     
     /// Parsed metadata
@@ -49,6 +50,7 @@ pub struct AdrDocument {
     pub content: String,
     
     /// Raw frontmatter YAML
+    #[allow(dead_code)] // Planned for frontmatter analysis
     pub frontmatter: String,
 }
 
