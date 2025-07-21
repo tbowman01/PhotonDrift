@@ -183,15 +183,33 @@ PhotonDrift welcomes contributions! We use a systematic development approach wit
 5. **Submit a PR** with clear description and test coverage
 
 ### Development Setup
+
 ```bash
 git clone https://github.com/tbowman01/PhotonDrift
 cd PhotonDrift
+
+# Setup development environment with pre-commit hooks
+./setup-hooks.sh
+
 cargo build
 cargo test
 
 # For ML features
 cargo test --features ml
 ```
+
+### Code Quality
+
+The project uses comprehensive pre-commit hooks to ensure code quality:
+
+- **Rust formatting** with `rustfmt`
+- **Linting** with `clippy` (warnings as errors)
+- **Compilation checks** with `cargo check`
+- **Test suite** execution
+- **Security scanning** for secrets and patterns
+- **File quality** checks (trailing whitespace, line endings, etc.)
+
+See [Development Hooks Documentation](docs/DEVELOPMENT_HOOKS.md) for detailed information.
 
 ## 📊 Performance & Benchmarks
 
