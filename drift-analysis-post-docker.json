@@ -1,0 +1,33 @@
+{
+  "timestamp": "2025-07-21T00:15:04.697249625Z",
+  "scanned_directory": ".",
+  "baseline_snapshot": null,
+  "total_items": 0,
+  "category_summary": {},
+  "severity_summary": {},
+  "items": [],
+  "scan_stats": {
+    "files_scanned": 203,
+    "lines_analyzed": 30540,
+    "scan_duration_ms": 36,
+    "patterns_matched": 0,
+    "adrs_analyzed": 2,
+    "file_types": {
+      "toml": 1,
+      "unknown": 8,
+      "pdf": 4,
+      "yaml": 1,
+      "lock": 1,
+      "json": 10,
+      "db": 2,
+      "yml": 19,
+      "bat": 1,
+      "js": 2,
+      "md": 119,
+      "sh": 3,
+      "txt": 6,
+      "rs": 25,
+      "ps1": 1
+    }
+  }
+}
