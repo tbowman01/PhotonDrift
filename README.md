@@ -74,7 +74,10 @@ docker run -it --rm -v "$(pwd)":/app ghcr.io/tbowman01/photondrift:latest
 docker build -t photondrift .
 
 # Run with your project
-docker run --rm -v "$(pwd)":/app photondrift analyze /app
+docker run --rm -v "$(pwd)":/workspace photondrift diff --adr-dir /workspace/docs/adr
+
+# See comprehensive build guide
+# docs/DOCKER_BUILD_GUIDE.md
 ```
 
 ## 🚀 Quick Start
@@ -162,6 +165,7 @@ drift:
 ### Integration & Automation
 - **[GitHub Integration](docs/GITHUB_LABELS.md)** - GitHub automation features
 - **[Development Hooks](docs/DEVELOPMENT_HOOKS.md)** - Pre-commit hooks and automation setup
+- **[Docker Build Guide](docs/DOCKER_BUILD_GUIDE.md)** - Comprehensive Docker build instructions
 
 ### Technical Reference
 - **[CHANGELOG.md](CHANGELOG.md)** - Complete version history and release notes
