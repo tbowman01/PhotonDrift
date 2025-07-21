@@ -486,7 +486,11 @@ Proposed - Generated from drift detection
             ("{{STATUS}}", &"proposed".to_string()),
             (
                 "{{CATEGORY}}",
-                &drift_item.category.to_string().to_lowercase(),
+                &drift_item
+                    .category
+                    .to_string()
+                    .to_lowercase()
+                    .replace(' ', ""),
             ),
             (
                 "{{SEVERITY}}",
@@ -1668,8 +1672,14 @@ Detected in: {{DETECTED_FILE}}
         let result = cmd
             .generate_adr_proposal(&drift_item, &adr_dir, &config)
             .await;
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("already exists"));
+
+        // The system auto-increments ADR numbers to avoid conflicts
+        // So this should succeed with ADR number 0002 instead of 0001
+        assert!(result.is_ok());
+        let created_path = result.unwrap();
+        assert!(created_path
+            .to_string_lossy()
+            .contains("0002-test-technology"));
     }
 
     #[tokio::test]
