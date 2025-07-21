@@ -1,6 +1,6 @@
 [package]
 name = "adrscan"
-version = "0.2.0-alpha.20250121"
+version = "0.2.0-alpha.20250721"
 edition = "2021"
 authors = ["tbowman01"]
 description = "AI-powered Architecture Decision Record (ADR) management with ML-enhanced drift detection"
