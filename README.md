@@ -149,14 +149,24 @@ drift:
 ## 📚 Documentation
 
 ### Core Documentation
+- **[User Guide](docs/USER_GUIDE.md)** - Comprehensive usage guide
+- **[Quick Start](docs/QUICK_START.md)** - Get started quickly
+- **[Development Guide](docs/DEVELOPMENT.md)** - Contributing guidelines
+- **[Configuration](docs/CONFIGURATION.md)** - Configuration options
+
+### ML & Security Features ✨
+- **[ML Security Guide](docs/ML_SECURITY_GUIDE.md)** - AI-powered security analysis and secret detection
+- **[Neural Training](docs/NEURAL_TRAINING.md)** - Train models from operations and improve accuracy
+- **[Performance Analysis](docs/PERFORMANCE_ANALYSIS.md)** - Monitor performance and optimize bottlenecks
+
+### Integration & Automation
+- **[GitHub Integration](docs/GITHUB_LABELS.md)** - GitHub automation features
+- **[Development Hooks](docs/DEVELOPMENT_HOOKS.md)** - Pre-commit hooks and automation setup
+
+### Technical Reference
 - **[CHANGELOG.md](CHANGELOG.md)** - Complete version history and release notes
 - **[ROADMAP.md](ROADMAP.md)** - Development roadmap through 2025
 - **[Requirements & Architecture](docs/REQUIREMENTS_SUMMARY.md)** - Technical requirements and phases
-
-### ML & AI Features
-- **[ML Module Overview](src/ml/README.md)** - Machine learning architecture and algorithms
-- **[Feature Engineering Guide](src/ml/features.rs)** - Understanding extracted features
-- **[Model Selection Guide](src/ml/models.rs)** - Choosing the right ML algorithm
 - **[Training & Optimization](src/ml/training.rs)** - Model training and hyperparameter tuning
 
 ### Integration & Usage
