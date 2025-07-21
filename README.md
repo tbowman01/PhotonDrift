@@ -2,7 +2,7 @@
 
 > Next-generation Architecture Decision Record (ADR) management with ML-enhanced drift detection for intelligent development governance.
 
-[![Version](https://img.shields.io/badge/version-0.2.0--alpha.20250720-blue)](https://github.com/tbowman01/PhotonDrift/releases)
+[![Version](https://img.shields.io/badge/version-0.2.0--alpha.20250721-blue)](https://github.com/tbowman01/PhotonDrift/releases)
 [![Tests](https://img.shields.io/badge/tests-140%2F144%20passing-green)](https://github.com/tbowman01/PhotonDrift/actions)
 [![ML Coverage](https://img.shields.io/badge/ML%20tests-26%2F26%20passing-brightgreen)](https://github.com/tbowman01/PhotonDrift/tree/main/src/ml)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
