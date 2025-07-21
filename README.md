@@ -1,13 +1,14 @@
-# PhotonDrift - The Next Generation AI-Powered ADR Management Tool
+# PhotonDrift - AI-Powered ADR Management
 
 > Next-generation Architecture Decision Record (ADR) management with ML-enhanced drift detection for intelligent development governance.
 
+[![CI](https://github.com/tbowman01/PhotonDrift/actions/workflows/ci.yml/badge.svg)](https://github.com/tbowman01/PhotonDrift/actions/workflows/ci.yml)
+[![Docker](https://github.com/tbowman01/PhotonDrift/actions/workflows/docker.yml/badge.svg)](https://github.com/tbowman01/PhotonDrift/actions/workflows/docker.yml)
 [![Version](https://img.shields.io/badge/version-0.2.0--alpha.20250721-blue)](https://github.com/tbowman01/PhotonDrift/releases)
 [![Tests](https://img.shields.io/badge/tests-178%2F182%20passing-green)](https://github.com/tbowman01/PhotonDrift/actions)
 [![ML Coverage](https://img.shields.io/badge/ML%20tests-26%2F26%20passing-brightgreen)](https://github.com/tbowman01/PhotonDrift/tree/main/src/ml)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-
-## 🚀 Overview
+[![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)](https://rust-lang.org)
 
 PhotonDrift is an AI-powered Rust CLI tool that revolutionizes Architecture Decision Record (ADR) management through **machine learning-enhanced drift detection**. It automatically identifies when code deviates from documented architectural decisions and provides intelligent insights to maintain architectural integrity.
 
@@ -38,6 +39,44 @@ PhotonDrift is an AI-powered Rust CLI tool that revolutionizes Architecture Deci
 - **CI/CD Ready**: WebAssembly module and GitHub Action for automation
 - **Scalable**: Handles enterprise codebases (100k+ files)
 
+### 🐳 **Docker Support**
+- **Multi-platform containers**: Linux amd64/arm64 support
+- **Security-hardened**: Non-root user, minimal attack surface
+- **Production-ready**: Health checks, proper metadata labels
+- **Easy deployment**: Available on GitHub Container Registry
+
+## 🐳 Docker Usage
+
+### Quick Start with Docker
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/tbowman01/photondrift:latest
+
+# Run ADRScan on your project
+docker run --rm -v "$(pwd)":/app ghcr.io/tbowman01/photondrift:latest analyze /app
+
+# Interactive shell
+docker run -it --rm -v "$(pwd)":/app ghcr.io/tbowman01/photondrift:latest
+```
+
+### Available Tags
+
+- `latest` - Latest stable release
+- `main` - Latest from main branch
+- `develop` - Latest development version
+- `v0.2.0-alpha.20250721` - Specific version tags
+
+### Build Locally
+
+```bash
+# Build the image
+docker build -t photondrift .
+
+# Run with your project
+docker run --rm -v "$(pwd)":/app photondrift analyze /app
+```
+
 ## 🚀 Quick Start
 
 ### Installation
@@ -56,12 +95,6 @@ cargo build --release
 ### Basic Usage
 
 ```bash
-# Initialize ADR structure in your project
-adrscan init
-
-# Scan existing ADRs and codebase
-adrscan inventory
-
 # Detect architectural drift with AI
 adrscan diff
 
@@ -151,6 +184,8 @@ drift:
 - [x] **🧪 ML Test Suite**: 26 comprehensive ML tests ensuring reliability
 - [x] **📈 Performance Metrics**: Precision, recall, F1-score tracking
 - [x] **🔍 Explainable AI**: Model explanations for every detection
+- [x] **🐳 Docker Support**: Production-ready containerization
+- [x] **🛠️ DevOps Pipeline**: Enhanced CI/CD with comprehensive automation
 
 ### 🔧 Phase 3 - Developer Experience (Q2 2025) - **PLANNED**
 - [ ] **IDE Extensions**: VS Code and IntelliJ plugins with ML insights
@@ -229,7 +264,7 @@ See [Development Hooks Documentation](docs/DEVELOPMENT_HOOKS.md) for detailed in
 
 ## 📄 License
 
-MIT License - see [LICENSE](LICENSE) for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
