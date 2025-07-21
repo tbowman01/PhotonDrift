@@ -544,13 +544,11 @@ mod tests {
 
         let mut detector = MLDriftDetector::new(config);
 
-        // Train mock model
-        let training_data = vec![
-            (create_test_drift_item(), true),
-            (create_test_drift_item(), false),
-        ];
-
-        detector.train_model(training_data).await.unwrap();
+        // Load mock model from file to use MockAnomalyModel instead of training
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let model_path = temp_dir.path().join("mock_model.dat");
+        std::fs::write(&model_path, "mock model data").unwrap();
+        detector.load_model(&model_path).await.unwrap();
 
         let drift_items = vec![create_test_drift_item()];
         let results = detector.enhance_detection(drift_items).await.unwrap();
