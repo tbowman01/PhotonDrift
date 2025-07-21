@@ -1,0 +1,55 @@
+# Rust build artifacts
+target/
+Cargo.lock
+
+# Development files
+.git/
+.gitignore
+.pre-commit-config.yaml
+.githooks/
+setup-hooks.sh
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# CI/CD
+.github/
+Dockerfile*
+.dockerignore
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+
+# Environment files
+.env*
+!.env.example
+
+# Cache directories
+.cache/
+node_modules/
+
+# Test artifacts
+coverage/
+test-results/
+
+# Release artifacts
+dist/
+build/
+release/
