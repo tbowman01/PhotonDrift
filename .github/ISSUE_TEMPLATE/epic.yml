@@ -1,0 +1,91 @@
+name: Epic
+description: Large feature or initiative spanning multiple issues
+title: "[EPIC] "
+labels: ["epic", "planning"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for large features or initiatives that span multiple issues and phases.
+
+  - type: textarea
+    id: epic-description
+    attributes:
+      label: Epic Description
+      description: High-level description of this epic
+      placeholder: Describe the overall goal and scope...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: epic-phase
+    attributes:
+      label: Primary Phase
+      description: Which phase does this epic primarily belong to?
+      options:
+        - Phase 1 - CLI MVP
+        - Phase 2 - Drift Detection
+        - Phase 3 - WASM & GitHub Action
+        - Phase 4 - Documentation
+        - Cross-Phase
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Epic Acceptance Criteria
+      description: High-level criteria for epic completion
+      placeholder: |
+        - [ ] Major milestone 1
+        - [ ] Major milestone 2
+        - [ ] Major milestone 3
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope & Components
+      description: What components and areas does this epic cover?
+      placeholder: |
+        Components involved:
+        - Component 1
+        - Component 2
+        
+        Out of scope:
+        - Feature X
+        - Feature Y
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Other epics or major features this depends on
+      placeholder: |
+        - Epic: #X
+        - External dependency: Y
+
+  - type: dropdown
+    id: epic-priority
+    attributes:
+      label: Epic Priority
+      description: Overall priority of this epic
+      options:
+        - Critical
+        - High
+        - Medium
+        - Low
+    validations:
+      required: true
+
+  - type: textarea
+    id: timeline
+    attributes:
+      label: Timeline & Estimates
+      description: Expected timeline and effort estimates
+      placeholder: |
+        Expected duration: X weeks
+        Key milestones:
+        - Week 1: Milestone A
+        - Week 2: Milestone B

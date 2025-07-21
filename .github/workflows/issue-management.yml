@@ -1,0 +1,201 @@
+name: Issue Management
+
+on:
+  issues:
+    types: [opened, closed, labeled, unlabeled, assigned, unassigned]
+  pull_request:
+    types: [opened, closed, linked, ready_for_review]
+  project_card:
+    types: [moved]
+
+jobs:
+  auto-assign-phase:
+    name: Auto-assign Phase Label
+    runs-on: ubuntu-latest
+    if: github.event.action == 'opened' && github.event.issue
+    steps:
+      - name: Auto-assign phase label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = context.payload.issue.title.toLowerCase();
+            let phaseLabel = null;
+            
+            if (title.includes('[phase 1]') || title.includes('phase 1')) {
+              phaseLabel = 'phase-1';
+            } else if (title.includes('[phase 2]') || title.includes('phase 2')) {
+              phaseLabel = 'phase-2';
+            } else if (title.includes('[phase 3]') || title.includes('phase 3')) {
+              phaseLabel = 'phase-3';
+            } else if (title.includes('[phase 4]') || title.includes('phase 4')) {
+              phaseLabel = 'phase-4';
+            }
+            
+            if (phaseLabel) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                labels: [phaseLabel]
+              });
+            }
+
+  auto-assign-priority:
+    name: Auto-assign Priority Label
+    runs-on: ubuntu-latest
+    if: github.event.action == 'opened' && github.event.issue
+    steps:
+      - name: Auto-assign priority based on keywords
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.issue.body?.toLowerCase() || '';
+            let priorityLabel = null;
+            
+            if (body.includes('critical') || body.includes('urgent')) {
+              priorityLabel = 'priority-critical';
+            } else if (body.includes('high priority') || body.includes('priority: high')) {
+              priorityLabel = 'priority-high';
+            } else if (body.includes('medium priority') || body.includes('priority: medium')) {
+              priorityLabel = 'priority-medium';
+            } else if (body.includes('low priority') || body.includes('priority: low')) {
+              priorityLabel = 'priority-low';
+            }
+            
+            if (priorityLabel) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                labels: [priorityLabel]
+              });
+            }
+
+  estimate-complexity:
+    name: Estimate Issue Complexity
+    runs-on: ubuntu-latest
+    if: github.event.action == 'opened' && github.event.issue
+    steps:
+      - name: Add complexity estimate based on content
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.issue.body || '';
+            const title = context.payload.issue.title || '';
+            
+            // Count acceptance criteria
+            const criteriaMatches = body.match(/- \[ \]/g);
+            const criteriaCount = criteriaMatches ? criteriaMatches.length : 0;
+            
+            // Check for complexity indicators
+            const complexWords = ['algorithm', 'engine', 'wasm', 'parsing', 'detection'];
+            const hasComplexity = complexWords.some(word => 
+              title.toLowerCase().includes(word) || body.toLowerCase().includes(word)
+            );
+            
+            let estimateLabel = null;
+            
+            if (criteriaCount >= 8 || hasComplexity) {
+              estimateLabel = 'estimate-xl';
+            } else if (criteriaCount >= 5) {
+              estimateLabel = 'estimate-l';
+            } else if (criteriaCount >= 3) {
+              estimateLabel = 'estimate-m';
+            } else {
+              estimateLabel = 'estimate-s';
+            }
+            
+            if (estimateLabel) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                labels: [estimateLabel]
+              });
+            }
+
+  track-completion:
+    name: Track Issue Completion
+    runs-on: ubuntu-latest
+    if: github.event.action == 'closed' && github.event.issue
+    steps:
+      - name: Add completion tracking
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueNumber = context.payload.issue.number;
+            const title = context.payload.issue.title;
+            
+            // Add completed label
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              labels: ['status-completed']
+            });
+            
+            // Create completion comment
+            const completionComment = `✅ **Issue Completed**
+            
+            **Completed:** ${new Date().toISOString().split('T')[0]}
+            **Issue:** #${issueNumber} - ${title}
+            
+            This issue has been automatically marked as completed. If this was closed in error, please reopen and remove the \`status-completed\` label.`;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: completionComment
+            });
+
+  update-project-board:
+    name: Update Project Board
+    runs-on: ubuntu-latest
+    if: github.event.action == 'closed' && github.event.issue
+    steps:
+      - name: Move to Done column
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // This would integrate with GitHub Projects v2 API
+            // Implementation depends on project board setup
+            console.log('Issue completed, should move to Done column');
+
+  dependency-check:
+    name: Check Dependencies
+    runs-on: ubuntu-latest
+    if: github.event.action == 'closed' && github.event.issue
+    steps:
+      - name: Find and update dependent issues
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const closedIssueNumber = context.payload.issue.number;
+            
+            // Search for issues that depend on this one
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open'
+            });
+            
+            for (const issue of issues) {
+              const body = issue.body || '';
+              
+              // Look for dependency references like "Dependencies: #X" or "Depends on #X"
+              const dependencyPattern = new RegExp(`(?:depends? on|dependencies?).*#${closedIssueNumber}`, 'i');
+              
+              if (dependencyPattern.test(body)) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: `🔗 **Dependency Completed**
+                  
+                  Issue #${closedIssueNumber} that this issue depends on has been completed. This issue may now be ready to start.
+                  
+                  Please review the completion and update this issue's status if ready to begin work.`
+                });
+              }
+            }

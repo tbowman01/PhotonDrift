@@ -1,0 +1,33 @@
+adr_dir: /workspaces/test-adrscan/docs/adr
+include_patterns:
+- '**/*.md'
+- '**/*.rs'
+- '**/*.py'
+- '**/*.js'
+- '**/*.ts'
+- '**/*.java'
+- '**/*.tf'
+- '**/*.yml'
+- '**/*.yaml'
+- '**/*.json'
+exclude_patterns:
+- '**/target/**'
+- '**/node_modules/**'
+- '**/.git/**'
+- '**/build/**'
+- '**/dist/**'
+snapshot_file: .adrscan_snapshot.json
+template:
+  format: madr
+  custom_path: null
+drift:
+  enabled: true
+  detection_patterns:
+  - name: Database Dependencies
+    file_pattern: '**/Cargo.toml'
+    content_pattern: (postgres|mysql|sqlite|mongodb)
+    category: database
+  - name: Cloud Provider
+    file_pattern: '**/*.tf'
+    content_pattern: (aws|azure|gcp|google)
+    category: cloud

@@ -1,0 +1,75 @@
+name: Implementation Task
+description: Track implementation progress for ADRScan features
+title: "[TASK] "
+labels: ["task", "implementation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template to track implementation tasks for ADRScan development.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Task Description
+      description: Detailed description of the implementation task
+      placeholder: Describe what needs to be implemented...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Implementation Phase
+      description: Which phase does this task belong to?
+      options:
+        - Phase 1 - CLI MVP
+        - Phase 2 - Drift Detection
+        - Phase 3 - WASM & GitHub Action
+        - Phase 4 - Documentation
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which component does this task affect?
+      options:
+        - CLI Commands
+        - Core Engine
+        - Configuration
+        - Parsing Logic
+        - Drift Detection
+        - WASM Module
+        - GitHub Action
+        - Documentation
+        - Testing
+        - CI/CD
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: What defines this task as complete?
+      placeholder: |
+        - [ ] Criteria 1
+        - [ ] Criteria 2
+        - [ ] Criteria 3
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: Task priority level
+      options:
+        - Critical
+        - High
+        - Medium
+        - Low
+    validations:
+      required: true

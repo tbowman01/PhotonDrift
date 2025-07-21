@@ -1,0 +1,23 @@
+name: ADRScan - Basic PR Check
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  architecture-check:
+    runs-on: ubuntu-latest
+    name: Check Architecture Compliance
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run ADRScan Drift Detection
+      uses: tbowman01/PhotonDrift@main
+      with:
+        adr-directory: './docs/adr'
+        target-directory: '.'
+        fail-on-drift: true
+        create-issues: false
+        output-format: 'console'
