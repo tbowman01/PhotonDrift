@@ -549,17 +549,28 @@ mod tests {
         std::fs::write(&model_path, "mock model data").unwrap();
         detector.load_model(&model_path).await.unwrap();
 
-        let drift_items = vec![create_test_drift_item()];
+        // Create a drift item that will definitely trigger anomaly in mock model
+        // The mock model triggers on file_count > 0 OR complexity_score > 0.3
+        let drift_item = DriftItem::new(
+            "test".to_string(),
+            DriftSeverity::Critical, // High severity
+            DriftCategory::NewTechnology,
+            "Complex new technology integration".to_string(), // Longer title for complexity
+            "This involves introducing a completely new technology stack with multiple components and complex dependencies".to_string(), // Long description
+            DriftLocation::new(PathBuf::from("src/complex_module.rs")),
+        ).with_technology("Complex Technology".to_string()); // Add technology for more features
+
+        let drift_items = vec![drift_item];
         let results = detector.enhance_detection(drift_items).await.unwrap();
 
-        // Even with normal features, the mock model should return a result
-        // since we lowered the confidence threshold
+        // Should return results because the mock model should classify this as anomaly
         assert!(
             !results.is_empty(),
             "Expected non-empty results from ML detection"
         );
         if !results.is_empty() {
             assert!(results[0].confidence > 0.0);
+            assert!(results[0].anomaly_score > 0.5); // Should be anomaly
             assert!(results[0].explanation.is_some());
         }
     }
@@ -729,17 +740,19 @@ mod tests {
 
         let mut detector = MLDriftDetector::new(config);
 
-        // Train with similar normal samples
-        let normal_item = DriftItem::new(
-            "training".to_string(),
-            crate::drift::DriftSeverity::Low,
-            crate::drift::DriftCategory::Configuration,
-            "Config change".to_string(),
-            "Updated parameter".to_string(),
-            crate::drift::DriftLocation::new(PathBuf::from("config.rs")),
-        );
-
-        let training_data = vec![(normal_item, false)];
+        // Train with multiple similar normal samples (SVM needs more data)
+        let mut training_data = Vec::new();
+        for i in 0..5 {
+            let normal_item = DriftItem::new(
+                format!("training_{}", i),
+                crate::drift::DriftSeverity::Low,
+                crate::drift::DriftCategory::Configuration,
+                format!("Config change {}", i),
+                format!("Updated parameter {}", i),
+                crate::drift::DriftLocation::new(PathBuf::from(format!("config{}.rs", i))),
+            );
+            training_data.push((normal_item, false)); // false = normal
+        }
         detector
             .train_model_with_type(training_data, ModelType::OneClassSVM)
             .await
@@ -761,13 +774,15 @@ mod tests {
             let result = &results[0];
 
             // SVM implementation might give high scores due to limited training data
-            // Just verify we get valid output ranges and behavior is reasonable
             assert!(
                 result.anomaly_score >= 0.0 && result.anomaly_score <= 1.0,
                 "Anomaly score should be in valid range [0,1], got: {}",
                 result.anomaly_score
             );
             assert!(result.confidence > 0.8);
+
+            // For this simple test, we accept that SVM might classify normal samples as anomalies
+            // due to limited training data - the important thing is it produces valid output
         }
     }
 }
