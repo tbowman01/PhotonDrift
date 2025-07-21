@@ -1,7 +1,7 @@
 {
   "name": "adrscan-wasm",
-  "version": "0.1.0",
-  "description": "WebAssembly module for ADRScan - Architecture Decision Record management and drift detection",
+  "version": "0.2.0-alpha.20250721",
+  "description": "WebAssembly module for ADRScan - AI-powered Architecture Decision Record management with ML-enhanced drift detection",
   "main": "index.js",
   "types": "index.d.ts",
   "files": [
@@ -18,15 +18,25 @@
     "documentation",
     "drift-detection",
     "wasm",
-    "webassembly"
+    "webassembly",
+    "ml",
+    "ai",
+    "governance"
   ],
-  "author": "tbowman01",
+  "author": {
+    "name": "tbowman01",
+    "email": "github@photondrift.io"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tbowman01/PhotonDrift.git"
+    "url": "https://github.com/tbowman01/PhotonDrift.git",
+    "directory": "wasm"
   },
-  "homepage": "https://github.com/tbowman01/PhotonDrift",
+  "homepage": "https://github.com/tbowman01/PhotonDrift#readme",
+  "bugs": {
+    "url": "https://github.com/tbowman01/PhotonDrift/issues"
+  },
   "engines": {
     "node": ">=16.0.0"
   },
@@ -35,9 +45,15 @@
     "@types/node": "^20.0.0"
   },
   "scripts": {
-    "build": "wasm-pack build --target nodejs --out-dir wasm",
-    "build:web": "wasm-pack build --target web --out-dir wasm-web",
-    "build:bundler": "wasm-pack build --target bundler --out-dir wasm-bundler",
-    "test": "node test.js"
+    "build": "wasm-pack build --target nodejs --out-dir ../pkg --features wasm && cp -r ../pkg/* .",
+    "build:web": "wasm-pack build --target web --out-dir ../wasm-web --features wasm",
+    "build:bundler": "wasm-pack build --target bundler --out-dir ../wasm-bundler --features wasm",
+    "build:all": "npm run build && npm run build:web && npm run build:bundler",
+    "test": "node test.js",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

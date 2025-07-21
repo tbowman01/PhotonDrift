@@ -196,7 +196,7 @@ impl CodebaseScanner {
                         files_processed += 1;
 
                         if files_processed % 100 == 0 {
-                            log::debug!("Processed {} files...", files_processed);
+                            log::debug!("Processed {files_processed} files...");
                         }
                     }
                     Err(e) => {
@@ -379,7 +379,7 @@ impl CodebaseScanner {
 
         // Try to get current commit hash
         let commit = tokio::process::Command::new("git")
-            .args(&["rev-parse", "HEAD"])
+            .args(["rev-parse", "HEAD"])
             .current_dir(root_path)
             .output()
             .await
@@ -394,7 +394,7 @@ impl CodebaseScanner {
 
         // Try to get current branch
         let branch = tokio::process::Command::new("git")
-            .args(&["branch", "--show-current"])
+            .args(["branch", "--show-current"])
             .current_dir(root_path)
             .output()
             .await

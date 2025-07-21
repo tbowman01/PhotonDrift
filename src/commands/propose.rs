@@ -54,7 +54,7 @@ impl ProposeCommand {
 
         // Create async runtime
         let rt = Runtime::new().map_err(|e| {
-            AdrscanError::DriftError(format!("Failed to create async runtime: {}", e))
+            AdrscanError::DriftError(format!("Failed to create async runtime: {e}"))
         })?;
 
         rt.block_on(async {
@@ -83,7 +83,7 @@ impl ProposeCommand {
 
             // Ensure ADR directory exists
             if !adr_dir.exists() {
-                std::fs::create_dir_all(adr_dir).map_err(|e| AdrscanError::Io(e))?;
+                std::fs::create_dir_all(adr_dir).map_err(AdrscanError::Io)?;
                 log::info!("Created ADR directory: {}", adr_dir.display());
             }
 
@@ -115,15 +115,12 @@ impl ProposeCommand {
             // Summary
             println!("\n📊 Proposal Generation Summary:");
             if self.dry_run {
-                println!(
-                    "  🔍 Proposals that would be created: {}",
-                    proposals_created
-                );
+                println!("  🔍 Proposals that would be created: {proposals_created}");
             } else {
-                println!("  ✅ Proposals created: {}", proposals_created);
+                println!("  ✅ Proposals created: {proposals_created}");
             }
             if proposals_skipped > 0 {
-                println!("  ⏭️  Proposals skipped: {}", proposals_skipped);
+                println!("  ⏭️  Proposals skipped: {proposals_skipped}");
             }
 
             if !self.dry_run && proposals_created > 0 {
@@ -170,8 +167,7 @@ impl ProposeCommand {
         // Determine directories
         let scan_dir = self
             .directory
-            .as_ref()
-            .map(|p| p.clone())
+            .clone()
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
 
         let adr_dir = self.adr_dir.as_ref().unwrap_or(&config.adr_dir);
@@ -185,7 +181,7 @@ impl ProposeCommand {
                 adr_dir,
                 &scan_dir,
                 None, // No baseline for proposals
-                &detection_patterns,
+                detection_patterns,
             )
             .await
     }
@@ -287,7 +283,7 @@ impl ProposeCommand {
 
         // Generate ADR filename
         let title_slug = self.slugify(&drift_item.title);
-        let filename = format!("{:04}-{}.md", adr_number, title_slug);
+        let filename = format!("{adr_number:04}-{title_slug}.md");
         let adr_path = adr_dir.join(&filename);
 
         // Check if file already exists
@@ -305,7 +301,7 @@ impl ProposeCommand {
 
         // Write ADR file (unless dry run)
         if !self.dry_run {
-            std::fs::write(&adr_path, adr_content).map_err(|e| AdrscanError::Io(e))?;
+            std::fs::write(&adr_path, adr_content).map_err(AdrscanError::Io)?;
         }
 
         Ok(adr_path)
@@ -362,11 +358,7 @@ impl ProposeCommand {
         adr_number: u32,
         config: &Config,
     ) -> Result<String> {
-        let template_name = self
-            .template
-            .as_ref()
-            .or(Some(&config.template.format))
-            .unwrap();
+        let template_name = self.template.as_ref().unwrap_or(&config.template.format);
 
         match template_name.as_str() {
             "madr" => self.generate_madr_content(drift_item, adr_number).await,
@@ -381,8 +373,7 @@ impl ProposeCommand {
                 }
             }
             _ => Err(AdrscanError::InvalidArgument(format!(
-                "Unsupported template: {}. Use 'madr' or 'custom'",
-                template_name
+                "Unsupported template: {template_name}. Use 'madr' or 'custom'"
             ))),
         }
     }
@@ -459,7 +450,7 @@ Proposed - Generated from drift detection
             drift_item.category,
             drift_item.severity,
             if let Some(ref tech) = drift_item.detected_technology {
-                format!("- Technology: {}", tech)
+                format!("- Technology: {tech}")
             } else {
                 String::new()
             }
@@ -489,7 +480,7 @@ Proposed - Generated from drift detection
 
         // Replace template variables
         let replacements = [
-            ("{{ADR_NUMBER}}", &format!("{:04}", adr_number)),
+            ("{{ADR_NUMBER}}", &format!("{adr_number:04}")),
             ("{{ADR_TITLE}}", &self.generate_decision_title(drift_item)),
             ("{{DATE}}", &now.format("%Y-%m-%d").to_string()),
             ("{{STATUS}}", &"proposed".to_string()),
@@ -536,7 +527,7 @@ Proposed - Generated from drift detection
             }
             DriftCategory::ConflictingTechnology => {
                 if let Some(ref tech) = drift_item.detected_technology {
-                    format!("Resolve {} Usage Conflict", tech)
+                    format!("Resolve {tech} Usage Conflict")
                 } else {
                     "Resolve Technology Conflict".to_string()
                 }
@@ -614,10 +605,7 @@ Proposed - Generated from drift detection
                 .trim_end_matches(',')
                 .trim_end_matches('.');
             if clean_word.len() > 3
-                && clean_word
-                    .chars()
-                    .next()
-                    .map_or(false, |c| c.is_uppercase())
+                && clean_word.chars().next().is_some_and(|c| c.is_uppercase())
                 && !common_words.contains(&clean_word)
             {
                 return clean_word.to_string();
@@ -675,7 +663,7 @@ Proposed - Generated from drift detection
             drift_item.category,
             drift_item.severity,
             if let Some(ref action) = drift_item.suggested_action {
-                format!("- Suggested action: {}", action)
+                format!("- Suggested action: {action}")
             } else {
                 String::new()
             }
@@ -717,9 +705,7 @@ Proposed - Generated from drift detection
                     }
                 )
             }
-            _ => {
-                format!(
-                    "We will address this architectural concern by implementing appropriate \
+            _ => "We will address this architectural concern by implementing appropriate \
                     measures based on the specific requirements and constraints.\n\n\
                     **Next steps:**\n\
                     - Analyze the current situation in detail\n\
@@ -727,17 +713,14 @@ Proposed - Generated from drift detection
                     - Implement the chosen solution\n\
                     - Monitor the results and adjust if necessary\n\n\
                     *This proposal requires further analysis and team discussion.*"
-                )
-            }
+                .to_string(),
         }
     }
 
     /// Generate consequences section
     fn generate_consequences_section(&self, drift_item: &DriftItem) -> String {
         match drift_item.category {
-            DriftCategory::NewTechnology => {
-                format!(
-                    "**Positive consequences:**\n\
+            DriftCategory::NewTechnology => "**Positive consequences:**\n\
                     - Maintains current functionality without disruption\n\
                     - Leverages existing team knowledge and implementation\n\
                     - Avoids costly refactoring in the short term\n\n\
@@ -748,11 +731,8 @@ Proposed - Generated from drift detection
                     **Neutral consequences:**\n\
                     - Updates our documented technology stack to match reality\n\
                     - Provides a basis for future technology decisions"
-                )
-            }
-            DriftCategory::ConflictingTechnology => {
-                format!(
-                    "**Positive consequences:**\n\
+                .to_string(),
+            DriftCategory::ConflictingTechnology => "**Positive consequences:**\n\
                     - Resolves the conflict between documentation and implementation\n\
                     - Provides clarity for future development decisions\n\
                     - Improves architectural governance\n\n\
@@ -763,11 +743,8 @@ Proposed - Generated from drift detection
                     **Risks:**\n\
                     - Delayed resolution may lead to further architectural drift\n\
                     - Inconsistent technology usage across the codebase"
-                )
-            }
-            _ => {
-                format!(
-                    "**Expected benefits:**\n\
+                .to_string(),
+            _ => "**Expected benefits:**\n\
                     - Improved architectural alignment\n\
                     - Better documentation of our technology decisions\n\
                     - Reduced risk of future architectural drift\n\n\
@@ -778,8 +755,7 @@ Proposed - Generated from drift detection
                     **Long-term impact:**\n\
                     - Stronger architectural governance\n\
                     - More predictable technology landscape"
-                )
-            }
+                .to_string(),
         }
     }
 }
@@ -878,20 +854,19 @@ mod tests {
     }
 
     fn create_existing_adr(adr_dir: &PathBuf, number: u32, title: &str) -> PathBuf {
-        let filename = format!("{:04}-{}.md", number, title);
+        let filename = format!("{number:04}-{title}.md");
         let adr_path = adr_dir.join(&filename);
 
         let content = format!(
             r#"---
-title: "Existing ADR {}"
+title: "Existing ADR {number}"
 status: accepted
 ---
 
-# Existing ADR {}
+# Existing ADR {number}
 
 This is an existing ADR.
-"#,
-            number, number
+"#
         );
 
         fs::write(&adr_path, content).unwrap();
@@ -1665,7 +1640,7 @@ Detected in: {{DETECTED_FILE}}
             force: false,
         };
         let title_slug = cmd.slugify("Test technology");
-        let existing_path = adr_dir.join(format!("0001-{}.md", title_slug));
+        let existing_path = adr_dir.join(format!("0001-{title_slug}.md"));
         fs::write(&existing_path, "existing content").unwrap();
 
         let config = create_test_config(&adr_dir);

@@ -23,13 +23,11 @@ impl InitCommand {
         let adr_dir = self.adr_dir.as_ref().unwrap_or(&config.adr_dir);
 
         // Check if directory already exists
-        if adr_dir.exists() && !self.force {
-            if adr_dir.read_dir()?.next().is_some() {
-                return Err(AdrscanError::ValidationError(
-                    format!("Directory '{}' already exists and is not empty. Use --force to initialize anyway.", 
-                           adr_dir.display())
-                ));
-            }
+        if adr_dir.exists() && !self.force && adr_dir.read_dir()?.next().is_some() {
+            return Err(AdrscanError::ValidationError(format!(
+                "Directory '{}' already exists and is not empty. Use --force to initialize anyway.",
+                adr_dir.display()
+            )));
         }
 
         // Create ADR directory

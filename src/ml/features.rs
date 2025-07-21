@@ -118,6 +118,12 @@ impl Default for FeatureConfig {
     }
 }
 
+impl Default for FeatureExtractor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FeatureExtractor {
     /// Create a new feature extractor
     pub fn new() -> Self {
@@ -459,7 +465,7 @@ mod tests {
         let drift_item = create_test_drift_item();
 
         let score = extractor.calculate_complexity_score(&drift_item);
-        assert!(score >= 0.0 && score <= 1.0);
+        assert!((0.0..=1.0).contains(&score));
     }
 
     #[test]

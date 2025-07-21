@@ -165,6 +165,14 @@ impl AdrscanWasm {
                 drift_items += 1;
                 summary_items.push(format!("Docker configuration in {}", path));
             }
+            if content.contains("postgresql") || content.contains("pg") {
+                drift_items += 1;
+                summary_items.push(format!("PostgreSQL usage detected in {}", path));
+            }
+            if content.contains("kubernetes") || content.contains("kubectl") {
+                drift_items += 1;
+                summary_items.push(format!("Kubernetes configuration in {}", path));
+            }
         }
 
         let report = WasmDriftReport {
@@ -175,6 +183,192 @@ impl AdrscanWasm {
         };
 
         Ok(report)
+    }
+
+    /// Full diff functionality with baseline support (WASM compatible)
+    #[wasm_bindgen]
+    pub fn diff(
+        &self,
+        current_files_json: &str,
+        baseline_json: Option<String>,
+    ) -> Result<WasmDriftReport, JsValue> {
+        // Parse current files
+        let current_files: HashMap<String, String> = serde_json::from_str(current_files_json)
+            .map_err(|e| JsValue::from_str(&format!("Invalid current files JSON: {}", e)))?;
+
+        // If baseline provided, compare against it
+        if let Some(baseline_str) = baseline_json {
+            let baseline_files: HashMap<String, String> = serde_json::from_str(&baseline_str)
+                .map_err(|e| JsValue::from_str(&format!("Invalid baseline JSON: {}", e)))?;
+
+            return self.diff_against_baseline(current_files, baseline_files);
+        }
+
+        // Otherwise, do standard drift detection
+        self.detect_drift(current_files_json)
+    }
+
+    /// Compare current state against baseline
+    fn diff_against_baseline(
+        &self,
+        current: HashMap<String, String>,
+        baseline: HashMap<String, String>,
+    ) -> Result<WasmDriftReport, JsValue> {
+        let mut drift_items = 0;
+        let mut summary_items = Vec::new();
+
+        // Check for new files
+        for (path, content) in &current {
+            if !baseline.contains_key(path) {
+                drift_items += 1;
+                summary_items.push(format!("New file detected: {}", path));
+
+                // Analyze content of new file
+                if content.contains("mongodb") {
+                    summary_items.push(format!("MongoDB usage in new file: {}", path));
+                }
+                if content.contains("redis") {
+                    summary_items.push(format!("Redis usage in new file: {}", path));
+                }
+            }
+        }
+
+        // Check for modified files
+        for (path, current_content) in &current {
+            if let Some(baseline_content) = baseline.get(path) {
+                if current_content != baseline_content {
+                    drift_items += 1;
+                    summary_items.push(format!("File modified: {}", path));
+
+                    // Detect technology changes
+                    let baseline_has_mongo = baseline_content.contains("mongodb");
+                    let current_has_mongo = current_content.contains("mongodb");
+
+                    if !baseline_has_mongo && current_has_mongo {
+                        summary_items.push(format!("MongoDB added to: {}", path));
+                    } else if baseline_has_mongo && !current_has_mongo {
+                        summary_items.push(format!("MongoDB removed from: {}", path));
+                    }
+                }
+            }
+        }
+
+        // Check for deleted files
+        for path in baseline.keys() {
+            if !current.contains_key(path) {
+                drift_items += 1;
+                summary_items.push(format!("File deleted: {}", path));
+            }
+        }
+
+        let report = WasmDriftReport {
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            scanned_directory: ".".to_string(),
+            total_items: drift_items,
+            summary: summary_items.join("; "),
+        };
+
+        Ok(report)
+    }
+
+    /// Inventory ADR files (requires file list and contents from host)
+    #[wasm_bindgen]
+    pub fn inventory(&self, files_json: &str) -> Result<String, JsValue> {
+        // Parse the files JSON provided by the host
+        let files: HashMap<String, String> = serde_json::from_str(files_json)
+            .map_err(|e| JsValue::from_str(&format!("Invalid files JSON: {}", e)))?;
+
+        let parser = AdrParser::new();
+        let mut adr_summaries = Vec::new();
+        let mut total_size = 0u64;
+        let mut total_lines = 0;
+        let mut status_breakdown = HashMap::new();
+        let mut tag_breakdown = HashMap::new();
+
+        // Process each ADR file
+        for (path, content) in &files {
+            if path.ends_with(".md") {
+                let file_size = content.len() as u64;
+                let line_count = content.lines().count();
+                total_size += file_size;
+                total_lines += line_count;
+
+                match parser.parse_content(content, path) {
+                    Ok(adr) => {
+                        // Extract metadata
+                        let status = adr
+                            .frontmatter
+                            .get("status")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("unknown")
+                            .to_string();
+
+                        let tags: Vec<String> = adr
+                            .frontmatter
+                            .get("tags")
+                            .and_then(|v| v.as_array())
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|v| v.as_str())
+                                    .map(|s| s.to_string())
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+
+                        // Update breakdowns
+                        *status_breakdown.entry(status.clone()).or_insert(0) += 1;
+                        for tag in &tags {
+                            *tag_breakdown.entry(tag.clone()).or_insert(0) += 1;
+                        }
+
+                        let summary = serde_json::json!({
+                            "path": path,
+                            "title": adr.frontmatter.get("title")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("Untitled"),
+                            "status": status,
+                            "date": adr.frontmatter.get("date")
+                                .and_then(|v| v.as_str()),
+                            "tags": tags,
+                            "file_size": file_size,
+                            "line_count": line_count
+                        });
+
+                        adr_summaries.push(summary);
+                    }
+                    Err(_) => {
+                        // Still include basic file info for unparseable files
+                        let summary = serde_json::json!({
+                            "path": path,
+                            "title": "Parse Error",
+                            "status": "error",
+                            "file_size": file_size,
+                            "line_count": line_count,
+                            "tags": []
+                        });
+                        adr_summaries.push(summary);
+                    }
+                }
+            }
+        }
+
+        // Build inventory response
+        let inventory = serde_json::json!({
+            "total_count": adr_summaries.len(),
+            "status_breakdown": status_breakdown,
+            "tag_breakdown": tag_breakdown,
+            "adrs": adr_summaries,
+            "statistics": {
+                "total_files": adr_summaries.len(),
+                "total_size_bytes": total_size,
+                "total_lines": total_lines,
+                "average_file_size": if adr_summaries.is_empty() { 0.0 } else { total_size as f64 / adr_summaries.len() as f64 },
+                "average_lines_per_adr": if adr_summaries.is_empty() { 0.0 } else { total_lines as f64 / adr_summaries.len() as f64 }
+            }
+        });
+
+        serde_json::to_string_pretty(&inventory)
+            .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
     }
 
     /// Generate ADR proposals (simplified)

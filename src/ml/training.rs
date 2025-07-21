@@ -150,6 +150,12 @@ pub struct HyperparameterResult {
     pub duration: std::time::Duration,
 }
 
+impl Default for TrainingData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TrainingData {
     /// Create new training data
     pub fn new() -> Self {
@@ -265,7 +271,7 @@ impl ModelTrainer {
             training_data.train_validation_split(self.config.validation_split);
 
         // Create and train model
-        let model = super::models::ModelFactory::create_model(model_type.clone());
+        let model = super::models::ModelFactory::create_model(model_type);
 
         // Calculate training metrics
         let metrics = self.calculate_training_metrics(&model, &train_data, &val_data)?;
@@ -321,7 +327,7 @@ impl ModelTrainer {
             }
 
             // Train model on this fold
-            let model = super::models::ModelFactory::create_model(model_type.clone());
+            let model = super::models::ModelFactory::create_model(model_type);
             let metrics = self.calculate_training_metrics(&model, &train_data, &val_data)?;
 
             cv_results.push(metrics);
@@ -340,9 +346,7 @@ impl ModelTrainer {
         let start_time = std::time::Instant::now();
 
         log::info!(
-            "Starting hyperparameter optimization for {:?} with {} trials",
-            model_type,
-            n_trials
+            "Starting hyperparameter optimization for {model_type:?} with {n_trials} trials"
         );
 
         // For now, return mock optimization result
@@ -394,10 +398,7 @@ impl ModelTrainer {
                 .sum::<f64>()
                 / self.training_history.len() as f64;
 
-            report.push_str(&format!(
-                "Average validation accuracy: {:.3}\n",
-                avg_accuracy
-            ));
+            report.push_str(&format!("Average validation accuracy: {avg_accuracy:.3}\n"));
 
             // Best performing model
             if let Some(best_session) = self.training_history.iter().max_by(|a, b| {
@@ -406,7 +407,7 @@ impl ModelTrainer {
                     .partial_cmp(&b.metrics.validation_accuracy)
                     .unwrap()
             }) {
-                report.push_str(&format!("\n## Best Model\n"));
+                report.push_str("\n## Best Model\n");
                 report.push_str(&format!("Type: {:?}\n", best_session.model_type));
                 report.push_str(&format!(
                     "Accuracy: {:.3}\n",
@@ -435,7 +436,7 @@ impl ModelTrainer {
         }
 
         let (positive_ratio, _) = training_data.get_class_balance();
-        if positive_ratio < 0.1 || positive_ratio > 0.9 {
+        if !(0.1..=0.9).contains(&positive_ratio) {
             log::warn!(
                 "Training data is imbalanced: {:.1}% positive samples",
                 positive_ratio * 100.0

@@ -95,7 +95,7 @@ impl IndexCommand {
         };
 
         // Write index file
-        std::fs::write(&output_path, index_content).map_err(|e| AdrscanError::Io(e))?;
+        std::fs::write(&output_path, index_content).map_err(AdrscanError::Io)?;
 
         println!("✅ ADR index generated: {}", output_path.display());
         println!("📋 Indexed {} ADRs", adr_entries.len());
@@ -290,7 +290,7 @@ impl IndexCommand {
                 } else {
                     String::new()
                 };
-                content.push_str(&format!("- **{}**: {}{}\n", status, count, badge));
+                content.push_str(&format!("- **{status}**: {count}{badge}\n"));
             }
             content.push('\n');
         }
@@ -313,7 +313,7 @@ impl IndexCommand {
             // Table rows
             for entry in entries {
                 let number_display = if let Some(num) = entry.number {
-                    format!("{:04}", num)
+                    format!("{num:04}")
                 } else if let Some(ref id) = entry.id {
                     id.clone()
                 } else {
@@ -340,8 +340,7 @@ impl IndexCommand {
                 };
 
                 content.push_str(&format!(
-                    "| {} | {} | {} | {} | {} |\n",
-                    number_display, title_link, status_display, date_display, deciders_display
+                    "| {number_display} | {title_link} | {status_display} | {date_display} | {deciders_display} |\n"
                 ));
             }
         }
@@ -362,8 +361,7 @@ impl IndexCommand {
         template_path: &PathBuf,
         _adr_dir: &PathBuf,
     ) -> Result<String> {
-        let template_content =
-            std::fs::read_to_string(template_path).map_err(|e| AdrscanError::Io(e))?;
+        let template_content = std::fs::read_to_string(template_path).map_err(AdrscanError::Io)?;
 
         // Simple template variable replacement
         let mut content = template_content;
@@ -381,7 +379,7 @@ impl IndexCommand {
         let mut adr_list = String::new();
         for entry in entries {
             let number_display = if let Some(num) = entry.number {
-                format!("{:04}", num)
+                format!("{num:04}")
             } else if let Some(ref id) = entry.id {
                 id.clone()
             } else {
@@ -434,10 +432,7 @@ impl IndexCommand {
                 "![Superseded](https://img.shields.io/badge/Status-Superseded-lightgrey)"
                     .to_string()
             }
-            _ => format!(
-                "![{}](https://img.shields.io/badge/Status-{}-blue)",
-                status, status
-            ),
+            _ => format!("![{status}](https://img.shields.io/badge/Status-{status}-blue)"),
         }
     }
 }

@@ -358,7 +358,7 @@ impl DriftDetector {
                     format!("added_tech_{}", added_entry.id),
                     DriftSeverity::Medium,
                     DriftCategory::NewTechnology,
-                    format!("New technology detected: {}", technology),
+                    format!("New technology detected: {technology}"),
                     format!(
                         "Technology '{}' was introduced in {} since the baseline snapshot",
                         technology, added_entry.file_path
@@ -368,8 +368,7 @@ impl DriftDetector {
                 )
                 .with_technology(technology.clone())
                 .with_suggested_action(format!(
-                    "Consider creating an ADR to document the decision to use {}",
-                    technology
+                    "Consider creating an ADR to document the decision to use {technology}"
                 ));
 
                 report.add_item(drift_item);
@@ -383,7 +382,7 @@ impl DriftDetector {
                     format!("removed_tech_{}", removed_entry.id),
                     DriftSeverity::Low,
                     DriftCategory::DeprecatedTechnology,
-                    format!("Technology removed: {}", technology),
+                    format!("Technology removed: {technology}"),
                     format!(
                         "Technology '{}' was removed from {} since the baseline snapshot",
                         technology, removed_entry.file_path
@@ -416,7 +415,7 @@ impl DriftDetector {
             for technology in &decision.mentioned_technologies {
                 technology_decisions
                     .entry(technology.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(decision);
             }
         }
@@ -439,18 +438,16 @@ impl DriftDetector {
                         format!("uncovered_tech_{}", tech_entry.id),
                         DriftSeverity::High,
                         DriftCategory::NewTechnology,
-                        format!("Uncovered technology: {}", detected_tech),
+                        format!("Uncovered technology: {detected_tech}"),
                         format!(
-                            "Technology '{}' is in use but not covered by any ADR",
-                            detected_tech
+                            "Technology '{detected_tech}' is in use but not covered by any ADR"
                         ),
                         DriftLocation::new(PathBuf::from(&tech_entry.file_path))
                             .with_line(tech_entry.line_number.unwrap_or(1)),
                     )
                     .with_technology(detected_tech.clone())
                     .with_suggested_action(format!(
-                        "Create an ADR to document the decision to use {}",
-                        detected_tech
+                        "Create an ADR to document the decision to use {detected_tech}"
                     ));
 
                     report.add_item(drift_item);
@@ -468,7 +465,7 @@ impl DriftDetector {
                                 ),
                                 DriftSeverity::Critical,
                                 DriftCategory::ConflictingTechnology,
-                                format!("Rejected technology in use: {}", detected_tech),
+                                format!("Rejected technology in use: {detected_tech}"),
                                 format!(
                                     "Technology '{}' is being used but was rejected in ADR '{}'",
                                     detected_tech, decision.title
@@ -479,8 +476,7 @@ impl DriftDetector {
                             .with_technology(detected_tech.clone())
                             .with_related_adr(decision.title.clone())
                             .with_suggested_action(format!(
-                                "Remove {} or update the ADR to accept its use",
-                                detected_tech
+                                "Remove {detected_tech} or update the ADR to accept its use"
                             ));
 
                             report.add_item(drift_item);
@@ -534,18 +530,16 @@ impl DriftDetector {
                     format!("uncovered_significant_{}", technology.replace(' ', "_")),
                     DriftSeverity::Medium,
                     DriftCategory::NewTechnology,
-                    format!("Significant uncovered technology: {}", technology),
+                    format!("Significant uncovered technology: {technology}"),
                     format!(
-                        "Technology '{}' appears {} times but is not documented in any ADR",
-                        technology, count
+                        "Technology '{technology}' appears {count} times but is not documented in any ADR"
                     ),
                     DriftLocation::new(PathBuf::from("multiple_files")),
                 )
                 .with_technology(technology.clone())
                 .with_metadata("occurrence_count".to_string(), count.to_string())
                 .with_suggested_action(format!(
-                    "Consider creating an ADR to document the decision to use {}",
-                    technology
+                    "Consider creating an ADR to document the decision to use {technology}"
                 ));
 
                 report.add_item(drift_item);
@@ -811,9 +805,9 @@ We will use PostgreSQL as our database.
         // Add multiple Redis entries to make it "significant"
         for i in 1..=5 {
             let redis_entry = SnapshotEntry {
-                id: format!("tech_redis_{}", i),
+                id: format!("tech_redis_{i}"),
                 entry_type: SnapshotEntryType::Technology,
-                file_path: format!("src/cache_{}.rs", i),
+                file_path: format!("src/cache_{i}.rs"),
                 technology: Some("Redis".to_string()),
                 category: "database".to_string(),
                 line_number: Some(i),
@@ -976,9 +970,9 @@ We will NOT use:
         // Add uncovered technology (Redis - appears multiple times)
         for i in 1..=4 {
             let redis_entry = SnapshotEntry {
-                id: format!("tech_redis_{}", i),
+                id: format!("tech_redis_{i}"),
                 entry_type: SnapshotEntryType::Technology,
-                file_path: format!("src/cache_{}.rs", i),
+                file_path: format!("src/cache_{i}.rs"),
                 technology: Some("Redis".to_string()),
                 category: "database".to_string(),
                 line_number: Some(i),
