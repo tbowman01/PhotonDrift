@@ -1,0 +1,243 @@
+{
+  "name": "photondrift-adr-manager",
+  "displayName": "PhotonDrift ADR Manager",
+  "description": "AI-powered Architecture Decision Record (ADR) management with ML-enhanced drift detection",
+  "version": "0.1.0",
+  "publisher": "photondrift",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tbowman01/PhotonDrift"
+  },
+  "license": "MIT",
+  "icon": "resources/icon.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Snippets",
+    "Linters",
+    "Formatters"
+  ],
+  "keywords": [
+    "adr",
+    "architecture",
+    "decision record",
+    "drift detection",
+    "ml",
+    "ai",
+    "documentation"
+  ],
+  "activationEvents": [
+    "onLanguage:markdown",
+    "onCommand:photondrift.init",
+    "workspaceContains:**/*.adr.md",
+    "workspaceContains:docs/adr/**",
+    "workspaceContains:docs/decisions/**"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "adr-markdown",
+        "aliases": [
+          "ADR Markdown",
+          "adr"
+        ],
+        "extensions": [
+          ".adr.md"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "adr-markdown",
+        "scopeName": "text.html.adr.markdown",
+        "path": "./syntaxes/adr-markdown.tmGrammar.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "photondrift.init",
+        "title": "Initialize ADR Structure",
+        "category": "PhotonDrift"
+      },
+      {
+        "command": "photondrift.createAdr",
+        "title": "Create New ADR",
+        "category": "PhotonDrift"
+      },
+      {
+        "command": "photondrift.runDriftDetection",
+        "title": "Run Drift Detection",
+        "category": "PhotonDrift"
+      },
+      {
+        "command": "photondrift.generateIndex",
+        "title": "Generate ADR Index",
+        "category": "PhotonDrift"
+      },
+      {
+        "command": "photondrift.showInventory",
+        "title": "Show ADR Inventory",
+        "category": "PhotonDrift"
+      },
+      {
+        "command": "photondrift.proposeAdr",
+        "title": "Propose ADR for Changes",
+        "category": "PhotonDrift"
+      },
+      {
+        "command": "photondrift.openSettings",
+        "title": "Open PhotonDrift Settings",
+        "category": "PhotonDrift"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "photondrift.createAdr",
+          "when": "explorerResourceIsFolder",
+          "group": "photondrift@1"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "photondrift.proposeAdr",
+          "when": "editorHasSelection",
+          "group": "photondrift@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "photondrift.init"
+        },
+        {
+          "command": "photondrift.createAdr"
+        },
+        {
+          "command": "photondrift.runDriftDetection"
+        },
+        {
+          "command": "photondrift.generateIndex"
+        },
+        {
+          "command": "photondrift.showInventory"
+        },
+        {
+          "command": "photondrift.proposeAdr"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "PhotonDrift",
+      "properties": {
+        "photondrift.adrDirectory": {
+          "type": "string",
+          "default": "docs/adr",
+          "description": "Directory where ADR files are stored"
+        },
+        "photondrift.executable": {
+          "type": "string",
+          "default": "adrscan",
+          "description": "Path to PhotonDrift executable"
+        },
+        "photondrift.autoDetectDrift": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically detect drift on file changes"
+        },
+        "photondrift.enableMLFeatures": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable ML-enhanced drift detection"
+        },
+        "photondrift.confidenceThreshold": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "ML confidence threshold for drift detection (0.0-1.0)"
+        },
+        "photondrift.showInlineWarnings": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inline drift warnings in editor"
+        },
+        "photondrift.statusBarEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show PhotonDrift status in status bar"
+        },
+        "photondrift.templateFormat": {
+          "type": "string",
+          "enum": [
+            "madr",
+            "nygard",
+            "alexandrian"
+          ],
+          "default": "madr",
+          "description": "ADR template format to use"
+        }
+      }
+    },
+    "snippets": [
+      {
+        "language": "markdown",
+        "path": "./snippets/adr-snippets.json"
+      },
+      {
+        "language": "adr-markdown",
+        "path": "./snippets/adr-snippets.json"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "photondriftAdrTree",
+          "name": "ADR Documents",
+          "when": "workspaceHasAdrFiles"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "photondrift",
+          "title": "PhotonDrift",
+          "icon": "$(symbol-structure)"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "photondriftAdrTree",
+        "contents": "No ADR files found in workspace.\n[Initialize ADR Structure](command:photondrift.init)\n[Create New ADR](command:photondrift.createAdr)"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "20.x",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3",
+    "@vscode/test-electron": "^2.3.8",
+    "@vscode/vsce": "^2.22.0"
+  },
+  "dependencies": {
+    "yaml": "^2.3.4"
+  }
+}

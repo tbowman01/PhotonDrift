@@ -1,0 +1,218 @@
+{
+    "ADR MADR Template": {
+        "prefix": "adr-madr",
+        "description": "Complete MADR (Markdown Architecture Decision Record) template",
+        "body": [
+            "# ADR: ${1:Title}",
+            "",
+            "## Status",
+            "${2|Proposed,Accepted,Superseded,Deprecated,Rejected|}",
+            "",
+            "## Context",
+            "${3:What is the issue that we're seeing that is motivating this decision or change?}",
+            "",
+            "## Decision",
+            "${4:What is the change that we're proposing or have agreed to implement?}",
+            "",
+            "## Consequences",
+            "${5:What becomes easier or more difficult to do and any risks introduced by the change that will need to be mitigated?}",
+            "",
+            "## Considered Alternatives",
+            "${6:What other alternatives were considered?}",
+            "",
+            "## Links",
+            "${7:Any relevant links, ADRs, or documentation}"
+        ]
+    },
+    "ADR Nygard Template": {
+        "prefix": "adr-nygard",
+        "description": "Michael Nygard's original ADR template",
+        "body": [
+            "# ${1:Title}",
+            "",
+            "## Status",
+            "${2|Proposed,Accepted,Deprecated,Superseded|}",
+            "",
+            "## Context",
+            "${3:The issue motivating this decision, and any context that influences or constrains the decision.}",
+            "",
+            "## Decision",
+            "${4:The change that we're proposing or have agreed to implement.}",
+            "",
+            "## Consequences",
+            "${5:What becomes easier or more difficult to do and any risks introduced by the change that will need to be mitigated.}"
+        ]
+    },
+    "ADR Status Section": {
+        "prefix": "status",
+        "description": "ADR Status section with common statuses",
+        "body": [
+            "## Status",
+            "${1|Proposed,Accepted,Deprecated,Superseded,Rejected,Draft,Under Review,Approved|}"
+        ]
+    },
+    "ADR Context Section": {
+        "prefix": "context",
+        "description": "ADR Context section",
+        "body": [
+            "## Context",
+            "${1:What is the issue that we're seeing that is motivating this decision or change?}"
+        ]
+    },
+    "ADR Decision Section": {
+        "prefix": "decision",
+        "description": "ADR Decision section",
+        "body": [
+            "## Decision",
+            "${1:What is the change that we're proposing or have agreed to implement?}"
+        ]
+    },
+    "ADR Consequences Section": {
+        "prefix": "consequences",
+        "description": "ADR Consequences section",
+        "body": [
+            "## Consequences",
+            "",
+            "### Positive",
+            "- ${1:Benefits and advantages}",
+            "",
+            "### Negative", 
+            "- ${2:Risks and trade-offs}",
+            "",
+            "### Neutral",
+            "- ${3:Other outcomes}"
+        ]
+    },
+    "ADR Alternatives Section": {
+        "prefix": "alternatives",
+        "description": "ADR Considered Alternatives section",
+        "body": [
+            "## Considered Alternatives",
+            "",
+            "### ${1:Alternative 1}",
+            "- **Description**: ${2:Brief description}",
+            "- **Pros**: ${3:Advantages}",
+            "- **Cons**: ${4:Disadvantages}",
+            "- **Rejected because**: ${5:Reason for rejection}",
+            "",
+            "### ${6:Alternative 2}",
+            "- **Description**: ${7:Brief description}",
+            "- **Pros**: ${8:Advantages}",
+            "- **Cons**: ${9:Disadvantages}",
+            "- **Rejected because**: ${10:Reason for rejection}"
+        ]
+    },
+    "Decision Statement": {
+        "prefix": "we-will",
+        "description": "Standard decision statement template",
+        "body": [
+            "We will use ${1:technology/approach} for ${2:purpose} because ${3:primary reason}."
+        ]
+    },
+    "Decision with Alternatives": {
+        "prefix": "we-chose",
+        "description": "Decision statement with alternatives",
+        "body": [
+            "We chose ${1:selected option} over ${2:alternative option} because ${3:reasoning}."
+        ]
+    },
+    "Technology Decision": {
+        "prefix": "tech-decision",
+        "description": "Technology-specific decision template",
+        "body": [
+            "We will adopt ${1:technology} to replace ${2:current technology} in order to ${3:achieve goal}.",
+            "",
+            "This decision addresses the following requirements:",
+            "- ${4:Requirement 1}",
+            "- ${5:Requirement 2}",
+            "",
+            "Key benefits:",
+            "- ${6:Benefit 1}",
+            "- ${7:Benefit 2}"
+        ]
+    },
+    "Architecture Decision": {
+        "prefix": "arch-decision", 
+        "description": "Architecture-specific decision template",
+        "body": [
+            "We will implement ${1:architectural pattern/approach} to ${2:solve problem}.",
+            "",
+            "This architectural decision:",
+            "- ${3:Primary benefit}",
+            "- ${4:Secondary benefit}",
+            "",
+            "Trade-offs:",
+            "- ${5:Trade-off 1}",
+            "- ${6:Trade-off 2}"
+        ]
+    },
+    "Process Decision": {
+        "prefix": "process-decision",
+        "description": "Process-related decision template", 
+        "body": [
+            "We will adopt ${1:process/practice} in our ${2:workflow/development process}.",
+            "",
+            "This process change will:",
+            "- ${3:Expected outcome 1}",
+            "- ${4:Expected outcome 2}",
+            "",
+            "Implementation:",
+            "- ${5:Implementation step 1}",
+            "- ${6:Implementation step 2}"
+        ]
+    },
+    "ADR Link": {
+        "prefix": "adr-link",
+        "description": "Link to another ADR",
+        "body": [
+            "[ADR-${1:number}](${2:relative-path}.adr.md) - ${3:Brief description}"
+        ]
+    },
+    "ADR Metadata": {
+        "prefix": "adr-meta",
+        "description": "YAML frontmatter for ADR metadata",
+        "body": [
+            "---",
+            "title: ${1:ADR Title}",
+            "status: ${2|proposed,accepted,deprecated,superseded,rejected|}",
+            "date: ${3:${CURRENT_YEAR}-${CURRENT_MONTH}-${CURRENT_DATE}}",
+            "deciders: ${4:List of decision makers}",
+            "consulted: ${5:List of people consulted}",
+            "informed: ${6:List of people informed}",
+            "tags: [${7:tag1, tag2}]",
+            "---",
+            ""
+        ]
+    },
+    "Decision Drivers": {
+        "prefix": "drivers",
+        "description": "Decision drivers section",
+        "body": [
+            "## Decision Drivers",
+            "",
+            "- ${1:Driver 1} - ${2:Description}",
+            "- ${3:Driver 2} - ${4:Description}",
+            "- ${5:Driver 3} - ${6:Description}"
+        ]
+    },
+    "Validation Section": {
+        "prefix": "validation",
+        "description": "Validation and success criteria section",
+        "body": [
+            "## Validation",
+            "",
+            "This decision will be validated by:",
+            "",
+            "### Success Criteria",
+            "- ${1:Measurable outcome 1}",
+            "- ${2:Measurable outcome 2}",
+            "",
+            "### Validation Methods",
+            "- ${3:How to measure success}",
+            "- ${4:Timeline for validation}",
+            "",
+            "### Review Schedule",
+            "- ${5:When to review this decision}"
+        ]
+    }
+}

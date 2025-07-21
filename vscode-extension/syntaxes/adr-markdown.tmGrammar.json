@@ -1,0 +1,146 @@
+{
+    "name": "ADR Markdown",
+    "scopeName": "text.html.adr.markdown",
+    "patterns": [
+        {
+            "include": "text.html.markdown"
+        },
+        {
+            "name": "markup.heading.adr.title",
+            "match": "^(#{1})\\s+(.*)$",
+            "captures": {
+                "1": {
+                    "name": "punctuation.definition.heading.adr"
+                },
+                "2": {
+                    "name": "entity.name.section.adr.title"
+                }
+            }
+        },
+        {
+            "name": "markup.heading.adr.section",
+            "match": "^(#{2,6})\\s+(Status|Context|Decision|Consequences|Alternatives|Links|Date|Deciders|Technical Story|Problem Statement|Decision Drivers|Solution Description|Validation|Implementation|Considered Alternatives)\\s*$",
+            "captures": {
+                "1": {
+                    "name": "punctuation.definition.heading.adr"
+                },
+                "2": {
+                    "name": "entity.name.section.adr.standard"
+                }
+            }
+        },
+        {
+            "name": "markup.adr.status.proposed",
+            "match": "^\\s*(Proposed|Draft|Under Review)\\s*$",
+            "captures": {
+                "1": {
+                    "name": "constant.language.adr.status.proposed"
+                }
+            }
+        },
+        {
+            "name": "markup.adr.status.accepted",
+            "match": "^\\s*(Accepted|Approved|Active)\\s*$",
+            "captures": {
+                "1": {
+                    "name": "constant.language.adr.status.accepted"
+                }
+            }
+        },
+        {
+            "name": "markup.adr.status.deprecated",
+            "match": "^\\s*(Deprecated|Superseded|Replaced)\\s*$",
+            "captures": {
+                "1": {
+                    "name": "constant.language.adr.status.deprecated"
+                }
+            }
+        },
+        {
+            "name": "markup.adr.status.rejected",
+            "match": "^\\s*(Rejected|Declined)\\s*$",
+            "captures": {
+                "1": {
+                    "name": "constant.language.adr.status.rejected"
+                }
+            }
+        },
+        {
+            "name": "markup.adr.date",
+            "match": "\\b(\\d{4}-\\d{2}-\\d{2}|\\d{2}\\/\\d{2}\\/\\d{4}|\\w+\\s+\\d{1,2},\\s+\\d{4})\\b",
+            "captures": {
+                "1": {
+                    "name": "constant.numeric.adr.date"
+                }
+            }
+        },
+        {
+            "name": "markup.adr.decision.keyword",
+            "match": "\\b(We will|We decided|We chose|We adopt|We use|The team decided|It was decided|The decision is)\\b",
+            "captures": {
+                "1": {
+                    "name": "keyword.control.adr.decision"
+                }
+            }
+        },
+        {
+            "name": "markup.adr.consequence.positive",
+            "match": "\\b(benefit|advantage|improvement|easier|better|faster|more efficient|positive)\\b",
+            "captures": {
+                "1": {
+                    "name": "string.adr.consequence.positive"
+                }
+            }
+        },
+        {
+            "name": "markup.adr.consequence.negative",
+            "match": "\\b(risk|disadvantage|difficult|harder|worse|slower|complex|negative|trade-off)\\b",
+            "captures": {
+                "1": {
+                    "name": "invalid.adr.consequence.negative"
+                }
+            }
+        },
+        {
+            "name": "markup.adr.link",
+            "match": "\\[ADR[- ]?(\\d+)\\]",
+            "captures": {
+                "0": {
+                    "name": "markup.underline.link.adr.reference"
+                },
+                "1": {
+                    "name": "constant.numeric.adr.reference"
+                }
+            }
+        },
+        {
+            "name": "markup.adr.template.placeholder",
+            "match": "\\{\\{[^}]+\\}\\}",
+            "captures": {
+                "0": {
+                    "name": "variable.other.adr.placeholder"
+                }
+            }
+        },
+        {
+            "name": "comment.adr.template.instruction",
+            "match": "<!--.*?-->",
+            "captures": {
+                "0": {
+                    "name": "comment.block.adr.instruction"
+                }
+            }
+        },
+        {
+            "name": "markup.adr.metadata",
+            "begin": "^---\\s*$",
+            "end": "^---\\s*$",
+            "patterns": [
+                {
+                    "include": "source.yaml"
+                }
+            ],
+            "name": "meta.embedded.block.frontmatter"
+        }
+    ]
+}
