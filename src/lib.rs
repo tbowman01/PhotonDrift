@@ -1,5 +1,5 @@
 //! ADRScan - Architecture Decision Record management and drift detection
-//! 
+//!
 //! This library provides the core functionality for scanning, parsing, and analyzing
 //! Architecture Decision Records (ADRs) in software projects.
 
@@ -7,8 +7,8 @@ pub mod commands;
 pub mod config;
 pub mod drift;
 pub mod error;
-pub mod parser;
 pub mod ml;
+pub mod parser;
 
 // WebAssembly module (only compiled for wasm32 target)
 #[cfg(all(target_arch = "wasm32", feature = "wasm"))]

@@ -1,5 +1,5 @@
 //! Drift Detection Engine
-//! 
+//!
 //! This module provides the core functionality for detecting architectural drift
 //! between Architecture Decision Records (ADRs) and the actual codebase state.
 
@@ -10,13 +10,15 @@ pub mod scanner;
 pub mod snapshot;
 
 pub use detector::DriftDetector;
-pub use patterns::{TechnologyMatch, PatternMatcher};
-pub use report::{DriftReport, DriftItem, DriftSeverity, DriftCategory, DriftLocation, ScanStatistics};
+pub use patterns::{PatternMatcher, TechnologyMatch};
+pub use report::{
+    DriftCategory, DriftItem, DriftLocation, DriftReport, DriftSeverity, ScanStatistics,
+};
 pub use scanner::CodebaseScanner;
 pub use snapshot::{Snapshot, SnapshotEntryType};
 
-use crate::error::AdrscanError;
 use crate::config::DetectionPattern;
+use crate::error::AdrscanError;
 use std::path::Path;
 
 /// Result type for drift detection operations
@@ -46,29 +48,38 @@ impl DriftEngine {
         detection_patterns: &[DetectionPattern],
     ) -> DriftResult<DriftReport> {
         log::info!("Starting drift detection...");
-        
+
         // 1. Scan current codebase state
-        let current_snapshot = self.scanner.scan_codebase(codebase_dir, detection_patterns).await?;
-        
+        let current_snapshot = self
+            .scanner
+            .scan_codebase(codebase_dir, detection_patterns)
+            .await?;
+
         // 2. Load baseline snapshot if provided
         let baseline = if let Some(baseline_path) = baseline_snapshot {
             Some(Snapshot::load(baseline_path)?)
         } else {
             None
         };
-        
+
         // 3. Parse ADRs for architectural decisions
         let adr_decisions = self.detector.parse_adr_decisions(adr_dir).await?;
-        
+
         // 4. Detect drift between current state, baseline, and ADRs
-        let drift_report = self.detector.detect_drift(
-            &current_snapshot,
-            baseline.as_ref(),
-            &adr_decisions,
-            detection_patterns,
-        ).await?;
-        
-        log::info!("Drift detection completed. Found {} drift items", drift_report.items.len());
+        let drift_report = self
+            .detector
+            .detect_drift(
+                &current_snapshot,
+                baseline.as_ref(),
+                &adr_decisions,
+                detection_patterns,
+            )
+            .await?;
+
+        log::info!(
+            "Drift detection completed. Found {} drift items",
+            drift_report.items.len()
+        );
         Ok(drift_report)
     }
 }

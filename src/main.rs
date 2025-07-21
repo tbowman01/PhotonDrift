@@ -8,10 +8,7 @@ mod error;
 mod parser;
 
 use crate::commands::{
-    diff::DiffCommand,
-    index::IndexCommand,
-    init::InitCommand,
-    inventory::InventoryCommand,
+    diff::DiffCommand, index::IndexCommand, init::InitCommand, inventory::InventoryCommand,
     propose::ProposeCommand,
 };
 use crate::config::Config;
@@ -56,7 +53,7 @@ fn main() {
     } else {
         log::LevelFilter::Info
     };
-    
+
     env_logger::Builder::from_default_env()
         .filter_level(log_level)
         .init();

@@ -1,17 +1,17 @@
 //! Simplified WebAssembly Module for ADRScan
-//! 
+//!
 //! This module provides a WASM-compatible version without async/tokio dependencies
 
 #[cfg(feature = "wasm")]
-use wasm_bindgen::prelude::*;
-#[cfg(feature = "wasm")]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "wasm")]
 use std::collections::HashMap;
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "wasm")]
 use crate::{
-    config::{Config, TemplateConfig, DriftConfig},
+    config::{Config, DriftConfig, TemplateConfig},
     error::AdrscanError,
     parser::AdrParser,
 };
@@ -104,7 +104,7 @@ impl AdrscanWasm {
     #[wasm_bindgen(constructor)]
     pub fn new(config: &WasmConfig) -> Result<AdrscanWasm, JsValue> {
         let rust_config = convert_wasm_config(config)?;
-        
+
         Ok(AdrscanWasm {
             config: rust_config,
         })
@@ -118,13 +118,13 @@ impl AdrscanWasm {
             format!("{}/.adrscan.yaml", directory),
             format!("{}/0001-record-architecture-decisions.md", directory),
         ];
-        
+
         let init_content = HashMap::from([
             (format!("{}/README.md", directory), "# Architecture Decision Records\n\nThis directory contains Architecture Decision Records (ADRs) for this project.\n"),
             (format!("{}/.adrscan.yaml", directory), "adr_dir: .\ninclude_patterns:\n  - \"**/*.md\"\nexclude_patterns:\n  - \"**/node_modules/**\"\ntemplate:\n  format: madr\ndrift:\n  enabled: true\n"),
             (format!("{}/0001-record-architecture-decisions.md", directory), include_str!("../templates/madr.md")),
         ]);
-        
+
         Ok(serde_json::to_string(&init_content)
             .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))?)
     }
@@ -134,10 +134,8 @@ impl AdrscanWasm {
     pub fn parse_adr(&self, content: &str, filename: &str) -> Result<String, JsValue> {
         let parser = AdrParser::new();
         match parser.parse_content(content, filename) {
-            Ok(adr) => {
-                serde_json::to_string(&adr)
-                    .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
-            }
+            Ok(adr) => serde_json::to_string(&adr)
+                .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e))),
             Err(e) => Err(JsValue::from_str(&format!("Parse error: {}", e))),
         }
     }
@@ -148,11 +146,11 @@ impl AdrscanWasm {
         // Parse the files JSON provided by the host
         let files: HashMap<String, String> = serde_json::from_str(files_json)
             .map_err(|e| JsValue::from_str(&format!("Invalid files JSON: {}", e)))?;
-        
+
         // Simple drift detection logic
         let mut drift_items = 0;
         let mut summary_items = Vec::new();
-        
+
         for (path, content) in &files {
             // Basic technology detection
             if content.contains("mongodb") || content.contains("mongoose") {
@@ -168,14 +166,14 @@ impl AdrscanWasm {
                 summary_items.push(format!("Docker configuration in {}", path));
             }
         }
-        
+
         let report = WasmDriftReport {
             timestamp: chrono::Utc::now().to_rfc3339(),
             scanned_directory: ".".to_string(),
             total_items: drift_items,
             summary: summary_items.join("; "),
         };
-        
+
         Ok(report)
     }
 
@@ -185,11 +183,11 @@ impl AdrscanWasm {
         if drift_report.total_items == 0 {
             return Ok("[]".to_string());
         }
-        
+
         // Generate simple proposals based on drift
         let mut proposals = Vec::new();
         let summary_parts: Vec<&str> = drift_report.summary.split("; ").collect();
-        
+
         for (i, item) in summary_parts.iter().enumerate() {
             if !item.is_empty() {
                 let adr_number = i + 1;
@@ -202,19 +200,23 @@ impl AdrscanWasm {
                 } else {
                     "Document Architectural Decision"
                 };
-                
+
                 let proposal = HashMap::from([
                     ("number", format!("{:04}", adr_number)),
                     ("title", title.to_string()),
                     ("status", "proposed".to_string()),
                     ("context", format!("Detected: {}", item)),
-                    ("decision", "Document the architectural decision for this technology choice.".to_string()),
+                    (
+                        "decision",
+                        "Document the architectural decision for this technology choice."
+                            .to_string(),
+                    ),
                 ]);
-                
+
                 proposals.push(proposal);
             }
         }
-        
+
         Ok(serde_json::to_string(&proposals)
             .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))?)
     }
@@ -227,7 +229,7 @@ impl AdrscanWasm {
             ("template_format", self.config.template.format.clone()),
             ("drift_enabled", self.config.drift.enabled.to_string()),
         ]);
-        
+
         JsValue::from_serde(&config_map)
             .map_err(|e| JsValue::from_str(&format!("Config serialization error: {}", e)))
     }
@@ -274,8 +276,8 @@ impl WasmUtils {
     /// Validate ADR template format
     #[wasm_bindgen]
     pub fn validate_template(template: &str) -> bool {
-        template.contains("# ") && 
-        (template.contains("## Status") || template.contains("## Decision"))
+        template.contains("# ")
+            && (template.contains("## Status") || template.contains("## Decision"))
     }
 
     /// Get default MADR template
@@ -298,11 +300,11 @@ pub fn version() -> String {
 pub fn features() -> JsValue {
     let features = vec![
         "parse_adr",
-        "detect_drift", 
+        "detect_drift",
         "propose",
         "frontmatter_parsing",
         "template_validation",
     ];
-    
+
     JsValue::from_serde(&features).unwrap_or(JsValue::NULL)
 }

@@ -1,13 +1,13 @@
+use chrono::Utc;
 use clap::Args;
 use std::path::PathBuf;
 #[cfg(feature = "tokio")]
 use tokio::runtime::Runtime;
-use chrono::Utc;
 
 use crate::{
-    config::Config, 
+    config::Config,
+    drift::{DriftCategory, DriftEngine, DriftItem, DriftReport, DriftSeverity},
     error::AdrscanError,
-    drift::{DriftEngine, DriftReport, DriftItem, DriftCategory, DriftSeverity}
 };
 
 type Result<T> = std::result::Result<T, AdrscanError>;
@@ -51,10 +51,12 @@ impl ProposeCommand {
     #[cfg(feature = "tokio")]
     pub fn execute(&self, config: &Config) -> Result<()> {
         log::info!("Generating ADR proposals...");
-        
+
         // Create async runtime
-        let rt = Runtime::new().map_err(|e| AdrscanError::DriftError(format!("Failed to create async runtime: {}", e)))?;
-        
+        let rt = Runtime::new().map_err(|e| {
+            AdrscanError::DriftError(format!("Failed to create async runtime: {}", e))
+        })?;
+
         rt.block_on(async {
             // Get or generate drift report
             let drift_report = if let Some(ref drift_file) = self.drift_file {
@@ -62,31 +64,33 @@ impl ProposeCommand {
             } else {
                 self.generate_drift_report(config).await?
             };
-            
+
             // Filter drift items based on criteria
             let filtered_items = self.filter_drift_items(&drift_report);
-            
+
             if filtered_items.is_empty() {
                 println!("✅ No drift items found that meet the criteria for ADR proposals.");
                 return Ok(());
             }
-            
-            println!("📋 Found {} drift items for ADR proposal generation", filtered_items.len());
-            
+
+            println!(
+                "📋 Found {} drift items for ADR proposal generation",
+                filtered_items.len()
+            );
+
             // Get ADR directory
             let adr_dir = self.adr_dir.as_ref().unwrap_or(&config.adr_dir);
-            
+
             // Ensure ADR directory exists
             if !adr_dir.exists() {
-                std::fs::create_dir_all(adr_dir)
-                    .map_err(|e| AdrscanError::Io(e))?;
+                std::fs::create_dir_all(adr_dir).map_err(|e| AdrscanError::Io(e))?;
                 log::info!("Created ADR directory: {}", adr_dir.display());
             }
-            
+
             // Generate proposals
             let mut proposals_created = 0;
             let mut proposals_skipped = 0;
-            
+
             for item in filtered_items {
                 match self.generate_adr_proposal(item, adr_dir, config).await {
                     Ok(adr_path) => {
@@ -98,42 +102,55 @@ impl ProposeCommand {
                         proposals_created += 1;
                     }
                     Err(e) => {
-                        log::warn!("Failed to create proposal for drift item '{}': {}", item.title, e);
+                        log::warn!(
+                            "Failed to create proposal for drift item '{}': {}",
+                            item.title,
+                            e
+                        );
                         proposals_skipped += 1;
                     }
                 }
             }
-            
+
             // Summary
             println!("\n📊 Proposal Generation Summary:");
             if self.dry_run {
-                println!("  🔍 Proposals that would be created: {}", proposals_created);
+                println!(
+                    "  🔍 Proposals that would be created: {}",
+                    proposals_created
+                );
             } else {
                 println!("  ✅ Proposals created: {}", proposals_created);
             }
             if proposals_skipped > 0 {
                 println!("  ⏭️  Proposals skipped: {}", proposals_skipped);
             }
-            
+
             if !self.dry_run && proposals_created > 0 {
                 println!("\n💡 Next steps:");
-                println!("  1. Review the generated ADR proposals in {}", adr_dir.display());
+                println!(
+                    "  1. Review the generated ADR proposals in {}",
+                    adr_dir.display()
+                );
                 println!("  2. Edit and customize the content as needed");
                 println!("  3. Update status from 'proposed' to 'accepted' once approved");
                 println!("  4. Commit the ADRs to your repository");
             }
-            
+
             Ok(())
         })
     }
-    
+
     /// Load drift report from file
     async fn load_drift_report(&self, drift_file: &PathBuf) -> Result<DriftReport> {
-        let content = std::fs::read_to_string(drift_file)
-            .map_err(|e| AdrscanError::FileNotFound(
-                format!("Cannot read drift file {}: {}", drift_file.display(), e)
-            ))?;
-        
+        let content = std::fs::read_to_string(drift_file).map_err(|e| {
+            AdrscanError::FileNotFound(format!(
+                "Cannot read drift file {}: {}",
+                drift_file.display(),
+                e
+            ))
+        })?;
+
         // Try to parse as JSON first, then YAML
         if let Ok(report) = serde_json::from_str::<DriftReport>(&content) {
             Ok(report)
@@ -141,41 +158,46 @@ impl ProposeCommand {
             Ok(report)
         } else {
             Err(AdrscanError::SerializationError(
-                "Drift file is not valid JSON or YAML".to_string()
+                "Drift file is not valid JSON or YAML".to_string(),
             ))
         }
     }
-    
+
     /// Generate drift report using drift detection engine
     async fn generate_drift_report(&self, config: &Config) -> Result<DriftReport> {
         let drift_engine = DriftEngine::new();
-        
+
         // Determine directories
-        let scan_dir = self.directory.as_ref()
+        let scan_dir = self
+            .directory
+            .as_ref()
             .map(|p| p.clone())
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
-        
+
         let adr_dir = self.adr_dir.as_ref().unwrap_or(&config.adr_dir);
-        
+
         // Get detection patterns from config
         let detection_patterns = &config.drift.detection_patterns;
-        
+
         // Perform drift detection
-        drift_engine.detect_drift(
-            adr_dir,
-            &scan_dir,
-            None, // No baseline for proposals
-            &detection_patterns,
-        ).await
+        drift_engine
+            .detect_drift(
+                adr_dir,
+                &scan_dir,
+                None, // No baseline for proposals
+                &detection_patterns,
+            )
+            .await
     }
-    
+
     /// Filter drift items based on command criteria
     fn filter_drift_items<'a>(&self, drift_report: &'a DriftReport) -> Vec<&'a DriftItem> {
         let mut filtered_items: Vec<&DriftItem> = drift_report.items.iter().collect();
-        
+
         // Filter by severity if specified
         if let Some(ref severities) = self.severity {
-            let severity_filters: Vec<DriftSeverity> = severities.iter()
+            let severity_filters: Vec<DriftSeverity> = severities
+                .iter()
                 .filter_map(|s| match s.to_lowercase().as_str() {
                     "critical" => Some(DriftSeverity::Critical),
                     "high" => Some(DriftSeverity::High),
@@ -185,21 +207,32 @@ impl ProposeCommand {
                     _ => None,
                 })
                 .collect();
-            
+
             if !severity_filters.is_empty() {
                 filtered_items.retain(|item| severity_filters.contains(&item.severity));
             }
         }
-        
+
         // Filter by category if specified
         if let Some(ref categories) = self.category {
-            let category_filters: Vec<DriftCategory> = categories.iter()
+            let category_filters: Vec<DriftCategory> = categories
+                .iter()
                 .filter_map(|s| match s.to_lowercase().as_str() {
-                    "newtechnology" | "new-technology" | "new_technology" => Some(DriftCategory::NewTechnology),
-                    "conflictingtechnology" | "conflicting-technology" | "conflicting_technology" => Some(DriftCategory::ConflictingTechnology),
-                    "deprecatedtechnology" | "deprecated-technology" | "deprecated_technology" => Some(DriftCategory::DeprecatedTechnology),
-                    "patternviolation" | "pattern-violation" | "pattern_violation" => Some(DriftCategory::PatternViolation),
-                    "missingcomponent" | "missing-component" | "missing_component" => Some(DriftCategory::MissingComponent),
+                    "newtechnology" | "new-technology" | "new_technology" => {
+                        Some(DriftCategory::NewTechnology)
+                    }
+                    "conflictingtechnology"
+                    | "conflicting-technology"
+                    | "conflicting_technology" => Some(DriftCategory::ConflictingTechnology),
+                    "deprecatedtechnology" | "deprecated-technology" | "deprecated_technology" => {
+                        Some(DriftCategory::DeprecatedTechnology)
+                    }
+                    "patternviolation" | "pattern-violation" | "pattern_violation" => {
+                        Some(DriftCategory::PatternViolation)
+                    }
+                    "missingcomponent" | "missing-component" | "missing_component" => {
+                        Some(DriftCategory::MissingComponent)
+                    }
                     "security" => Some(DriftCategory::Security),
                     "performance" => Some(DriftCategory::Performance),
                     "database" => Some(DriftCategory::Database),
@@ -210,18 +243,18 @@ impl ProposeCommand {
                     _ => None,
                 })
                 .collect();
-            
+
             if !category_filters.is_empty() {
                 filtered_items.retain(|item| category_filters.contains(&item.category));
             }
         }
-        
+
         // Only include items that would benefit from ADR documentation
         filtered_items.retain(|item| self.should_generate_adr_for_item(item));
-        
+
         filtered_items
     }
-    
+
     /// Determine if a drift item should have an ADR generated
     fn should_generate_adr_for_item(&self, item: &DriftItem) -> bool {
         match item.category {
@@ -236,10 +269,12 @@ impl ProposeCommand {
             DriftCategory::Infrastructure => true,
             DriftCategory::Framework => true,
             DriftCategory::Configuration => false, // Usually too granular
-            DriftCategory::Other => item.severity == DriftSeverity::Critical || item.severity == DriftSeverity::High,
+            DriftCategory::Other => {
+                item.severity == DriftSeverity::Critical || item.severity == DriftSeverity::High
+            }
         }
     }
-    
+
     /// Generate a single ADR proposal from a drift item
     async fn generate_adr_proposal(
         &self,
@@ -249,35 +284,37 @@ impl ProposeCommand {
     ) -> Result<PathBuf> {
         // Get next ADR number
         let adr_number = self.get_next_adr_number(adr_dir).await?;
-        
+
         // Generate ADR filename
         let title_slug = self.slugify(&drift_item.title);
         let filename = format!("{:04}-{}.md", adr_number, title_slug);
         let adr_path = adr_dir.join(&filename);
-        
+
         // Check if file already exists
         if adr_path.exists() && !self.force {
-            return Err(AdrscanError::InvalidArgument(
-                format!("ADR file already exists: {}. Use --force to overwrite", adr_path.display())
-            ));
+            return Err(AdrscanError::InvalidArgument(format!(
+                "ADR file already exists: {}. Use --force to overwrite",
+                adr_path.display()
+            )));
         }
-        
+
         // Generate ADR content
-        let adr_content = self.generate_adr_content(drift_item, adr_number, config).await?;
-        
+        let adr_content = self
+            .generate_adr_content(drift_item, adr_number, config)
+            .await?;
+
         // Write ADR file (unless dry run)
         if !self.dry_run {
-            std::fs::write(&adr_path, adr_content)
-                .map_err(|e| AdrscanError::Io(e))?;
+            std::fs::write(&adr_path, adr_content).map_err(|e| AdrscanError::Io(e))?;
         }
-        
+
         Ok(adr_path)
     }
-    
+
     /// Get the next available ADR number
     async fn get_next_adr_number(&self, adr_dir: &PathBuf) -> Result<u32> {
         let mut max_number = 0;
-        
+
         // Scan existing ADR files
         for entry in walkdir::WalkDir::new(adr_dir)
             .max_depth(1)
@@ -298,10 +335,10 @@ impl ProposeCommand {
                 }
             }
         }
-        
+
         Ok(max_number + 1)
     }
-    
+
     /// Convert title to URL-friendly slug
     fn slugify(&self, title: &str) -> String {
         title
@@ -317,7 +354,7 @@ impl ProposeCommand {
             .take(50) // Limit length
             .collect()
     }
-    
+
     /// Generate ADR content based on template and drift item
     async fn generate_adr_content(
         &self,
@@ -325,41 +362,50 @@ impl ProposeCommand {
         adr_number: u32,
         config: &Config,
     ) -> Result<String> {
-        let template_name = self.template.as_ref()
+        let template_name = self
+            .template
+            .as_ref()
             .or(Some(&config.template.format))
             .unwrap();
-        
+
         match template_name.as_str() {
             "madr" => self.generate_madr_content(drift_item, adr_number).await,
             "custom" => {
                 if let Some(ref custom_path) = config.template.custom_path {
-                    self.generate_custom_content(drift_item, adr_number, custom_path).await
+                    self.generate_custom_content(drift_item, adr_number, custom_path)
+                        .await
                 } else {
                     Err(AdrscanError::ConfigError(
-                        "Custom template specified but no custom_path configured".to_string()
+                        "Custom template specified but no custom_path configured".to_string(),
                     ))
                 }
             }
-            _ => Err(AdrscanError::InvalidArgument(
-                format!("Unsupported template: {}. Use 'madr' or 'custom'", template_name)
-            )),
+            _ => Err(AdrscanError::InvalidArgument(format!(
+                "Unsupported template: {}. Use 'madr' or 'custom'",
+                template_name
+            ))),
         }
     }
-    
+
     /// Generate MADR (Markdown Any Decision Records) format content
-    async fn generate_madr_content(&self, drift_item: &DriftItem, adr_number: u32) -> Result<String> {
+    async fn generate_madr_content(
+        &self,
+        drift_item: &DriftItem,
+        adr_number: u32,
+    ) -> Result<String> {
         let now = Utc::now();
         let date_str = now.format("%Y-%m-%d").to_string();
-        
+
         // Generate decision title
         let decision_title = self.generate_decision_title(drift_item);
-        
+
         // Generate context and decision sections
         let context = self.generate_context_section(drift_item);
         let decision = self.generate_decision_section(drift_item);
         let consequences = self.generate_consequences_section(drift_item);
-        
-        let content = format!(r#"---
+
+        let content = format!(
+            r#"---
 title: "{}"
 status: proposed
 date: {}
@@ -418,10 +464,10 @@ Proposed - Generated from drift detection
                 String::new()
             }
         );
-        
+
         Ok(content)
     }
-    
+
     /// Generate custom template content
     async fn generate_custom_content(
         &self,
@@ -429,37 +475,52 @@ Proposed - Generated from drift detection
         adr_number: u32,
         template_path: &PathBuf,
     ) -> Result<String> {
-        let template_content = std::fs::read_to_string(template_path)
-            .map_err(|e| AdrscanError::FileNotFound(
-                format!("Cannot read custom template {}: {}", template_path.display(), e)
-            ))?;
-        
+        let template_content = std::fs::read_to_string(template_path).map_err(|e| {
+            AdrscanError::FileNotFound(format!(
+                "Cannot read custom template {}: {}",
+                template_path.display(),
+                e
+            ))
+        })?;
+
         // Simple template variable replacement
         let mut content = template_content;
         let now = Utc::now();
-        
+
         // Replace template variables
         let replacements = [
             ("{{ADR_NUMBER}}", &format!("{:04}", adr_number)),
             ("{{ADR_TITLE}}", &self.generate_decision_title(drift_item)),
             ("{{DATE}}", &now.format("%Y-%m-%d").to_string()),
             ("{{STATUS}}", &"proposed".to_string()),
-            ("{{CATEGORY}}", &drift_item.category.to_string().to_lowercase()),
-            ("{{SEVERITY}}", &drift_item.severity.to_string().to_lowercase()),
-            ("{{DETECTED_FILE}}", &drift_item.location.file_path.display().to_string()),
+            (
+                "{{CATEGORY}}",
+                &drift_item.category.to_string().to_lowercase(),
+            ),
+            (
+                "{{SEVERITY}}",
+                &drift_item.severity.to_string().to_lowercase(),
+            ),
+            (
+                "{{DETECTED_FILE}}",
+                &drift_item.location.file_path.display().to_string(),
+            ),
             ("{{DESCRIPTION}}", &drift_item.description),
             ("{{CONTEXT}}", &self.generate_context_section(drift_item)),
             ("{{DECISION}}", &self.generate_decision_section(drift_item)),
-            ("{{CONSEQUENCES}}", &self.generate_consequences_section(drift_item)),
+            (
+                "{{CONSEQUENCES}}",
+                &self.generate_consequences_section(drift_item),
+            ),
         ];
-        
+
         for (placeholder, value) in &replacements {
             content = content.replace(placeholder, value);
         }
-        
+
         Ok(content)
     }
-    
+
     /// Generate appropriate decision title
     fn generate_decision_title(&self, drift_item: &DriftItem) -> String {
         match drift_item.category {
@@ -467,7 +528,10 @@ Proposed - Generated from drift detection
                 if let Some(ref tech) = drift_item.detected_technology {
                     format!("Use {} for {}", tech, self.infer_purpose(drift_item))
                 } else {
-                    format!("Address New Technology: {}", self.extract_technology_from_title(&drift_item.title))
+                    format!(
+                        "Address New Technology: {}",
+                        self.extract_technology_from_title(&drift_item.title)
+                    )
                 }
             }
             DriftCategory::ConflictingTechnology => {
@@ -487,43 +551,82 @@ Proposed - Generated from drift detection
             _ => format!("Address {}", drift_item.title),
         }
     }
-    
+
     /// Extract technology name from drift item title
     fn extract_technology_from_title(&self, title: &str) -> String {
         // Look for technology keywords in the title
         let words: Vec<&str> = title.split_whitespace().collect();
-        
+
         // Common patterns for technology extraction
         let tech_keywords = [
-            "Redis", "MongoDB", "PostgreSQL", "MySQL", "SQLite", "React", "Vue", "Angular",
-            "Docker", "Kubernetes", "Rust", "Python", "JavaScript", "TypeScript", "Java",
-            "Spring", "Django", "Flask", "Express", "GraphQL", "REST", "Nginx", "Apache"
+            "Redis",
+            "MongoDB",
+            "PostgreSQL",
+            "MySQL",
+            "SQLite",
+            "React",
+            "Vue",
+            "Angular",
+            "Docker",
+            "Kubernetes",
+            "Rust",
+            "Python",
+            "JavaScript",
+            "TypeScript",
+            "Java",
+            "Spring",
+            "Django",
+            "Flask",
+            "Express",
+            "GraphQL",
+            "REST",
+            "Nginx",
+            "Apache",
         ];
-        
+
         // First, look for exact technology matches
         for word in &words {
-            let clean_word = word.trim_end_matches(':').trim_end_matches(',').trim_end_matches('.');
+            let clean_word = word
+                .trim_end_matches(':')
+                .trim_end_matches(',')
+                .trim_end_matches('.');
             for tech in &tech_keywords {
                 if clean_word.eq_ignore_ascii_case(tech) {
                     return tech.to_string();
                 }
             }
         }
-        
+
         // Fallback: look for capitalized words that aren't common words
-        let common_words = ["Uncovered", "New", "Technology", "Framework", "Database", "Library", "Service", "Short"];
+        let common_words = [
+            "Uncovered",
+            "New",
+            "Technology",
+            "Framework",
+            "Database",
+            "Library",
+            "Service",
+            "Short",
+        ];
         for word in words {
-            let clean_word = word.trim_end_matches(':').trim_end_matches(',').trim_end_matches('.');
-            if clean_word.len() > 3 && 
-               clean_word.chars().next().map_or(false, |c| c.is_uppercase()) &&
-               !common_words.contains(&clean_word) {
+            let clean_word = word
+                .trim_end_matches(':')
+                .trim_end_matches(',')
+                .trim_end_matches('.');
+            if clean_word.len() > 3
+                && clean_word
+                    .chars()
+                    .next()
+                    .map_or(false, |c| c.is_uppercase())
+                && !common_words.contains(&clean_word)
+            {
                 return clean_word.to_string();
             }
         }
-        
+
         "Unknown Technology".to_string()
     }
-    
+
     /// Infer the purpose/domain of the technology
     fn infer_purpose(&self, drift_item: &DriftItem) -> String {
         match drift_item.category {
@@ -534,7 +637,11 @@ Proposed - Generated from drift detection
             DriftCategory::Performance => "Performance Optimization",
             _ => {
                 // Try to infer from file path
-                let file_path = drift_item.location.file_path.to_string_lossy().to_lowercase();
+                let file_path = drift_item
+                    .location
+                    .file_path
+                    .to_string_lossy()
+                    .to_lowercase();
                 if file_path.contains("database") || file_path.contains("db") {
                     "Data Management"
                 } else if file_path.contains("api") || file_path.contains("server") {
@@ -547,9 +654,10 @@ Proposed - Generated from drift detection
                     "Application Development"
                 }
             }
-        }.to_string()
+        }
+        .to_string()
     }
-    
+
     /// Generate context section
     fn generate_context_section(&self, drift_item: &DriftItem) -> String {
         format!(
@@ -573,7 +681,7 @@ Proposed - Generated from drift detection
             }
         )
     }
-    
+
     /// Generate decision section
     fn generate_decision_section(&self, drift_item: &DriftItem) -> String {
         match drift_item.category {
@@ -623,7 +731,7 @@ Proposed - Generated from drift detection
             }
         }
     }
-    
+
     /// Generate consequences section
     fn generate_consequences_section(&self, drift_item: &DriftItem) -> String {
         match drift_item.category {
@@ -679,11 +787,11 @@ Proposed - Generated from drift detection
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{Config, DriftConfig, TemplateConfig};
+    use crate::drift::{DriftCategory, DriftItem, DriftLocation, DriftReport, DriftSeverity};
     use std::fs;
     use std::path::Path;
     use tempfile::TempDir;
-    use crate::drift::{DriftReport, DriftItem, DriftSeverity, DriftCategory, DriftLocation};
-    use crate::config::{Config, TemplateConfig, DriftConfig};
 
     fn create_test_config(adr_dir: &PathBuf) -> Config {
         Config {
@@ -704,7 +812,7 @@ mod tests {
 
     fn create_test_drift_report(temp_dir: &Path) -> DriftReport {
         let mut report = DriftReport::new(temp_dir.to_path_buf(), None);
-        
+
         // Add drift items for different scenarios
         let new_tech_item = DriftItem::new(
             "new_tech_1".to_string(),
@@ -716,9 +824,9 @@ mod tests {
         )
         .with_technology("Redis".to_string())
         .with_suggested_action("Create an ADR for Redis usage".to_string());
-        
+
         report.add_item(new_tech_item);
-        
+
         let conflict_item = DriftItem::new(
             "conflict_1".to_string(),
             DriftSeverity::Critical,
@@ -729,9 +837,9 @@ mod tests {
         )
         .with_technology("MongoDB".to_string())
         .with_suggested_action("Remove MongoDB or update the ADR".to_string());
-        
+
         report.add_item(conflict_item);
-        
+
         let security_item = DriftItem::new(
             "security_1".to_string(),
             DriftSeverity::High,
@@ -741,9 +849,9 @@ mod tests {
             DriftLocation::new(PathBuf::from("src/auth.rs")).with_line(25),
         )
         .with_technology("JWT".to_string());
-        
+
         report.add_item(security_item);
-        
+
         // Add a configuration drift that should be filtered out
         let config_item = DriftItem::new(
             "config_1".to_string(),
@@ -753,27 +861,28 @@ mod tests {
             "Minor configuration change".to_string(),
             DriftLocation::new(PathBuf::from("config.toml")),
         );
-        
+
         report.add_item(config_item);
-        
+
         report
     }
 
     fn create_test_drift_file(temp_dir: &Path, filename: &str) -> PathBuf {
         let drift_report = create_test_drift_report(temp_dir);
         let drift_file = temp_dir.join(filename);
-        
+
         let json_content = drift_report.to_json().unwrap();
         fs::write(&drift_file, json_content).unwrap();
-        
+
         drift_file
     }
 
     fn create_existing_adr(adr_dir: &PathBuf, number: u32, title: &str) -> PathBuf {
         let filename = format!("{:04}-{}.md", number, title);
         let adr_path = adr_dir.join(&filename);
-        
-        let content = format!(r#"---
+
+        let content = format!(
+            r#"---
 title: "Existing ADR {}"
 status: accepted
 ---
@@ -781,8 +890,10 @@ status: accepted
 # Existing ADR {}
 
 This is an existing ADR.
-"#, number, number);
-        
+"#,
+            number, number
+        );
+
         fs::write(&adr_path, content).unwrap();
         adr_path
     }
@@ -799,7 +910,7 @@ This is an existing ADR.
             dry_run: false,
             force: false,
         };
-        
+
         assert!(cmd.drift_file.is_none());
         assert!(cmd.template.is_none());
         assert!(!cmd.dry_run);
@@ -810,7 +921,7 @@ This is an existing ADR.
     fn test_propose_command_with_options() {
         let temp_dir = TempDir::new().unwrap();
         let drift_file = temp_dir.path().join("drift.json");
-        
+
         let cmd = ProposeCommand {
             drift_file: Some(drift_file.clone()),
             template: Some("custom".to_string()),
@@ -821,10 +932,13 @@ This is an existing ADR.
             dry_run: true,
             force: true,
         };
-        
+
         assert_eq!(cmd.drift_file, Some(drift_file));
         assert_eq!(cmd.template, Some("custom".to_string()));
-        assert_eq!(cmd.severity, Some(vec!["critical".to_string(), "high".to_string()]));
+        assert_eq!(
+            cmd.severity,
+            Some(vec!["critical".to_string(), "high".to_string()])
+        );
         assert_eq!(cmd.category, Some(vec!["new-technology".to_string()]));
         assert!(cmd.dry_run);
         assert!(cmd.force);
@@ -834,7 +948,7 @@ This is an existing ADR.
     async fn test_load_drift_report_json() {
         let temp_dir = TempDir::new().unwrap();
         let drift_file = create_test_drift_file(temp_dir.path(), "drift.json");
-        
+
         let cmd = ProposeCommand {
             drift_file: Some(drift_file),
             template: None,
@@ -845,12 +959,15 @@ This is an existing ADR.
             dry_run: false,
             force: false,
         };
-        
+
         let drift_file_path = cmd.drift_file.as_ref().unwrap();
         let report = cmd.load_drift_report(drift_file_path).await.unwrap();
         assert_eq!(report.total_items, 4);
         assert!(report.items.iter().any(|item| item.title.contains("Redis")));
-        assert!(report.items.iter().any(|item| item.title.contains("MongoDB")));
+        assert!(report
+            .items
+            .iter()
+            .any(|item| item.title.contains("MongoDB")));
     }
 
     #[tokio::test]
@@ -858,10 +975,10 @@ This is an existing ADR.
         let temp_dir = TempDir::new().unwrap();
         let drift_report = create_test_drift_report(temp_dir.path());
         let drift_file = temp_dir.path().join("drift.yaml");
-        
+
         let yaml_content = drift_report.to_yaml().unwrap();
         fs::write(&drift_file, yaml_content).unwrap();
-        
+
         let cmd = ProposeCommand {
             drift_file: Some(drift_file.clone()),
             template: None,
@@ -872,7 +989,7 @@ This is an existing ADR.
             dry_run: false,
             force: false,
         };
-        
+
         let report = cmd.load_drift_report(&drift_file).await.unwrap();
         assert_eq!(report.total_items, 4);
     }
@@ -882,7 +999,7 @@ This is an existing ADR.
         let temp_dir = TempDir::new().unwrap();
         let invalid_file = temp_dir.path().join("invalid.json");
         fs::write(&invalid_file, "invalid json content").unwrap();
-        
+
         let cmd = ProposeCommand {
             drift_file: Some(invalid_file.clone()),
             template: None,
@@ -893,7 +1010,7 @@ This is an existing ADR.
             dry_run: false,
             force: false,
         };
-        
+
         let result = cmd.load_drift_report(&invalid_file).await;
         assert!(result.is_err());
     }
@@ -902,7 +1019,7 @@ This is an existing ADR.
     fn test_filter_drift_items_by_severity() {
         let temp_dir = TempDir::new().unwrap();
         let drift_report = create_test_drift_report(temp_dir.path());
-        
+
         let cmd = ProposeCommand {
             drift_file: None,
             template: None,
@@ -913,22 +1030,22 @@ This is an existing ADR.
             dry_run: false,
             force: false,
         };
-        
+
         let filtered = cmd.filter_drift_items(&drift_report);
-        
+
         // Should filter to only critical and high severity items
         assert_eq!(filtered.len(), 3); // Redis (High), MongoDB (Critical), JWT (High)
-        assert!(filtered.iter().all(|item| 
-            item.severity == DriftSeverity::Critical || 
-            item.severity == DriftSeverity::High
-        ));
+        assert!(filtered
+            .iter()
+            .all(|item| item.severity == DriftSeverity::Critical
+                || item.severity == DriftSeverity::High));
     }
 
     #[test]
     fn test_filter_drift_items_by_category() {
         let temp_dir = TempDir::new().unwrap();
         let drift_report = create_test_drift_report(temp_dir.path());
-        
+
         let cmd = ProposeCommand {
             drift_file: None,
             template: None,
@@ -939,19 +1056,21 @@ This is an existing ADR.
             dry_run: false,
             force: false,
         };
-        
+
         let filtered = cmd.filter_drift_items(&drift_report);
-        
+
         // Should filter to only new technology items
         assert_eq!(filtered.len(), 1); // Only Redis
-        assert!(filtered.iter().all(|item| item.category == DriftCategory::NewTechnology));
+        assert!(filtered
+            .iter()
+            .all(|item| item.category == DriftCategory::NewTechnology));
     }
 
     #[test]
     fn test_filter_drift_items_excludes_configuration() {
         let temp_dir = TempDir::new().unwrap();
         let drift_report = create_test_drift_report(temp_dir.path());
-        
+
         let cmd = ProposeCommand {
             drift_file: None,
             template: None,
@@ -962,11 +1081,13 @@ This is an existing ADR.
             dry_run: false,
             force: false,
         };
-        
+
         let filtered = cmd.filter_drift_items(&drift_report);
-        
+
         // Should exclude configuration items by default
-        assert!(!filtered.iter().any(|item| item.category == DriftCategory::Configuration));
+        assert!(!filtered
+            .iter()
+            .any(|item| item.category == DriftCategory::Configuration));
     }
 
     #[test]
@@ -981,32 +1102,52 @@ This is an existing ADR.
             dry_run: false,
             force: false,
         };
-        
+
         // Should generate ADR for these categories
         assert!(cmd.should_generate_adr_for_item(&DriftItem::new(
-            "test".to_string(), DriftSeverity::High, DriftCategory::NewTechnology,
-            "test".to_string(), "test".to_string(), DriftLocation::new(PathBuf::from("test"))
+            "test".to_string(),
+            DriftSeverity::High,
+            DriftCategory::NewTechnology,
+            "test".to_string(),
+            "test".to_string(),
+            DriftLocation::new(PathBuf::from("test"))
         )));
-        
+
         assert!(cmd.should_generate_adr_for_item(&DriftItem::new(
-            "test".to_string(), DriftSeverity::Critical, DriftCategory::ConflictingTechnology,
-            "test".to_string(), "test".to_string(), DriftLocation::new(PathBuf::from("test"))
+            "test".to_string(),
+            DriftSeverity::Critical,
+            DriftCategory::ConflictingTechnology,
+            "test".to_string(),
+            "test".to_string(),
+            DriftLocation::new(PathBuf::from("test"))
         )));
-        
+
         assert!(cmd.should_generate_adr_for_item(&DriftItem::new(
-            "test".to_string(), DriftSeverity::High, DriftCategory::Security,
-            "test".to_string(), "test".to_string(), DriftLocation::new(PathBuf::from("test"))
+            "test".to_string(),
+            DriftSeverity::High,
+            DriftCategory::Security,
+            "test".to_string(),
+            "test".to_string(),
+            DriftLocation::new(PathBuf::from("test"))
         )));
-        
+
         // Should NOT generate ADR for these categories
         assert!(!cmd.should_generate_adr_for_item(&DriftItem::new(
-            "test".to_string(), DriftSeverity::Low, DriftCategory::Configuration,
-            "test".to_string(), "test".to_string(), DriftLocation::new(PathBuf::from("test"))
+            "test".to_string(),
+            DriftSeverity::Low,
+            DriftCategory::Configuration,
+            "test".to_string(),
+            "test".to_string(),
+            DriftLocation::new(PathBuf::from("test"))
         )));
-        
+
         assert!(!cmd.should_generate_adr_for_item(&DriftItem::new(
-            "test".to_string(), DriftSeverity::Medium, DriftCategory::DeprecatedTechnology,
-            "test".to_string(), "test".to_string(), DriftLocation::new(PathBuf::from("test"))
+            "test".to_string(),
+            DriftSeverity::Medium,
+            DriftCategory::DeprecatedTechnology,
+            "test".to_string(),
+            "test".to_string(),
+            DriftLocation::new(PathBuf::from("test"))
         )));
     }
 
@@ -1015,7 +1156,7 @@ This is an existing ADR.
         let temp_dir = TempDir::new().unwrap();
         let adr_dir = temp_dir.path().to_path_buf();
         fs::create_dir_all(&adr_dir).unwrap();
-        
+
         let cmd = ProposeCommand {
             drift_file: None,
             template: None,
@@ -1026,7 +1167,7 @@ This is an existing ADR.
             dry_run: false,
             force: false,
         };
-        
+
         let next_number = cmd.get_next_adr_number(&adr_dir).await.unwrap();
         assert_eq!(next_number, 1);
     }
@@ -1036,12 +1177,12 @@ This is an existing ADR.
         let temp_dir = TempDir::new().unwrap();
         let adr_dir = temp_dir.path().to_path_buf();
         fs::create_dir_all(&adr_dir).unwrap();
-        
+
         // Create some existing ADRs
         create_existing_adr(&adr_dir, 1, "first-adr");
         create_existing_adr(&adr_dir, 3, "third-adr");
         create_existing_adr(&adr_dir, 5, "fifth-adr");
-        
+
         let cmd = ProposeCommand {
             drift_file: None,
             template: None,
@@ -1052,7 +1193,7 @@ This is an existing ADR.
             dry_run: false,
             force: false,
         };
-        
+
         let next_number = cmd.get_next_adr_number(&adr_dir).await.unwrap();
         assert_eq!(next_number, 6); // Should be highest + 1
     }
@@ -1069,14 +1210,21 @@ This is an existing ADR.
             dry_run: false,
             force: false,
         };
-        
-        assert_eq!(cmd.slugify("Use Redis for Caching"), "use-redis-for-caching");
-        assert_eq!(cmd.slugify("Handle Special!@#$%Characters"), "handle-special-characters");
+
+        assert_eq!(
+            cmd.slugify("Use Redis for Caching"),
+            "use-redis-for-caching"
+        );
+        assert_eq!(
+            cmd.slugify("Handle Special!@#$%Characters"),
+            "handle-special-characters"
+        );
         assert_eq!(cmd.slugify("Multiple   Spaces"), "multiple-spaces");
         assert_eq!(cmd.slugify("UPPERCASE Title"), "uppercase-title");
-        
+
         // Test length limit
-        let long_title = "This is a very long title that should be truncated to avoid extremely long filenames";
+        let long_title =
+            "This is a very long title that should be truncated to avoid extremely long filenames";
         let slugified = cmd.slugify(long_title);
         assert!(slugified.len() <= 50);
     }
@@ -1093,7 +1241,7 @@ This is an existing ADR.
             dry_run: false,
             force: false,
         };
-        
+
         let drift_item = DriftItem::new(
             "test_item".to_string(),
             DriftSeverity::High,
@@ -1104,9 +1252,9 @@ This is an existing ADR.
         )
         .with_technology("Redis".to_string())
         .with_suggested_action("Create an ADR for Redis".to_string());
-        
+
         let content = cmd.generate_madr_content(&drift_item, 42).await.unwrap();
-        
+
         // Check MADR format structure
         assert!(content.contains("---"));
         assert!(content.contains("title:"));
@@ -1125,7 +1273,7 @@ This is an existing ADR.
     async fn test_generate_custom_content() {
         let temp_dir = TempDir::new().unwrap();
         let template_path = temp_dir.path().join("custom_template.md");
-        
+
         let template_content = r#"---
 title: "{{ADR_TITLE}}"
 number: {{ADR_NUMBER}}
@@ -1148,9 +1296,9 @@ Detected in: {{DETECTED_FILE}}
 ## Description
 {{DESCRIPTION}}
 "#;
-        
+
         fs::write(&template_path, template_content).unwrap();
-        
+
         let cmd = ProposeCommand {
             drift_file: None,
             template: None,
@@ -1161,7 +1309,7 @@ Detected in: {{DETECTED_FILE}}
             dry_run: false,
             force: false,
         };
-        
+
         let drift_item = DriftItem::new(
             "test_item".to_string(),
             DriftSeverity::Critical,
@@ -1171,9 +1319,12 @@ Detected in: {{DETECTED_FILE}}
             DriftLocation::new(PathBuf::from("src/db.rs")),
         )
         .with_technology("MongoDB".to_string());
-        
-        let content = cmd.generate_custom_content(&drift_item, 10, &template_path).await.unwrap();
-        
+
+        let content = cmd
+            .generate_custom_content(&drift_item, 10, &template_path)
+            .await
+            .unwrap();
+
         // Check template variable replacement
         assert!(content.contains("number: 0010"));
         assert!(content.contains("status: proposed"));
@@ -1195,34 +1346,48 @@ Detected in: {{DETECTED_FILE}}
             dry_run: false,
             force: false,
         };
-        
+
         // Test new technology
         let new_tech_item = DriftItem::new(
-            "test".to_string(), DriftSeverity::High, DriftCategory::NewTechnology,
-            "test".to_string(), "test".to_string(), DriftLocation::new(PathBuf::from("src/cache.rs"))
-        ).with_technology("Redis".to_string());
-        
+            "test".to_string(),
+            DriftSeverity::High,
+            DriftCategory::NewTechnology,
+            "test".to_string(),
+            "test".to_string(),
+            DriftLocation::new(PathBuf::from("src/cache.rs")),
+        )
+        .with_technology("Redis".to_string());
+
         let title = cmd.generate_decision_title(&new_tech_item);
         assert!(title.contains("Redis"));
         assert!(title.contains("Use"));
-        
+
         // Test conflicting technology
         let conflict_item = DriftItem::new(
-            "test".to_string(), DriftSeverity::Critical, DriftCategory::ConflictingTechnology,
-            "test".to_string(), "test".to_string(), DriftLocation::new(PathBuf::from("test"))
-        ).with_technology("MongoDB".to_string());
-        
+            "test".to_string(),
+            DriftSeverity::Critical,
+            DriftCategory::ConflictingTechnology,
+            "test".to_string(),
+            "test".to_string(),
+            DriftLocation::new(PathBuf::from("test")),
+        )
+        .with_technology("MongoDB".to_string());
+
         let title = cmd.generate_decision_title(&conflict_item);
         assert!(title.contains("MongoDB"));
         assert!(title.contains("Resolve"));
         assert!(title.contains("Conflict"));
-        
+
         // Test security category
         let security_item = DriftItem::new(
-            "test".to_string(), DriftSeverity::High, DriftCategory::Security,
-            "test".to_string(), "test".to_string(), DriftLocation::new(PathBuf::from("test"))
+            "test".to_string(),
+            DriftSeverity::High,
+            DriftCategory::Security,
+            "test".to_string(),
+            "test".to_string(),
+            DriftLocation::new(PathBuf::from("test")),
         );
-        
+
         let title = cmd.generate_decision_title(&security_item);
         assert!(title.contains("Security"));
     }
@@ -1239,11 +1404,23 @@ Detected in: {{DETECTED_FILE}}
             dry_run: false,
             force: false,
         };
-        
-        assert_eq!(cmd.extract_technology_from_title("Uncovered technology: Redis"), "Redis");
-        assert_eq!(cmd.extract_technology_from_title("New framework: React"), "React");
-        assert_eq!(cmd.extract_technology_from_title("Database: PostgreSQL"), "PostgreSQL");
-        assert_eq!(cmd.extract_technology_from_title("Short"), "Unknown Technology");
+
+        assert_eq!(
+            cmd.extract_technology_from_title("Uncovered technology: Redis"),
+            "Redis"
+        );
+        assert_eq!(
+            cmd.extract_technology_from_title("New framework: React"),
+            "React"
+        );
+        assert_eq!(
+            cmd.extract_technology_from_title("Database: PostgreSQL"),
+            "PostgreSQL"
+        );
+        assert_eq!(
+            cmd.extract_technology_from_title("Short"),
+            "Unknown Technology"
+        );
     }
 
     #[test]
@@ -1258,30 +1435,46 @@ Detected in: {{DETECTED_FILE}}
             dry_run: false,
             force: false,
         };
-        
+
         // Test category-based inference
         let db_item = DriftItem::new(
-            "test".to_string(), DriftSeverity::High, DriftCategory::Database,
-            "test".to_string(), "test".to_string(), DriftLocation::new(PathBuf::from("test"))
+            "test".to_string(),
+            DriftSeverity::High,
+            DriftCategory::Database,
+            "test".to_string(),
+            "test".to_string(),
+            DriftLocation::new(PathBuf::from("test")),
         );
         assert_eq!(cmd.infer_purpose(&db_item), "Data Persistence");
-        
+
         let framework_item = DriftItem::new(
-            "test".to_string(), DriftSeverity::High, DriftCategory::Framework,
-            "test".to_string(), "test".to_string(), DriftLocation::new(PathBuf::from("test"))
+            "test".to_string(),
+            DriftSeverity::High,
+            DriftCategory::Framework,
+            "test".to_string(),
+            "test".to_string(),
+            DriftLocation::new(PathBuf::from("test")),
         );
         assert_eq!(cmd.infer_purpose(&framework_item), "Application Framework");
-        
+
         // Test file path-based inference
         let api_item = DriftItem::new(
-            "test".to_string(), DriftSeverity::High, DriftCategory::NewTechnology,
-            "test".to_string(), "test".to_string(), DriftLocation::new(PathBuf::from("src/api/server.rs"))
+            "test".to_string(),
+            DriftSeverity::High,
+            DriftCategory::NewTechnology,
+            "test".to_string(),
+            "test".to_string(),
+            DriftLocation::new(PathBuf::from("src/api/server.rs")),
         );
         assert_eq!(cmd.infer_purpose(&api_item), "Backend Services");
-        
+
         let frontend_item = DriftItem::new(
-            "test".to_string(), DriftSeverity::High, DriftCategory::NewTechnology,
-            "test".to_string(), "test".to_string(), DriftLocation::new(PathBuf::from("frontend/ui/components.js"))
+            "test".to_string(),
+            DriftSeverity::High,
+            DriftCategory::NewTechnology,
+            "test".to_string(),
+            "test".to_string(),
+            DriftLocation::new(PathBuf::from("frontend/ui/components.js")),
         );
         assert_eq!(cmd.infer_purpose(&frontend_item), "Frontend Development");
     }
@@ -1298,7 +1491,7 @@ Detected in: {{DETECTED_FILE}}
             dry_run: false,
             force: false,
         };
-        
+
         let drift_item = DriftItem::new(
             "test".to_string(),
             DriftSeverity::High,
@@ -1309,9 +1502,9 @@ Detected in: {{DETECTED_FILE}}
         )
         .with_technology("Redis".to_string())
         .with_suggested_action("Document Redis usage".to_string());
-        
+
         let context = cmd.generate_context_section(&drift_item);
-        
+
         assert!(context.contains("Redis"));
         assert!(context.contains("src/cache.rs"));
         assert!(context.contains("New Technology"));
@@ -1332,25 +1525,35 @@ Detected in: {{DETECTED_FILE}}
             dry_run: false,
             force: false,
         };
-        
+
         // Test new technology decision
         let new_tech_item = DriftItem::new(
-            "test".to_string(), DriftSeverity::High, DriftCategory::NewTechnology,
-            "test".to_string(), "test".to_string(), DriftLocation::new(PathBuf::from("test"))
-        ).with_technology("Redis".to_string());
-        
+            "test".to_string(),
+            DriftSeverity::High,
+            DriftCategory::NewTechnology,
+            "test".to_string(),
+            "test".to_string(),
+            DriftLocation::new(PathBuf::from("test")),
+        )
+        .with_technology("Redis".to_string());
+
         let decision = cmd.generate_decision_section(&new_tech_item);
         assert!(decision.contains("adopt"));
         assert!(decision.contains("Redis"));
         assert!(decision.contains("Rationale"));
         assert!(decision.contains("Alternatives"));
-        
+
         // Test conflicting technology decision
         let conflict_item = DriftItem::new(
-            "test".to_string(), DriftSeverity::Critical, DriftCategory::ConflictingTechnology,
-            "test".to_string(), "test".to_string(), DriftLocation::new(PathBuf::from("test"))
-        ).with_suggested_action("Remove the technology".to_string());
-        
+            "test".to_string(),
+            DriftSeverity::Critical,
+            DriftCategory::ConflictingTechnology,
+            "test".to_string(),
+            "test".to_string(),
+            DriftLocation::new(PathBuf::from("test")),
+        )
+        .with_suggested_action("Remove the technology".to_string());
+
         let decision = cmd.generate_decision_section(&conflict_item);
         assert!(decision.contains("remove the technology"));
         assert!(decision.contains("Options:"));
@@ -1369,26 +1572,34 @@ Detected in: {{DETECTED_FILE}}
             dry_run: false,
             force: false,
         };
-        
+
         // Test new technology consequences
         let new_tech_item = DriftItem::new(
-            "test".to_string(), DriftSeverity::High, DriftCategory::NewTechnology,
-            "test".to_string(), "test".to_string(), DriftLocation::new(PathBuf::from("test"))
+            "test".to_string(),
+            DriftSeverity::High,
+            DriftCategory::NewTechnology,
+            "test".to_string(),
+            "test".to_string(),
+            DriftLocation::new(PathBuf::from("test")),
         );
-        
+
         let consequences = cmd.generate_consequences_section(&new_tech_item);
         assert!(consequences.contains("Positive consequences:"));
         assert!(consequences.contains("Negative consequences:"));
         assert!(consequences.contains("Neutral consequences:"));
         assert!(consequences.contains("functionality without disruption"));
         assert!(consequences.contains("technology surface area"));
-        
+
         // Test conflicting technology consequences
         let conflict_item = DriftItem::new(
-            "test".to_string(), DriftSeverity::Critical, DriftCategory::ConflictingTechnology,
-            "test".to_string(), "test".to_string(), DriftLocation::new(PathBuf::from("test"))
+            "test".to_string(),
+            DriftSeverity::Critical,
+            DriftCategory::ConflictingTechnology,
+            "test".to_string(),
+            "test".to_string(),
+            DriftLocation::new(PathBuf::from("test")),
         );
-        
+
         let consequences = cmd.generate_consequences_section(&conflict_item);
         assert!(consequences.contains("Resolves the conflict"));
         assert!(consequences.contains("Risks:"));
@@ -1400,9 +1611,9 @@ Detected in: {{DETECTED_FILE}}
         let temp_dir = TempDir::new().unwrap();
         let adr_dir = temp_dir.path().join("adr");
         fs::create_dir_all(&adr_dir).unwrap();
-        
+
         let config = create_test_config(&adr_dir);
-        
+
         let cmd = ProposeCommand {
             drift_file: None,
             template: None,
@@ -1413,7 +1624,7 @@ Detected in: {{DETECTED_FILE}}
             dry_run: true,
             force: false,
         };
-        
+
         let drift_item = DriftItem::new(
             "test".to_string(),
             DriftSeverity::High,
@@ -1421,11 +1632,14 @@ Detected in: {{DETECTED_FILE}}
             "Test technology".to_string(),
             "Test description".to_string(),
             DriftLocation::new(PathBuf::from("test.rs")),
-        ).with_technology("TestTech".to_string());
-        
-        let result = cmd.generate_adr_proposal(&drift_item, &adr_dir, &config).await;
+        )
+        .with_technology("TestTech".to_string());
+
+        let result = cmd
+            .generate_adr_proposal(&drift_item, &adr_dir, &config)
+            .await;
         assert!(result.is_ok());
-        
+
         let adr_path = result.unwrap();
         // In dry run mode, file should not actually be created
         assert!(!adr_path.exists());
@@ -1437,16 +1651,9 @@ Detected in: {{DETECTED_FILE}}
         let temp_dir = TempDir::new().unwrap();
         let adr_dir = temp_dir.path().join("adr");
         fs::create_dir_all(&adr_dir).unwrap();
-        
+
         // Create an existing ADR file that would conflict
         // Use the same naming logic as the generate_adr_proposal function
-        let cmd = ProposeCommand { drift_file: None, template: None, directory: None, adr_dir: None, severity: None, category: None, dry_run: false, force: false };
-        let title_slug = cmd.slugify("Test technology");
-        let existing_path = adr_dir.join(format!("0001-{}.md", title_slug));
-        fs::write(&existing_path, "existing content").unwrap();
-        
-        let config = create_test_config(&adr_dir);
-        
         let cmd = ProposeCommand {
             drift_file: None,
             template: None,
@@ -1457,7 +1664,23 @@ Detected in: {{DETECTED_FILE}}
             dry_run: false,
             force: false,
         };
-        
+        let title_slug = cmd.slugify("Test technology");
+        let existing_path = adr_dir.join(format!("0001-{}.md", title_slug));
+        fs::write(&existing_path, "existing content").unwrap();
+
+        let config = create_test_config(&adr_dir);
+
+        let cmd = ProposeCommand {
+            drift_file: None,
+            template: None,
+            directory: None,
+            adr_dir: None,
+            severity: None,
+            category: None,
+            dry_run: false,
+            force: false,
+        };
+
         let drift_item = DriftItem::new(
             "test".to_string(),
             DriftSeverity::High,
@@ -1466,8 +1689,10 @@ Detected in: {{DETECTED_FILE}}
             "Test description".to_string(),
             DriftLocation::new(PathBuf::from("test.rs")),
         );
-        
-        let result = cmd.generate_adr_proposal(&drift_item, &adr_dir, &config).await;
+
+        let result = cmd
+            .generate_adr_proposal(&drift_item, &adr_dir, &config)
+            .await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("already exists"));
     }
@@ -1477,13 +1702,13 @@ Detected in: {{DETECTED_FILE}}
         let temp_dir = TempDir::new().unwrap();
         let adr_dir = temp_dir.path().join("adr");
         fs::create_dir_all(&adr_dir).unwrap();
-        
+
         // Create an existing ADR file
         let existing_path = adr_dir.join("0001-test-technology.md");
         fs::write(&existing_path, "old content").unwrap();
-        
+
         let config = create_test_config(&adr_dir);
-        
+
         let cmd = ProposeCommand {
             drift_file: None,
             template: None,
@@ -1494,7 +1719,7 @@ Detected in: {{DETECTED_FILE}}
             dry_run: false,
             force: true,
         };
-        
+
         let drift_item = DriftItem::new(
             "test".to_string(),
             DriftSeverity::High,
@@ -1502,14 +1727,17 @@ Detected in: {{DETECTED_FILE}}
             "Test technology".to_string(),
             "Test description".to_string(),
             DriftLocation::new(PathBuf::from("test.rs")),
-        ).with_technology("TestTech".to_string());
-        
-        let result = cmd.generate_adr_proposal(&drift_item, &adr_dir, &config).await;
+        )
+        .with_technology("TestTech".to_string());
+
+        let result = cmd
+            .generate_adr_proposal(&drift_item, &adr_dir, &config)
+            .await;
         assert!(result.is_ok());
-        
+
         let adr_path = result.unwrap();
         assert!(adr_path.exists());
-        
+
         // Content should be overwritten
         let content = fs::read_to_string(&adr_path).unwrap();
         assert!(content.contains("TestTech"));
