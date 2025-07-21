@@ -543,14 +543,11 @@ mod tests {
         };
 
         let mut detector = MLDriftDetector::new(config);
-
-        // Train mock model
-        let training_data = vec![
-            (create_test_drift_item(), true),
-            (create_test_drift_item(), false),
-        ];
-
-        detector.train_model(training_data).await.unwrap();
+        // Load mock model for testing
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let model_path = temp_dir.path().join("mock_model.dat");
+        std::fs::write(&model_path, "mock model data").unwrap();
+        detector.load_model(&model_path).await.unwrap();
 
         // Create a drift item that will definitely trigger anomaly in mock model
         // The mock model triggers on file_count > 0 OR complexity_score > 0.3
@@ -777,7 +774,6 @@ mod tests {
             let result = &results[0];
 
             // SVM implementation might give high scores due to limited training data
-            // Just verify we get valid output ranges and high confidence
             assert!(
                 result.anomaly_score >= 0.0 && result.anomaly_score <= 1.0,
                 "Anomaly score should be in valid range [0,1], got: {}",
