@@ -2,8 +2,8 @@
 
 > Next-generation Architecture Decision Record (ADR) management with ML-enhanced drift detection for intelligent development governance.
 
-[![Version](https://img.shields.io/badge/version-0.2.0--alpha.20250720-blue)](https://github.com/tbowman01/PhotonDrift/releases)
-[![Tests](https://img.shields.io/badge/tests-140%2F144%20passing-green)](https://github.com/tbowman01/PhotonDrift/actions)
+[![Version](https://img.shields.io/badge/version-0.2.0--alpha.20250721-blue)](https://github.com/tbowman01/PhotonDrift/releases)
+[![Tests](https://img.shields.io/badge/tests-178%2F182%20passing-green)](https://github.com/tbowman01/PhotonDrift/actions)
 [![ML Coverage](https://img.shields.io/badge/ML%20tests-26%2F26%20passing-brightgreen)](https://github.com/tbowman01/PhotonDrift/tree/main/src/ml)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
@@ -177,15 +177,22 @@ PhotonDrift welcomes contributions! We use a systematic development approach wit
 
 ### How to Contribute
 1. **Fork the repository** and create a feature branch
-2. **Run the test suite**: `cargo test` (ensure all 140+ tests pass)
-3. **Add ML tests** if implementing ML features: `cargo test ml::`
-4. **Follow the roadmap**: Check [ROADMAP.md](ROADMAP.md) for planned features
-5. **Submit a PR** with clear description and test coverage
+2. **Setup development environment**: Run `./setup-hooks.sh` for automated setup
+3. **Run the test suite**: `cargo test` (ensure all 178+ tests pass)
+4. **Add ML tests** if implementing ML features: `cargo test ml::`
+5. **Follow pre-commit hooks**: Code formatting, linting, and testing are automated
+6. **Follow the roadmap**: Check [ROADMAP.md](ROADMAP.md) for planned features
+7. **Submit a PR** with clear description and test coverage
 
 ### Development Setup
+
 ```bash
 git clone https://github.com/tbowman01/PhotonDrift
 cd PhotonDrift
+
+# Setup development environment with pre-commit hooks
+./setup-hooks.sh
+
 cargo build
 cargo test
 
@@ -193,12 +200,25 @@ cargo test
 cargo test --features ml
 ```
 
+### Code Quality
+
+The project uses comprehensive pre-commit hooks to ensure code quality:
+
+- **Rust formatting** with `rustfmt`
+- **Linting** with `clippy` (warnings as errors)
+- **Compilation checks** with `cargo check`
+- **Test suite** execution
+- **Security scanning** for secrets and patterns
+- **File quality** checks (trailing whitespace, line endings, etc.)
+
+See [Development Hooks Documentation](docs/DEVELOPMENT_HOOKS.md) for detailed information.
+
 ## 📊 Performance & Benchmarks
 
 - **Scanning Speed**: 206 files in ~91ms (production baseline)
 - **ML Prediction**: ~1-5ms per drift item
 - **Memory Usage**: ~10MB for 1000 ML training samples
-- **Test Coverage**: 140/144 tests passing (97.2%)
+- **Test Coverage**: 178/182 tests passing (97.8%)
 - **ML Test Coverage**: 26/26 tests passing (100%)
 
 ## 🔗 Related Projects
@@ -213,6 +233,6 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-**🚀 Current Status**: Phase 2 Complete - ML-Enhanced Intelligence Ready for Production Testing
+**🚀 Current Status**: Phase 2 Complete - Production-Ready Alpha with Enhanced DevOps Pipeline
 
 **📧 Questions?** Open an [issue](https://github.com/tbowman01/PhotonDrift/issues) or check our [discussions](https://github.com/tbowman01/PhotonDrift/discussions)

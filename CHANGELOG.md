@@ -5,6 +5,37 @@ All notable changes to PhotonDrift (ADRScan) will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### 🔧 Infrastructure & DevOps
+- **NEW**: Comprehensive pre-commit hooks with Rust formatting, linting, and testing
+- **NEW**: Custom git hooks for intelligent code quality checks
+- **NEW**: Development environment setup automation with `setup-hooks.sh`
+- **NEW**: Security scanning with `detect-secrets` integration
+- **IMPROVED**: GitHub Actions workflows updated to latest versions (v4)
+- **IMPROVED**: Docker containerization with multi-platform support (amd64/arm64)
+- **IMPROVED**: Enhanced development documentation with hook configuration guide
+
+### 🛠️ Code Quality & Standards
+- **NEW**: Automated code formatting with `rustfmt` on pre-commit
+- **NEW**: Clippy linting with warnings-as-errors enforcement
+- **NEW**: Compilation checks and test execution in CI pipeline
+- **NEW**: Interactive development hooks with colored output and prompts
+- **IMPROVED**: Zero-warning build target achieved
+- **IMPROVED**: Enhanced error handling and debugging capabilities
+
+### 📚 Documentation Improvements
+- **NEW**: Comprehensive development hooks documentation (`docs/DEVELOPMENT_HOOKS.md`)
+- **NEW**: Pre-commit configuration with environment variable controls
+- **NEW**: IDE integration guides for VS Code and CLI aliases
+- **IMPROVED**: Repository setup instructions with automated scripts
+
+### 🚀 Release Management
+- **NEW**: Enhanced containerization workflow with security best practices
+- **NEW**: Multi-architecture container builds for broader compatibility
+- **IMPROVED**: Alpha release tagging with build number integration
+- **IMPROVED**: GitHub release automation with detailed release notes
+
 ## [0.2.0-alpha.2025.07.20] - 2025-07-20
 
 ### 🚀 Major Features - Phase 2: Intelligence & Integration
