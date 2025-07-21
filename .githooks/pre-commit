@@ -1,0 +1,168 @@
+#!/bin/bash
+# Pre-commit hook for ADRScan Rust project
+# This script runs Rust-specific checks before allowing commits
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Function to print colored output
+print_status() {
+    echo -e "${BLUE}[ADRScan Pre-commit]${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}✅${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠️${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}❌${NC} $1"
+}
+
+# Check if we're in a Rust project
+if [ ! -f "Cargo.toml" ]; then
+    print_warning "No Cargo.toml found, skipping Rust checks"
+    exit 0
+fi
+
+print_status "Running Rust pre-commit checks..."
+
+# Check for staged Rust files
+staged_rust_files=$(git diff --cached --name-only --diff-filter=ACM | grep '\.rs$' || true)
+
+if [ -z "$staged_rust_files" ]; then
+    print_status "No Rust files staged, skipping Rust-specific checks"
+    exit 0
+fi
+
+print_status "Found staged Rust files:"
+echo "$staged_rust_files" | sed 's/^/  - /'
+
+# 1. Rust formatting check
+print_status "Checking Rust code formatting..."
+if ! cargo fmt --all -- --check; then
+    print_error "Code formatting check failed!"
+    print_status "Run 'cargo fmt --all' to fix formatting issues"
+    exit 1
+fi
+print_success "Code formatting check passed"
+
+# 2. Clippy linting
+print_status "Running Clippy linting..."
+if ! cargo clippy --all-targets --all-features -- -D warnings; then
+    print_warning "Clippy linting failed!"
+    print_status "Fix the warnings above or use #[allow(clippy::lint_name)] if intentional"
+    # Allow clippy failures during merge resolution
+    if [ -f .git/MERGE_HEAD ]; then
+        print_status "Merge in progress - allowing clippy warnings for now"
+    else
+        exit 1
+    fi
+else
+    print_success "Clippy linting passed"
+fi
+
+# 3. Compilation check
+print_status "Checking compilation..."
+if ! cargo check --all-targets --all-features; then
+    print_error "Compilation check failed!"
+    print_status "Fix compilation errors before committing"
+    exit 1
+fi
+print_success "Compilation check passed"
+
+# 4. Test suite (optional, can be skipped with SKIP_TESTS=1)
+if [ "$SKIP_TESTS" != "1" ]; then
+    print_status "Running test suite..."
+    if ! cargo test --all-features; then
+        print_error "Test suite failed!"
+        print_status "Fix failing tests or set SKIP_TESTS=1 to skip this check"
+        exit 1
+    fi
+    print_success "Test suite passed"
+else
+    print_warning "Skipping test suite (SKIP_TESTS=1)"
+fi
+
+# 5. Check for TODO/FIXME comments in staged files
+print_status "Checking for TODO/FIXME comments..."
+todo_count=0
+for file in $staged_rust_files; do
+    if [ -f "$file" ]; then
+        todos=$(git diff --cached "$file" | grep '^+' | grep -i -E '(TODO|FIXME|XXX|HACK)' || true)
+        if [ -n "$todos" ]; then
+            if [ $todo_count -eq 0 ]; then
+                print_warning "Found TODO/FIXME comments in staged changes:"
+            fi
+            echo "  $file:"
+            echo "$todos" | sed 's/^/    /'
+            todo_count=$((todo_count + 1))
+        fi
+    fi
+done
+
+if [ $todo_count -gt 0 ]; then
+    print_warning "Consider addressing TODO/FIXME comments before committing"
+    print_status "Set ALLOW_TODOS=1 to bypass this warning"
+    if [ "$ALLOW_TODOS" != "1" ]; then
+        read -p "Continue with commit? [y/N] " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_status "Commit aborted"
+            exit 1
+        fi
+    fi
+fi
+
+# 6. Check for large files
+print_status "Checking for large files..."
+large_files=$(git diff --cached --name-only | xargs -I {} find {} -size +1M 2>/dev/null || true)
+if [ -n "$large_files" ]; then
+    print_warning "Large files detected:"
+    echo "$large_files" | sed 's/^/  - /'
+    print_status "Consider using Git LFS for large files"
+fi
+
+# 7. Security check for common patterns
+print_status "Running basic security checks..."
+security_issues=0
+for file in $staged_rust_files; do
+    if [ -f "$file" ]; then
+        # Check for potential security issues
+        issues=$(git diff --cached "$file" | grep '^+' | grep -E '(password|secret|key|token).*=.*["'"'"'][^"'"'"']*["'"'"']' || true)
+        if [ -n "$issues" ]; then
+            if [ $security_issues -eq 0 ]; then
+                print_warning "Potential security issues found:"
+            fi
+            echo "  $file:"
+            echo "$issues" | sed 's/^/    /'
+            security_issues=$((security_issues + 1))
+        fi
+    fi
+done
+
+if [ $security_issues -gt 0 ]; then
+    print_warning "Review the above for potential secrets or sensitive data"
+    if [ "$SKIP_SECURITY_CHECK" != "1" ]; then
+        read -p "Continue with commit? [y/N] " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_status "Commit aborted"
+            exit 1
+        fi
+    fi
+fi
+
+print_success "All pre-commit checks passed!"
+print_status "Proceeding with commit..."
+
+exit 0

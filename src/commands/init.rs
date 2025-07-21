@@ -20,8 +20,7 @@ impl InitCommand {
         log::info!("Initializing ADR directory and configuration...");
 
         // Determine ADR directory path
-        let adr_dir = self.adr_dir.as_ref()
-            .unwrap_or(&config.adr_dir);
+        let adr_dir = self.adr_dir.as_ref().unwrap_or(&config.adr_dir);
 
         // Check if directory already exists
         if adr_dir.exists() && !self.force {
@@ -46,10 +45,19 @@ impl InitCommand {
         // Create sample ADR template
         self.create_sample_template(adr_dir)?;
 
-        println!("✅ ADR directory initialized successfully at: {}", adr_dir.display());
+        println!(
+            "✅ ADR directory initialized successfully at: {}",
+            adr_dir.display()
+        );
         println!("📝 Created configuration file: .adrscan.yml");
-        println!("📋 Created ADR conventions: {}/0000-record-architecture-decisions.md", adr_dir.display());
-        println!("📄 Created sample template: {}/template.md", adr_dir.display());
+        println!(
+            "📋 Created ADR conventions: {}/0000-record-architecture-decisions.md",
+            adr_dir.display()
+        );
+        println!(
+            "📄 Created sample template: {}/template.md",
+            adr_dir.display()
+        );
         println!("\n🚀 Next steps:");
         println!("  1. Review the configuration in .adrscan.yml");
         println!("  2. Read the conventions in ADR-0000");
@@ -61,7 +69,7 @@ impl InitCommand {
 
     fn create_config_file(&self, adr_dir: &Path) -> Result<()> {
         let config_path = std::path::Path::new(".adrscan.yml");
-        
+
         if config_path.exists() && !self.force {
             log::info!("Configuration file already exists, skipping");
             return Ok(());
@@ -74,13 +82,13 @@ impl InitCommand {
 
         config.save(config_path)?;
         log::info!("Created configuration file: {}", config_path.display());
-        
+
         Ok(())
     }
 
     fn create_conventions_adr(&self, adr_dir: &Path) -> Result<()> {
         let adr_path = adr_dir.join("0000-record-architecture-decisions.md");
-        
+
         if adr_path.exists() && !self.force {
             log::info!("Conventions ADR already exists, skipping");
             return Ok(());
@@ -89,13 +97,13 @@ impl InitCommand {
         let content = self.get_conventions_template();
         std::fs::write(&adr_path, content)?;
         log::info!("Created conventions ADR: {}", adr_path.display());
-        
+
         Ok(())
     }
 
     fn create_sample_template(&self, adr_dir: &Path) -> Result<()> {
         let template_path = adr_dir.join("template.md");
-        
+
         if template_path.exists() && !self.force {
             log::info!("Template already exists, skipping");
             return Ok(());
@@ -104,12 +112,13 @@ impl InitCommand {
         let content = self.get_sample_template();
         std::fs::write(&template_path, content)?;
         log::info!("Created sample template: {}", template_path.display());
-        
+
         Ok(())
     }
 
     fn get_conventions_template(&self) -> String {
-        format!(r#"---
+        format!(
+            r#"---
 id: "0000"
 title: "Record architecture decisions"
 status: "accepted"
@@ -141,11 +150,14 @@ See Michael Nygard's article, linked above. For a lightweight ADR toolset, see N
 This ADR establishes the process for documenting architectural decisions. All significant architectural decisions should be documented using this format.
 
 Use `adrscan propose` to automatically generate new ADRs when architectural drift is detected, or create them manually following this template.
-"#, chrono::Utc::now().format("%Y-%m-%d"))
+"#,
+            chrono::Utc::now().format("%Y-%m-%d")
+        )
     }
 
     fn get_sample_template(&self) -> String {
-        format!(r#"---
+        format!(
+            r#"---
 id: "XXXX"
 title: "Title of the decision"
 status: "proposed"
@@ -192,7 +204,9 @@ Any specific implementation details or considerations.
 
 - [Link to relevant documentation]
 - [Link to related ADRs]
-"#, chrono::Utc::now().format("%Y-%m-%d"))
+"#,
+            chrono::Utc::now().format("%Y-%m-%d")
+        )
     }
 }
 
@@ -209,9 +223,9 @@ mod tests {
             adr_dir: None,
             force: false,
         };
-        
+
         let template = cmd.get_conventions_template();
-        
+
         assert!(template.contains("---"));
         assert!(template.contains("id: \"0000\""));
         assert!(template.contains("title: \"Record architecture decisions\""));
@@ -225,9 +239,9 @@ mod tests {
             adr_dir: None,
             force: false,
         };
-        
+
         let template = cmd.get_sample_template();
-        
+
         assert!(template.contains("---"));
         assert!(template.contains("id: \"XXXX\""));
         assert!(template.contains("title: \"Title of the decision\""));
@@ -243,21 +257,21 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let adr_dir = temp_dir.path().join("docs/adr");
         std::fs::create_dir_all(&adr_dir).unwrap();
-        
+
         let cmd = InitCommand {
             adr_dir: Some(adr_dir.clone()),
             force: false,
         };
-        
+
         // Change to temp directory
         let old_cwd = std::env::current_dir().unwrap();
         std::env::set_current_dir(&temp_dir).unwrap();
-        
+
         let result = cmd.create_config_file(&adr_dir);
-        
+
         // Restore directory
         std::env::set_current_dir(old_cwd).unwrap();
-        
+
         assert!(result.is_ok());
         assert!(temp_dir.path().join(".adrscan.yml").exists());
     }
@@ -267,20 +281,21 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let adr_dir = temp_dir.path().join("docs/adr");
         std::fs::create_dir_all(&adr_dir).unwrap();
-        
+
         let cmd = InitCommand {
             adr_dir: Some(adr_dir.clone()),
             force: false,
         };
-        
+
         let result = cmd.create_conventions_adr(&adr_dir);
-        
+
         assert!(result.is_ok());
-        assert!(adr_dir.join("0000-record-architecture-decisions.md").exists());
-        
-        let content = std::fs::read_to_string(
-            adr_dir.join("0000-record-architecture-decisions.md")
-        ).unwrap();
+        assert!(adr_dir
+            .join("0000-record-architecture-decisions.md")
+            .exists());
+
+        let content =
+            std::fs::read_to_string(adr_dir.join("0000-record-architecture-decisions.md")).unwrap();
         assert!(content.contains("Record architecture decisions"));
     }
 
@@ -289,17 +304,17 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let adr_dir = temp_dir.path().join("docs/adr");
         std::fs::create_dir_all(&adr_dir).unwrap();
-        
+
         let cmd = InitCommand {
             adr_dir: Some(adr_dir.clone()),
             force: false,
         };
-        
+
         let result = cmd.create_sample_template(&adr_dir);
-        
+
         assert!(result.is_ok());
         assert!(adr_dir.join("template.md").exists());
-        
+
         let content = std::fs::read_to_string(adr_dir.join("template.md")).unwrap();
         assert!(content.contains("Title of the decision"));
     }

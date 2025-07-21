@@ -1,55 +1,83 @@
-# Rust build artifacts
+# Docker ignore file for ADRScan
+# Excludes unnecessary files from Docker build context
+
+# Build artifacts
 target/
 Cargo.lock
 
-# Development files
+# Git and development files
 .git/
 .gitignore
-.pre-commit-config.yaml
-.githooks/
-setup-hooks.sh
+.github/
+.vscode/
+.idea/
 
-# Documentation
+# Documentation and examples
 docs/
+examples/
 *.md
 !README.md
 
-# CI/CD
-.github/
-Dockerfile*
-.dockerignore
+# Test files
+tests/
+**/tests/
+**/*_test.rs
+**/*_spec.rs
 
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# Development and CI files
+.env*
+.travis.yml
+.circleci/
+codecov.yml
+.coverage/
 
 # OS files
 .DS_Store
 Thumbs.db
-
-# Logs
-*.log
+*.swp
+*.swo
+*~
 
 # Temporary files
 tmp/
 temp/
+*.tmp
+*.log
 
-# Environment files
-.env*
-!.env.example
+# IDE and editor files
+*.sublime-*
+*.code-workspace
+.vs/
 
-# Cache directories
-.cache/
+# Runtime and data files
+.adrscan-snapshot.json
+drift-report.json
+drift-analysis.json
+adr-inventory.json
+
+# WASM build outputs
+wasm/
+wasm-web/
+wasm-bundler/
+pkg/
+
+# Node.js (if present)
 node_modules/
+npm-debug.log
+yarn-error.log
 
-# Test artifacts
-coverage/
-test-results/
+# Rust development
+**/*.rs.bk
+.cargo/
 
-# Release artifacts
-dist/
-build/
-release/
+# Security and secrets
+secrets/
+*.key
+*.pem
+*.crt
+!ca-certificates.crt
+
+# Swarm coordination files
+.swarm/
+.hive-mind/
+hive-mind-prompt-swarm-*

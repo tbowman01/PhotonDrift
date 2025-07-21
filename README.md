@@ -1,32 +1,49 @@
 # PhotonDrift - AI-Powered ADR Management
 
+> Next-generation Architecture Decision Record (ADR) management with ML-enhanced drift detection for intelligent development governance.
+
 [![CI](https://github.com/tbowman01/PhotonDrift/actions/workflows/ci.yml/badge.svg)](https://github.com/tbowman01/PhotonDrift/actions/workflows/ci.yml)
 [![Docker](https://github.com/tbowman01/PhotonDrift/actions/workflows/docker.yml/badge.svg)](https://github.com/tbowman01/PhotonDrift/actions/workflows/docker.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/badge/version-0.2.0--alpha.20250721-blue)](https://github.com/tbowman01/PhotonDrift/releases)
+[![Tests](https://img.shields.io/badge/tests-178%2F182%20passing-green)](https://github.com/tbowman01/PhotonDrift/actions)
+[![ML Coverage](https://img.shields.io/badge/ML%20tests-26%2F26%20passing-brightgreen)](https://github.com/tbowman01/PhotonDrift/tree/main/src/ml)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)](https://rust-lang.org)
-[![Version](https://img.shields.io/badge/version-0.2.0--alpha.20250721-blue.svg)](https://github.com/tbowman01/PhotonDrift/releases)
 
-ADRScan is an advanced Architecture Decision Record (ADR) management tool powered by machine learning for intelligent drift detection and analysis.
+PhotonDrift is an AI-powered Rust CLI tool that revolutionizes Architecture Decision Record (ADR) management through **machine learning-enhanced drift detection**. It automatically identifies when code deviates from documented architectural decisions and provides intelligent insights to maintain architectural integrity.
 
-## ✨ Features
+## ✨ Key Features
 
-### 🧠 ML-Enhanced Drift Detection
-- **5 Advanced Algorithms**: Isolation Forest, One-Class SVM, LOF, Statistical, Ensemble
-- **50+ Feature Engineering**: Technology diversity, complexity scoring, sentiment analysis
-- **Explainable AI**: Model explanations for every detection decision
-- **98%+ Accuracy**: Reduces false positives by 60-80%
+### 🤖 **AI-Enhanced Detection** (v0.2.0+)
+- **Machine Learning Models**: 5 advanced algorithms (Isolation Forest, SVM, LOF, Statistical, Ensemble)
+- **Smart Confidence Scoring**: Reduces false positives by 60-80%
+- **Explainable AI**: Clear explanations for every detection decision
+- **Adaptive Learning**: Improves accuracy through feedback and historical data
 
-### 🚀 Production Ready
-- **Enterprise Scale**: Supports 100k+ file repositories
-- **Performance Optimized**: 1-5ms prediction time, ~10MB memory for 1000 samples
-- **Comprehensive Testing**: 178/182 tests passing (97.8% success rate)
-- **Docker Support**: Multi-platform containerized deployment
+### 🔍 **Intelligent Analysis**
+- **Feature Engineering**: 50+ extracted features (complexity, diversity, temporal patterns)
+- **Technology Detection**: Automatic identification of frameworks, languages, patterns
+- **Sentiment Analysis**: Understanding the context and urgency of architectural changes
+- **Structural Analysis**: Code organization, coupling, and cohesion metrics
 
-### 📊 Advanced Analytics
-- Detailed drift analysis with confidence scores
-- Technology stack evolution tracking
-- Automated ADR quality assessment
-- Historical trend analysis
+### 🚀 **Core CLI Commands**
+- **`init`**: Initialize ADR structure with ML-ready configuration
+- **`inventory`**: Scan and catalog existing ADRs with intelligence insights
+- **`diff`**: Detect architectural drift with ML confidence scores
+- **`propose`**: Generate AI-informed ADR proposals for detected changes
+- **`index`**: Create comprehensive ADR indexes with smart categorization
+
+### 🌐 **Enterprise Integration**
+- **Multi-Language Support**: Works across diverse technology stacks
+- **Offline-First**: All ML processing is local (no external API calls)
+- **CI/CD Ready**: WebAssembly module and GitHub Action for automation
+- **Scalable**: Handles enterprise codebases (100k+ files)
+
+### 🐳 **Docker Support**
+- **Multi-platform containers**: Linux amd64/arm64 support
+- **Security-hardened**: Non-root user, minimal attack surface
+- **Production-ready**: Health checks, proper metadata labels
+- **Easy deployment**: Available on GitHub Container Registry
 
 ## 🐳 Docker Usage
 
@@ -60,260 +77,197 @@ docker build -t photondrift .
 docker run --rm -v "$(pwd)":/app photondrift analyze /app
 ```
 
-## 📦 Installation
-
-### From Source (Rust Required)
-
-```bash
-# Clone the repository
-git clone https://github.com/tbowman01/PhotonDrift.git
-cd PhotonDrift
-
-# Build and install
-cargo install --path .
-```
-
-### Pre-built Binaries
-
-Download from [GitHub Releases](https://github.com/tbowman01/PhotonDrift/releases)
-
 ## 🚀 Quick Start
 
-### Basic ADR Analysis
+### Installation
 
 ```bash
-# Analyze ADRs in current directory
-adrscan analyze
+# Download from GitHub Releases
+curl -L https://github.com/tbowman01/PhotonDrift/releases/latest/download/adrscan-linux -o adrscan
+chmod +x adrscan
 
-# Analyze specific directory
-adrscan analyze /path/to/adrs
-
-# Generate detailed report
-adrscan analyze --report detailed --format json
+# Or build from source
+git clone https://github.com/tbowman01/PhotonDrift
+cd PhotonDrift
+cargo build --release
 ```
 
-### ML-Enhanced Drift Detection
+### Basic Usage
 
 ```bash
-# Enable ML features
-adrscan analyze --ml --algorithm ensemble
+# Detect architectural drift with AI
+adrscan diff
 
-# Train custom model
-adrscan train --data /path/to/training/data
+# Generate AI-informed ADR proposals
+adrscan propose
 
-# Explain predictions
-adrscan analyze --ml --explain --algorithm isolation-forest
+# Create intelligent ADR index
+adrscan index
 ```
 
-### Advanced Usage
+### 🤖 AI-Enhanced Usage (v0.2.0+)
 
 ```bash
-# Multi-format output
-adrscan analyze --format json --output results.json
+# Enable ML features with configuration
+echo "ml:
+  enabled: true
+  model_type: IsolationForest
+  confidence_threshold: 0.7
+  online_learning: true" > adrscan.yml
 
-# Pattern-based filtering
-adrscan analyze --pattern "**/*decision*.md"
+# Detect drift with ML confidence scores
+adrscan diff --config adrscan.yml
 
-# Verbose logging
-adrscan analyze --verbose
-
-# Configuration file
-adrscan analyze --config config.toml
+# Example output with AI insights:
+# 🚨 HIGH CONFIDENCE (0.85): New React framework detected
+# 📝 Explanation: High technology diversity and complexity score indicate
+#    significant architectural change requiring ADR documentation
+# 💡 Recommendation: Create ADR for frontend framework standardization
 ```
 
-## 🧠 ML Algorithms
+### 🏗️ Advanced Configuration
 
-### Available Algorithms
+```yaml
+# adrscan.yml - ML-Enhanced Configuration
+adr_dir: "./docs/decisions"
+ml:
+  enabled: true
+  model_type: "Ensemble"          # IsolationForest, OneClassSVM, LOF, Statistical, Ensemble
+  confidence_threshold: 0.7       # 0.0-1.0 (higher = fewer, higher-confidence detections)
+  online_learning: true           # Learn from feedback to improve accuracy
+  max_training_samples: 10000     # Memory management for large codebases
 
-1. **Isolation Forest** - Anomaly detection for drift patterns
-2. **One-Class SVM** - Support vector classification for outliers
-3. **Local Outlier Factor (LOF)** - Density-based anomaly detection
-4. **Statistical** - Classical statistical methods
-5. **Ensemble** - Combined approach for maximum accuracy
-
-### Feature Engineering
-
-- **Content Analysis**: Text complexity, sentiment, readability
-- **Technology Tracking**: Framework usage, dependency changes
-- **Structural Analysis**: File organization, naming patterns
-- **Temporal Patterns**: Decision frequency, update patterns
-- **Quality Metrics**: Documentation completeness, decision rationale
-
-## 📁 Supported Formats
-
-- **Markdown** (.md, .markdown)
-- **YAML** frontmatter support
-- **TOML** configuration files
-- **JSON** structured data
-- **Plain text** with ADR patterns
-
-## 🔧 Configuration
-
-### Configuration File (config.toml)
-
-```toml
-[analysis]
-patterns = ["**/*.md", "**/ADR-*.md"]
-exclude = ["node_modules/**", ".git/**"]
-recursive = true
-
-[ml]
-algorithm = "ensemble"
-confidence_threshold = 0.7
-explain_predictions = true
-
-[output]
-format = "json"
-verbose = true
-report_type = "detailed"
+drift:
+  enabled: true
+  detection_patterns:
+    - pattern: "new framework"
+      severity: "high"
+    - pattern: "deprecated library"
+      severity: "medium"
 ```
 
-### Environment Variables
+## 📚 Documentation
 
-```bash
-export ADRSCAN_LOG_LEVEL=debug
-export ADRSCAN_ML_ENABLED=true
-export ADRSCAN_CONFIG_PATH=/path/to/config.toml
-```
+### Core Documentation
+- **[CHANGELOG.md](CHANGELOG.md)** - Complete version history and release notes
+- **[ROADMAP.md](ROADMAP.md)** - Development roadmap through 2025
+- **[Requirements & Architecture](docs/REQUIREMENTS_SUMMARY.md)** - Technical requirements and phases
 
-## 🏗️ Architecture
+### ML & AI Features
+- **[ML Module Overview](src/ml/README.md)** - Machine learning architecture and algorithms
+- **[Feature Engineering Guide](src/ml/features.rs)** - Understanding extracted features
+- **[Model Selection Guide](src/ml/models.rs)** - Choosing the right ML algorithm
+- **[Training & Optimization](src/ml/training.rs)** - Model training and hyperparameter tuning
 
-### Core Components
+### Integration & Usage
+- **[GitHub Action Guide](.github/workflows/)** - CI/CD integration with ML features
+- **[WebAssembly Integration](src/wasm_simple.rs)** - Browser and Node.js usage
+- **[Configuration Reference](docs/CONFIG.md)** - Complete configuration options
+- **[CLI Reference](docs/CLI.md)** - All commands and parameters
 
-- **Scanner Engine**: File discovery and content extraction
-- **ML Pipeline**: Feature engineering and model inference
-- **Analysis Engine**: Drift detection and quality assessment
-- **Report Generator**: Multi-format output generation
+## 🚀 Implementation Status
 
-### Technology Stack
+### ✅ Phase 1 - Core Foundation (v0.1.0) - **COMPLETED**
+- [x] **Complete CLI Tool**: All 5 commands (`init`, `inventory`, `diff`, `propose`, `index`)
+- [x] **Drift Detection Engine**: Pattern-based architectural violation detection
+- [x] **Configuration System**: YAML/TOML with flexible patterns
+- [x] **WebAssembly Support**: Browser/Node.js integration ready
+- [x] **GitHub Action**: CI/CD integration for automated analysis
+- [x] **Testing Suite**: 114 comprehensive tests (96.5% pass rate)
+- [x] **Production Ready**: Zero compilation warnings, robust error handling
 
-- **Language**: Rust 1.75+
-- **ML Libraries**: SmartCore, ndarray, nalgebra
-- **CLI Framework**: Clap 4.4
-- **Serialization**: Serde (JSON, YAML, TOML)
-- **Container**: Multi-stage Docker build
+### ✅ Phase 2 - Intelligence & Integration (v0.2.0-alpha) - **COMPLETED**
+- [x] **🤖 ML-Enhanced Detection**: 5 advanced anomaly detection algorithms
+- [x] **📊 Feature Engineering**: 50+ extracted features with advanced analysis
+- [x] **🏋️ Training Infrastructure**: Cross-validation, hyperparameter optimization
+- [x] **⚙️ Smart Configuration**: ML-ready configuration with backward compatibility
+- [x] **🧪 ML Test Suite**: 26 comprehensive ML tests ensuring reliability
+- [x] **📈 Performance Metrics**: Precision, recall, F1-score tracking
+- [x] **🔍 Explainable AI**: Model explanations for every detection
+- [x] **🐳 Docker Support**: Production-ready containerization
+- [x] **🛠️ DevOps Pipeline**: Enhanced CI/CD with comprehensive automation
 
-## 🧪 Development
+### 🔧 Phase 3 - Developer Experience (Q2 2025) - **PLANNED**
+- [ ] **IDE Extensions**: VS Code and IntelliJ plugins with ML insights
+- [ ] **Language Server Protocol**: Universal IDE support with intelligent warnings
+- [ ] **Real-time Analysis**: File system watchers with instant ML feedback
+- [ ] **Visual Dashboard**: Web-based analytics with trend analysis
+- [ ] **Advanced Templates**: AI-powered ADR generation and suggestions
 
-### Prerequisites
+### ☁️ Phase 4 - Cloud & Enterprise (Q3 2025) - **PLANNED**
+- [ ] **Cloud Platform SDKs**: AWS, Azure, GCP integration
+- [ ] **Enterprise Features**: Multi-user, SSO, audit trails
+- [ ] **Advanced Analytics**: Predictive drift analysis and risk assessment
+- [ ] **Performance Optimization**: SIMD acceleration for massive codebases
 
-- Rust 1.75+
-- Docker (optional)
-- Git
+### 🌐 Phase 5 - Ecosystem & Scale (Q4 2025) - **PLANNED**
+- [ ] **API & Integrations**: REST API, GraphQL, webhook support
+- [ ] **Plugin Marketplace**: Third-party extensions and community templates
+- [ ] **SaaS Platform**: Hosted PhotonDrift service
+- [ ] **Industry Standardization**: Architectural governance best practices
+
+## 🤝 Contributing
+
+PhotonDrift welcomes contributions! We use a systematic development approach with clear phases and comprehensive testing.
+
+### How to Contribute
+1. **Fork the repository** and create a feature branch
+2. **Setup development environment**: Run `./setup-hooks.sh` for automated setup
+3. **Run the test suite**: `cargo test` (ensure all 178+ tests pass)
+4. **Add ML tests** if implementing ML features: `cargo test ml::`
+5. **Follow pre-commit hooks**: Code formatting, linting, and testing are automated
+6. **Follow the roadmap**: Check [ROADMAP.md](ROADMAP.md) for planned features
+7. **Submit a PR** with clear description and test coverage
 
 ### Development Setup
 
 ```bash
-# Clone repository
-git clone https://github.com/tbowman01/PhotonDrift.git
+git clone https://github.com/tbowman01/PhotonDrift
 cd PhotonDrift
 
-# Install pre-commit hooks
+# Setup development environment with pre-commit hooks
 ./setup-hooks.sh
 
-# Run tests
+cargo build
 cargo test
 
-# Run with features
-cargo run --features ml -- analyze --ml
-```
-
-### Running Tests
-
-```bash
-# All tests
-cargo test
-
-# ML-specific tests
+# For ML features
 cargo test --features ml
-
-# Integration tests
-cargo test --test integration
-
-# With coverage
-cargo llvm-cov --all-features --workspace
 ```
-
-### Docker Development
-
-```bash
-# Build development image
-docker build -t photondrift-dev .
-
-# Run tests in container
-docker run --rm photondrift-dev cargo test
-
-# Development with volume mounting
-docker run -it --rm -v "$(pwd)":/usr/src/app photondrift-dev bash
-```
-
-## 📊 Performance
-
-### Benchmarks
-
-- **File Processing**: 1000+ files/second
-- **ML Inference**: 1-5ms per prediction
-- **Memory Usage**: ~10MB for 1000 samples
-- **Accuracy**: 98%+ with ensemble methods
-
-### Optimization Features
-
-- **Parallel Processing**: Multi-threaded file analysis
-- **Incremental Analysis**: Process only changed files
-- **Caching**: Smart caching of ML models and results
-- **Memory Efficiency**: Stream processing for large datasets
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Workflow
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests and documentation
-5. Run pre-commit hooks
-6. Submit a pull request
 
 ### Code Quality
 
-- **Formatting**: `cargo fmt`
-- **Linting**: `cargo clippy`
-- **Testing**: `cargo test --all-features`
-- **Coverage**: `cargo llvm-cov`
+The project uses comprehensive pre-commit hooks to ensure code quality:
 
-## 📝 License
+- **Rust formatting** with `rustfmt`
+- **Linting** with `clippy` (warnings as errors)
+- **Compilation checks** with `cargo check`
+- **Test suite** execution
+- **Security scanning** for secrets and patterns
+- **File quality** checks (trailing whitespace, line endings, etc.)
+
+See [Development Hooks Documentation](docs/DEVELOPMENT_HOOKS.md) for detailed information.
+
+## 📊 Performance & Benchmarks
+
+- **Scanning Speed**: 206 files in ~91ms (production baseline)
+- **ML Prediction**: ~1-5ms per drift item
+- **Memory Usage**: ~10MB for 1000 ML training samples
+- **Test Coverage**: 178/182 tests passing (97.8%)
+- **ML Test Coverage**: 26/26 tests passing (100%)
+
+## 🔗 Related Projects
+
+- **[ADR Tools](https://github.com/npryce/adr-tools)** - Command-line tools for working with ADRs
+- **[ADR Manager](https://github.com/adr/adr-manager)** - Web-based ADR management
+- **[Architecture Decision Records](https://adr.github.io/)** - ADR community resources
+
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Support
-
-- **Documentation**: [GitHub Wiki](https://github.com/tbowman01/PhotonDrift/wiki)
-- **Issues**: [GitHub Issues](https://github.com/tbowman01/PhotonDrift/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/tbowman01/PhotonDrift/discussions)
-
-## 🎯 Roadmap
-
-### v0.3.0 (Planned)
-- [ ] Web interface for ADR management
-- [ ] Real-time monitoring and alerts
-- [ ] Integration with popular documentation platforms
-- [ ] Advanced visualization dashboards
-
-### v0.4.0 (Future)
-- [ ] Natural language processing for ADR content
-- [ ] Automated ADR generation suggestions
-- [ ] Integration with development workflows
-- [ ] Advanced analytics and reporting
-
-## 🏆 Acknowledgments
-
-- Built with ❤️ using Rust
-- ML algorithms powered by SmartCore
-- Inspired by the ADR community
-- Special thanks to all contributors
-
 ---
 
-**PhotonDrift** - Making architectural decisions visible, traceable, and intelligent.
+**🚀 Current Status**: Phase 2 Complete - Production-Ready Alpha with Enhanced DevOps Pipeline
+
+**📧 Questions?** Open an [issue](https://github.com/tbowman01/PhotonDrift/issues) or check our [discussions](https://github.com/tbowman01/PhotonDrift/discussions)

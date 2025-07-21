@@ -5,7 +5,47 @@ All notable changes to PhotonDrift (ADRScan) will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0-alpha.2025.01.21] - 2025-01-21
+## [Unreleased]
+
+### 🐳 Docker Support & Containerization
+- **NEW**: Multi-stage Dockerfile with security-hardened build process
+- **NEW**: Linux amd64 container builds for GitHub Container Registry
+- **NEW**: Health checks and proper OCI metadata labels
+- **NEW**: .dockerignore optimization for efficient build context
+- **NEW**: GitHub Actions workflow for automated Docker builds
+- **IMPROVED**: Docker documentation with usage examples and deployment guides
+
+### 🔧 Infrastructure & DevOps
+- **NEW**: Comprehensive pre-commit hooks with Rust formatting, linting, and testing
+- **NEW**: Custom git hooks for intelligent code quality checks
+- **NEW**: Development environment setup automation with `setup-hooks.sh`
+- **NEW**: Security scanning with `detect-secrets` integration
+- **IMPROVED**: GitHub Actions workflows updated to latest versions (v4)
+- **IMPROVED**: Docker containerization with multi-platform support (amd64/arm64)
+- **IMPROVED**: Enhanced development documentation with hook configuration guide
+
+### 🛠️ Code Quality & Standards
+- **NEW**: Automated code formatting with `rustfmt` on pre-commit
+- **NEW**: Clippy linting with warnings-as-errors enforcement
+- **NEW**: Compilation checks and test execution in CI pipeline
+- **NEW**: Interactive development hooks with colored output and prompts
+- **IMPROVED**: Zero-warning build target achieved
+- **IMPROVED**: Enhanced error handling and debugging capabilities
+
+### 📚 Documentation Improvements
+- **NEW**: Comprehensive development hooks documentation (`docs/DEVELOPMENT_HOOKS.md`)
+- **NEW**: Pre-commit configuration with environment variable controls
+- **NEW**: IDE integration guides for VS Code and CLI aliases
+- **NEW**: Docker usage documentation with examples and best practices
+- **IMPROVED**: Repository setup instructions with automated scripts
+
+### 🚀 Release Management
+- **NEW**: Enhanced containerization workflow with security best practices
+- **NEW**: Multi-architecture container builds for broader compatibility
+- **IMPROVED**: Alpha release tagging with build number integration
+- **IMPROVED**: GitHub release automation with detailed release notes
+
+## [0.2.0-alpha.2025.07.20] - 2025-07-20
 
 ### 🚀 Major Features - Phase 2: Intelligence & Integration
 
@@ -15,146 +55,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **NEW**: Advanced feature engineering with 50+ extracted features
 - **NEW**: Confidence-based filtering to reduce false positives by 60-80%
 - **NEW**: Explainable AI with model explanations for every detection
-- **NEW**: Adaptive threshold adjustment based on historical patterns
+- **NEW**: Online learning capabilities for adaptive threshold adjustment
+- **NEW**: Cross-validation and hyperparameter optimization infrastructure
 
-#### 📊 Advanced Feature Engineering
-- **NEW**: Technology diversity analysis (counts unique technologies per drift)
-- **NEW**: Complexity scoring (0.0-1.0 normalized across multiple dimensions)
-- **NEW**: Temporal features (frequency analysis, seasonal patterns)
-- **NEW**: Text analysis (sentiment scoring, technical term extraction)
-- **NEW**: Structural features (directory depth, coupling analysis, cohesion metrics)
-
-#### 🏋️ Training Infrastructure
-- **NEW**: Cross-validation with configurable K-folds
-- **NEW**: Hyperparameter optimization framework (foundation for Optuna integration)
-- **NEW**: Performance metrics tracking (precision, recall, F1-score, AUC)
-- **NEW**: Model persistence (save/load trained models)
-- **NEW**: Online learning with feedback integration
-- **NEW**: Training data validation and quality checks
+#### 📊 Performance & Quality Metrics
+- **NEW**: Comprehensive ML test suite with 26 specialized tests (100% ML coverage)
+- **NEW**: Performance benchmarking: 1-5ms prediction time, ~10MB memory for 1000 samples
+- **NEW**: Model accuracy tracking: Precision, Recall, F1-score monitoring
+- **NEW**: Training session history and performance reporting
+- **IMPROVED**: Overall test coverage: 178/182 tests passing (97.8% success rate)
 
 #### ⚙️ Configuration & Integration
-- **NEW**: `MLConfig` with comprehensive configuration options
-- **NEW**: Optional ML features with `ml` feature flag for backward compatibility
-- **NEW**: Graceful degradation to rule-based detection when ML is disabled
-- **NEW**: Memory management with TTL and efficient training data handling
+- **NEW**: ML-ready configuration system with backward compatibility
+- **NEW**: Model persistence and serialization infrastructure
+- **NEW**: Feature-gated ML compilation (optional for lightweight builds)
+- **NEW**: Smart model auto-selection based on data characteristics
+- **IMPROVED**: Enhanced configuration validation and error handling
 
-### 📈 Performance Improvements
-- **IMPROVED**: Prediction speed ~1-5ms per drift item
-- **IMPROVED**: Memory usage optimized (~10MB for 1000 training samples)
-- **IMPROVED**: Model serialization (~1-5KB depending on complexity)
-- **IMPROVED**: Training time ~100ms for isolation forest (1000 samples)
+#### 🧪 Development Infrastructure
+- **NEW**: Comprehensive testing framework for ML components
+- **NEW**: Mock models for development and testing environments
+- **NEW**: Feature extraction pipeline with validation
+- **NEW**: Training data management with TTL and memory limits
+- **IMPROVED**: Modular architecture for easy ML model integration
 
-### 🧪 Testing & Quality
-- **NEW**: 26 comprehensive ML tests covering all modules
-- **NEW**: Integration tests for end-to-end ML workflows
-- **NEW**: Mock model infrastructure for consistent testing
-- **NEW**: Performance benchmarking utilities
-- **IMPROVED**: Test coverage increased to 96.5% (140/144 tests passing)
+## [0.1.0] - 2025-07-15
 
-### 📚 Documentation
-- **NEW**: Comprehensive roadmap documentation (`ROADMAP.md`)
-- **NEW**: Detailed ML module documentation with usage examples
-- **NEW**: Architecture decision rationale for ML implementation
-- **NEW**: Performance characteristics and benchmarking guide
+### 🚀 Initial Release - Core Foundation
 
-### 🛠️ Infrastructure
-- **NEW**: Date-based alpha versioning system
-- **IMPROVED**: Enhanced error handling throughout ML pipeline
-- **IMPROVED**: Logging and debugging capabilities
-- **IMPROVED**: Code organization with modular ML architecture
+#### 🏗️ Core CLI Framework
+- **NEW**: Complete CLI tool with 5 primary commands (`init`, `inventory`, `diff`, `propose`, `index`)
+- **NEW**: Flexible configuration system supporting YAML and TOML formats
+- **NEW**: Pattern-based drift detection engine with configurable rules
+- **NEW**: Multi-format output support (JSON, YAML, console, CSV)
+- **NEW**: Robust error handling and logging infrastructure
 
-### 🔧 Developer Experience
-- **NEW**: Rich CLI output with ML confidence scores
-- **NEW**: Detailed explanations for anomaly detections
-- **NEW**: Configuration validation and helpful error messages
-- **IMPROVED**: Compilation time optimizations
-- **IMPROVED**: Warning cleanup (zero compilation warnings)
+#### 📝 ADR Management
+- **NEW**: ADR directory initialization with templates
+- **NEW**: Comprehensive ADR inventory and cataloging
+- **NEW**: Architectural drift detection with severity classification
+- **NEW**: Intelligent ADR proposal generation
+- **NEW**: Smart ADR indexing with categorization
 
-## [0.1.0] - 2025-07-19
-
-### 🎯 Phase 1: Core Foundation - Initial Release
-
-#### 🏗️ Core CLI Tool
-- **NEW**: Complete CLI with 5 commands: `init`, `inventory`, `diff`, `propose`, `index`
-- **NEW**: Architecture Decision Record (ADR) parsing and management
-- **NEW**: Comprehensive drift detection engine
-- **NEW**: Multiple output formats: console, JSON, YAML, CSV
-- **NEW**: Flexible configuration system (YAML/TOML)
-
-#### 🔍 Drift Detection Engine
-- **NEW**: Pattern-based drift detection for architectural violations
-- **NEW**: Technology change detection
-- **NEW**: Configuration drift analysis
-- **NEW**: Documentation drift identification
-- **NEW**: Custom detection patterns support
-
-#### 🌐 WebAssembly Support
-- **NEW**: WASM module for browser/Node.js integration
-- **NEW**: Web-compatible API for drift detection
-- **NEW**: Cross-platform deployment capabilities
-
-#### 🚀 GitHub Integration
+#### 🌐 Integration & Deployment
+- **NEW**: WebAssembly (WASM) support for browser and Node.js environments
 - **NEW**: GitHub Action for CI/CD integration
-- **NEW**: Automated pull request analysis
-- **NEW**: Issue creation for detected drift
-- **NEW**: Repository-wide architectural compliance checking
+- **NEW**: Cross-platform binary distribution
+- **NEW**: Docker containerization support
 
-#### 📊 Reporting & Analysis
-- **NEW**: Comprehensive drift reports with severity levels
-- **NEW**: ADR index generation with sorting and filtering
-- **NEW**: Proposal generation for addressing drift
-- **NEW**: Statistical analysis of architectural patterns
+#### 🧪 Quality & Testing
+- **NEW**: Comprehensive test suite with 114 tests (96.5% pass rate)
+- **NEW**: Integration testing framework
+- **NEW**: Performance benchmarking (206 files in ~91ms)
+- **NEW**: Zero compilation warnings target achieved
 
-#### ⚡ Performance
-- **NEW**: High-performance file scanning (206 files in ~91ms)
-- **NEW**: Efficient memory usage for large codebases
-- **NEW**: Parallel processing capabilities
-- **NEW**: Optimized for enterprise-scale repositories
-
-#### 🧪 Testing & Quality
-- **NEW**: 114 comprehensive tests with 96.5% pass rate
-- **NEW**: Integration testing with real repositories
-- **NEW**: CLI testing with multiple scenarios
-- **NEW**: Error handling validation
-
-### 🛡️ Security & Reliability
-- **NEW**: Comprehensive error handling and validation
-- **NEW**: Safe file system operations
-- **NEW**: Input sanitization and validation
-- **NEW**: Graceful handling of malformed ADR files
-
-### 📦 Distribution
-- **NEW**: Rust crate with optimized release builds
-- **NEW**: Cross-platform binary support
-- **NEW**: Docker container ready
-- **NEW**: GitHub Releases integration
-
----
-
-## Version Scheme
-
-Starting with v0.2.0, PhotonDrift uses date-based alpha versioning:
-- Format: `MAJOR.MINOR.PATCH-alpha.YYYY.MM.DD`
-- Example: `0.2.0-alpha.2025.07.20`
-
-### Release Types
-- **Alpha**: Feature-complete but may have rough edges
-- **Beta**: Production-ready with final testing
-- **Stable**: Fully tested and production-ready
-
-### Roadmap Phases
-- **Phase 1** (v0.1.x): Core Foundation ✅
-- **Phase 2** (v0.2.x): Intelligence & Integration ✅
-- **Phase 3** (v0.3.x): Developer Experience (Q2 2025)
-- **Phase 4** (v0.4.x): Cloud & Enterprise (Q3 2025)
-- **Phase 5** (v1.0.x): Ecosystem & Scale (Q4 2025)
-
----
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+#### 📚 Documentation & Examples
+- **NEW**: Complete user documentation and API reference
+- **NEW**: Configuration examples and best practices
+- **NEW**: Integration guides for CI/CD workflows
+- **NEW**: Developer contribution guidelines

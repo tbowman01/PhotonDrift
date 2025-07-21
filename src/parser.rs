@@ -10,28 +10,28 @@ type Result<T> = std::result::Result<T, AdrscanError>;
 pub struct AdrMetadata {
     /// ADR number/identifier
     pub id: Option<String>,
-    
+
     /// ADR title
     pub title: String,
-    
+
     /// Status (proposed, accepted, rejected, deprecated, superseded)
     pub status: String,
-    
+
     /// Date of decision
     pub date: Option<chrono::NaiveDate>,
-    
+
     /// Decision makers/authors
     pub deciders: Vec<String>,
-    
+
     /// Tags for categorization
     pub tags: Vec<String>,
-    
+
     /// ADRs this one supersedes
     pub supersedes: Vec<String>,
-    
+
     /// Related ADRs
     pub relates_to: Vec<String>,
-    
+
     /// Additional custom fields
     pub custom_fields: HashMap<String, serde_yaml::Value>,
 }
@@ -42,13 +42,13 @@ pub struct AdrDocument {
     /// File path
     #[allow(dead_code)] // Planned for enhanced file tracking
     pub path: std::path::PathBuf,
-    
+
     /// Parsed metadata
     pub metadata: AdrMetadata,
-    
+
     /// Raw markdown content (without frontmatter)
     pub content: String,
-    
+
     /// Raw frontmatter YAML
     #[allow(dead_code)] // Planned for frontmatter analysis
     pub frontmatter: String,
@@ -60,8 +60,7 @@ pub struct AdrParser;
 impl AdrParser {
     /// Parse an ADR file
     pub fn parse_file(path: &Path) -> Result<AdrDocument> {
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| AdrscanError::Io(e))?;
+        let content = std::fs::read_to_string(path).map_err(|e| AdrscanError::Io(e))?;
 
         Self::parse_content(&content, path.to_path_buf())
     }
@@ -84,7 +83,7 @@ impl AdrParser {
         // Check for YAML frontmatter (---)
         if content.starts_with("---\n") {
             let content_without_first_delimiter = &content[4..]; // Skip first "---\n"
-            
+
             if let Some(end_pos) = content_without_first_delimiter.find("\n---\n") {
                 let frontmatter = content_without_first_delimiter[..end_pos].to_string();
                 let markdown_content = content_without_first_delimiter[end_pos + 5..].to_string(); // Skip "\n---\n"
@@ -98,7 +97,7 @@ impl AdrParser {
         // Check for TOML frontmatter (+++)
         else if content.starts_with("+++\n") {
             let content_without_first_delimiter = &content[4..]; // Skip first "+++\n"
-            
+
             if let Some(end_pos) = content_without_first_delimiter.find("\n+++\n") {
                 let frontmatter = content_without_first_delimiter[..end_pos].to_string();
                 let markdown_content = content_without_first_delimiter[end_pos + 5..].to_string(); // Skip "\n+++\n"
@@ -148,7 +147,7 @@ impl AdrParser {
 
         // If both fail, provide detailed error message
         Err(AdrscanError::ParseError(
-            "Frontmatter must be valid YAML or TOML format".to_string()
+            "Frontmatter must be valid YAML or TOML format".to_string(),
         ))
     }
 
@@ -178,7 +177,19 @@ impl AdrParser {
             .unwrap_or_default();
 
         // Collect custom fields (everything not in standard fields)
-        let standard_fields = ["title", "status", "id", "number", "date", "deciders", "authors", "tags", "supersedes", "relates_to", "related"];
+        let standard_fields = [
+            "title",
+            "status",
+            "id",
+            "number",
+            "date",
+            "deciders",
+            "authors",
+            "tags",
+            "supersedes",
+            "relates_to",
+            "related",
+        ];
         let custom_fields = mapping
             .iter()
             .filter_map(|(k, v)| {
@@ -208,7 +219,9 @@ impl AdrParser {
     }
 
     /// Extract metadata from TOML table
-    fn extract_metadata_from_toml(table: &toml::map::Map<String, toml::Value>) -> Result<AdrMetadata> {
+    fn extract_metadata_from_toml(
+        table: &toml::map::Map<String, toml::Value>,
+    ) -> Result<AdrMetadata> {
         // Extract required and optional fields
         let title = Self::extract_toml_string_field(table, "title")
             .unwrap_or_else(|| "Untitled ADR".to_string());
@@ -233,7 +246,19 @@ impl AdrParser {
             .unwrap_or_default();
 
         // Collect custom fields (everything not in standard fields)
-        let standard_fields = ["title", "status", "id", "number", "date", "deciders", "authors", "tags", "supersedes", "relates_to", "related"];
+        let standard_fields = [
+            "title",
+            "status",
+            "id",
+            "number",
+            "date",
+            "deciders",
+            "authors",
+            "tags",
+            "supersedes",
+            "relates_to",
+            "related",
+        ];
         let custom_fields = table
             .iter()
             .filter_map(|(k, v)| {
@@ -261,16 +286,25 @@ impl AdrParser {
 
     // YAML helper functions
     fn extract_yaml_string_field(mapping: &serde_yaml::Mapping, field: &str) -> Option<String> {
-        mapping.get(&serde_yaml::Value::String(field.to_string()))
+        mapping
+            .get(&serde_yaml::Value::String(field.to_string()))
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
     }
 
-    fn extract_yaml_string_array(mapping: &serde_yaml::Mapping, field: &str) -> Option<Vec<String>> {
-        mapping.get(&serde_yaml::Value::String(field.to_string()))
+    fn extract_yaml_string_array(
+        mapping: &serde_yaml::Mapping,
+        field: &str,
+    ) -> Option<Vec<String>> {
+        mapping
+            .get(&serde_yaml::Value::String(field.to_string()))
             .and_then(|v| {
                 if let Some(arr) = v.as_sequence() {
-                    Some(arr.iter().filter_map(|item| item.as_str().map(|s| s.to_string())).collect())
+                    Some(
+                        arr.iter()
+                            .filter_map(|item| item.as_str().map(|s| s.to_string()))
+                            .collect(),
+                    )
                 } else if let Some(s) = v.as_str() {
                     // Handle single string as array of one
                     Some(vec![s.to_string()])
@@ -281,24 +315,34 @@ impl AdrParser {
     }
 
     // TOML helper functions
-    fn extract_toml_string_field(table: &toml::map::Map<String, toml::Value>, field: &str) -> Option<String> {
-        table.get(field)
+    fn extract_toml_string_field(
+        table: &toml::map::Map<String, toml::Value>,
+        field: &str,
+    ) -> Option<String> {
+        table
+            .get(field)
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
     }
 
-    fn extract_toml_string_array(table: &toml::map::Map<String, toml::Value>, field: &str) -> Option<Vec<String>> {
-        table.get(field)
-            .and_then(|v| {
-                if let Some(arr) = v.as_array() {
-                    Some(arr.iter().filter_map(|item| item.as_str().map(|s| s.to_string())).collect())
-                } else if let Some(s) = v.as_str() {
-                    // Handle single string as array of one
-                    Some(vec![s.to_string()])
-                } else {
-                    None
-                }
-            })
+    fn extract_toml_string_array(
+        table: &toml::map::Map<String, toml::Value>,
+        field: &str,
+    ) -> Option<Vec<String>> {
+        table.get(field).and_then(|v| {
+            if let Some(arr) = v.as_array() {
+                Some(
+                    arr.iter()
+                        .filter_map(|item| item.as_str().map(|s| s.to_string()))
+                        .collect(),
+                )
+            } else if let Some(s) = v.as_str() {
+                // Handle single string as array of one
+                Some(vec![s.to_string()])
+            } else {
+                None
+            }
+        })
     }
 
     // Convert TOML value to YAML value for consistency in custom fields
@@ -309,20 +353,22 @@ impl AdrParser {
             toml::Value::Float(f) => serde_yaml::Value::Number(serde_yaml::Number::from(*f)),
             toml::Value::Boolean(b) => serde_yaml::Value::Bool(*b),
             toml::Value::Array(arr) => {
-                let yaml_seq: Vec<serde_yaml::Value> = arr.iter()
-                    .map(Self::toml_to_yaml_value)
-                    .collect();
+                let yaml_seq: Vec<serde_yaml::Value> =
+                    arr.iter().map(Self::toml_to_yaml_value).collect();
                 serde_yaml::Value::Sequence(yaml_seq)
-            },
+            }
             toml::Value::Table(table) => {
-                let yaml_map: serde_yaml::Mapping = table.iter()
-                    .map(|(k, v)| (
-                        serde_yaml::Value::String(k.clone()),
-                        Self::toml_to_yaml_value(v)
-                    ))
+                let yaml_map: serde_yaml::Mapping = table
+                    .iter()
+                    .map(|(k, v)| {
+                        (
+                            serde_yaml::Value::String(k.clone()),
+                            Self::toml_to_yaml_value(v),
+                        )
+                    })
                     .collect();
                 serde_yaml::Value::Mapping(yaml_map)
-            },
+            }
             toml::Value::Datetime(dt) => serde_yaml::Value::String(dt.to_string()),
         }
     }
@@ -418,7 +464,10 @@ status: accepted
 
         let result = AdrParser::parse_content(content, PathBuf::from("test.md"));
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("not properly closed"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("not properly closed"));
     }
 
     #[test]
@@ -490,7 +539,10 @@ date: "2023-12-01"
 
         let result = AdrParser::parse_content(content, PathBuf::from("test.md")).unwrap();
         assert!(result.metadata.date.is_some());
-        assert_eq!(result.metadata.date.unwrap().format("%Y-%m-%d").to_string(), "2023-12-01");
+        assert_eq!(
+            result.metadata.date.unwrap().format("%Y-%m-%d").to_string(),
+            "2023-12-01"
+        );
     }
 
     #[test]

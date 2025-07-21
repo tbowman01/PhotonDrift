@@ -1,7 +1,7 @@
 use clap::Args;
-use std::path::PathBuf;
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 use crate::{config::Config, error::AdrscanError, parser::AdrParser};
 type Result<T> = std::result::Result<T, AdrscanError>;
@@ -70,14 +70,15 @@ pub struct InventoryStats {
 impl InventoryCommand {
     pub fn execute(&self, config: &Config) -> Result<()> {
         log::info!("Scanning ADR inventory...");
-        
+
         let adr_dir = self.adr_dir.as_ref().unwrap_or(&config.adr_dir);
-        
+
         // Validate ADR directory exists
         if !adr_dir.exists() {
-            return Err(AdrscanError::DirectoryNotFound(
-                format!("ADR directory not found: {}", adr_dir.display())
-            ));
+            return Err(AdrscanError::DirectoryNotFound(format!(
+                "ADR directory not found: {}",
+                adr_dir.display()
+            )));
         }
 
         // Scan for ADR files
@@ -139,19 +140,20 @@ impl InventoryCommand {
     /// Parse a single ADR file into a summary
     fn parse_adr_file(&self, file_path: &PathBuf) -> Result<AdrSummary> {
         let adr_doc = AdrParser::parse_file(file_path)?;
-        
+
         // Get file metadata
-        let metadata = std::fs::metadata(file_path)
-            .map_err(|e| AdrscanError::Io(e))?;
+        let metadata = std::fs::metadata(file_path).map_err(|e| AdrscanError::Io(e))?;
         let file_size = metadata.len();
 
         // Count lines
-        let content = std::fs::read_to_string(file_path)
-            .map_err(|e| AdrscanError::Io(e))?;
+        let content = std::fs::read_to_string(file_path).map_err(|e| AdrscanError::Io(e))?;
         let line_count = content.lines().count();
 
         // Format date
-        let date_str = adr_doc.metadata.date.map(|d| d.format("%Y-%m-%d").to_string());
+        let date_str = adr_doc
+            .metadata
+            .date
+            .map(|d| d.format("%Y-%m-%d").to_string());
 
         Ok(AdrSummary {
             path: file_path.to_string_lossy().to_string(),
@@ -177,7 +179,11 @@ impl InventoryCommand {
 
         // Filter by tag
         if let Some(ref tag_filter) = self.tag {
-            if !adr.tags.iter().any(|tag| tag.eq_ignore_ascii_case(tag_filter)) {
+            if !adr
+                .tags
+                .iter()
+                .any(|tag| tag.eq_ignore_ascii_case(tag_filter))
+            {
                 return false;
             }
         }
@@ -207,13 +213,11 @@ impl InventoryCommand {
             }
             _ => {
                 log::warn!("Unknown sort field: {}, using date", self.sort_by);
-                adrs.sort_by(|a, b| {
-                    match (&a.date, &b.date) {
-                        (Some(a_date), Some(b_date)) => a_date.cmp(b_date),
-                        (Some(_), None) => std::cmp::Ordering::Less,
-                        (None, Some(_)) => std::cmp::Ordering::Greater,
-                        (None, None) => std::cmp::Ordering::Equal,
-                    }
+                adrs.sort_by(|a, b| match (&a.date, &b.date) {
+                    (Some(a_date), Some(b_date)) => a_date.cmp(b_date),
+                    (Some(_), None) => std::cmp::Ordering::Less,
+                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                    (None, None) => std::cmp::Ordering::Equal,
                 });
             }
         }
@@ -242,13 +246,13 @@ impl InventoryCommand {
             let total_files = adrs.len();
             let total_size_bytes: u64 = adrs.iter().map(|adr| adr.file_size).sum();
             let total_lines: usize = adrs.iter().map(|adr| adr.line_count).sum();
-            
+
             let average_file_size = if total_files > 0 {
                 total_size_bytes as f64 / total_files as f64
             } else {
                 0.0
             };
-            
+
             let average_lines_per_adr = if total_files > 0 {
                 total_lines as f64 / total_files as f64
             } else {
@@ -301,9 +305,19 @@ impl InventoryCommand {
             let tags = adr.tags.join(";");
             let date = adr.date.as_deref().unwrap_or("");
             let id = adr.id.as_deref().unwrap_or("");
-            
-            println!("{},{},{},{},{},{},{},{},{}",
-                adr.path, id, adr.title, adr.status, date, deciders, tags, adr.file_size, adr.line_count);
+
+            println!(
+                "{},{},{},{},{},{},{},{},{}",
+                adr.path,
+                id,
+                adr.title,
+                adr.status,
+                date,
+                deciders,
+                tags,
+                adr.file_size,
+                adr.line_count
+            );
         }
         Ok(())
     }
@@ -335,7 +349,8 @@ impl InventoryCommand {
             println!("🏷️  Tag Breakdown:");
             let mut tag_pairs: Vec<_> = inventory.tag_breakdown.iter().collect();
             tag_pairs.sort_by(|a, b| b.1.cmp(a.1)); // Sort by count descending
-            for (tag, count) in tag_pairs.iter().take(10) { // Show top 10
+            for (tag, count) in tag_pairs.iter().take(10) {
+                // Show top 10
                 println!("  {}: {}", tag, count);
             }
             if tag_pairs.len() > 10 {
@@ -351,16 +366,22 @@ impl InventoryCommand {
             println!("  Total size: {} bytes", stats.total_size_bytes);
             println!("  Total lines: {}", stats.total_lines);
             println!("  Average file size: {:.1} bytes", stats.average_file_size);
-            println!("  Average lines per ADR: {:.1}", stats.average_lines_per_adr);
+            println!(
+                "  Average lines per ADR: {:.1}",
+                stats.average_lines_per_adr
+            );
             println!();
         }
 
         // ADR details
         if !inventory.adrs.is_empty() {
             println!("📋 ADR Details:");
-            println!("  {:<4} {:<30} {:<12} {:<12} {}", "ID", "Title", "Status", "Date", "Tags");
+            println!(
+                "  {:<4} {:<30} {:<12} {:<12} {}",
+                "ID", "Title", "Status", "Date", "Tags"
+            );
             println!("  {}", "─".repeat(80));
-            
+
             for adr in &inventory.adrs {
                 let id = adr.id.as_deref().unwrap_or("N/A");
                 let title = if adr.title.len() > 28 {
@@ -374,9 +395,11 @@ impl InventoryCommand {
                 } else {
                     adr.tags.join(",")
                 };
-                
-                println!("  {:<4} {:<30} {:<12} {:<12} {}", 
-                    id, title, adr.status, date, tags);
+
+                println!(
+                    "  {:<4} {:<30} {:<12} {:<12} {}",
+                    id, title, adr.status, date, tags
+                );
             }
         }
 
@@ -439,7 +462,10 @@ mod tests {
         let config = create_test_config(&adr_dir);
 
         // Create test ADR files
-        create_test_adr(&adr_dir, "adr-001.md", r#"---
+        create_test_adr(
+            &adr_dir,
+            "adr-001.md",
+            r#"---
 title: "Use React for Frontend"
 status: accepted
 date: 2023-01-15
@@ -450,9 +476,13 @@ tags: ["frontend", "react"]
 # Use React for Frontend
 
 This is the content of ADR 001.
-"#);
+"#,
+        );
 
-        create_test_adr(&adr_dir, "adr-002.md", r#"---
+        create_test_adr(
+            &adr_dir,
+            "adr-002.md",
+            r#"---
 title: "Use PostgreSQL Database"
 status: proposed
 date: 2023-02-01
@@ -463,7 +493,8 @@ tags: ["database", "postgresql"]
 # Use PostgreSQL Database
 
 This is the content of ADR 002.
-"#);
+"#,
+        );
 
         let cmd = InventoryCommand {
             adr_dir: Some(adr_dir),
@@ -500,7 +531,9 @@ This is the content of ADR 002.
         let files = cmd.scan_adr_files(&adr_dir).unwrap();
         assert_eq!(files.len(), 2);
         assert!(files.iter().any(|f| f.file_name().unwrap() == "adr-001.md"));
-        assert!(files.iter().any(|f| f.file_name().unwrap() == "adr-002.markdown"));
+        assert!(files
+            .iter()
+            .any(|f| f.file_name().unwrap() == "adr-002.markdown"));
     }
 
     #[test]
@@ -552,19 +585,27 @@ Line 3
         let adr_dir = temp_dir.path().to_path_buf();
         let config = create_test_config(&adr_dir);
 
-        create_test_adr(&adr_dir, "accepted.md", r#"---
+        create_test_adr(
+            &adr_dir,
+            "accepted.md",
+            r#"---
 title: "Accepted ADR"
 status: accepted
 ---
 # Accepted
-"#);
+"#,
+        );
 
-        create_test_adr(&adr_dir, "proposed.md", r#"---
+        create_test_adr(
+            &adr_dir,
+            "proposed.md",
+            r#"---
 title: "Proposed ADR"
 status: proposed
 ---
 # Proposed
-"#);
+"#,
+        );
 
         let cmd = InventoryCommand {
             adr_dir: Some(adr_dir),
@@ -585,21 +626,29 @@ status: proposed
         let adr_dir = temp_dir.path().to_path_buf();
         let config = create_test_config(&adr_dir);
 
-        create_test_adr(&adr_dir, "frontend.md", r#"---
+        create_test_adr(
+            &adr_dir,
+            "frontend.md",
+            r#"---
 title: "Frontend ADR"
 status: accepted
 tags: ["frontend", "react"]
 ---
 # Frontend
-"#);
+"#,
+        );
 
-        create_test_adr(&adr_dir, "backend.md", r#"---
+        create_test_adr(
+            &adr_dir,
+            "backend.md",
+            r#"---
 title: "Backend ADR"
 status: accepted
 tags: ["backend", "database"]
 ---
 # Backend
-"#);
+"#,
+        );
 
         let cmd = InventoryCommand {
             adr_dir: Some(adr_dir),
@@ -767,7 +816,7 @@ tags: ["backend", "database"]
         assert_eq!(inventory.status_breakdown.get("proposed"), Some(&1));
         assert_eq!(inventory.tag_breakdown.get("frontend"), Some(&2));
         assert_eq!(inventory.tag_breakdown.get("backend"), Some(&1));
-        
+
         let stats = inventory.statistics.unwrap();
         assert_eq!(stats.total_files, 2);
         assert_eq!(stats.total_size_bytes, 300);

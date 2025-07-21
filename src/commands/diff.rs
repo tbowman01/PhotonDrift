@@ -3,7 +3,11 @@ use std::path::PathBuf;
 #[cfg(feature = "tokio")]
 use tokio::runtime::Runtime;
 
-use crate::{config::Config, error::AdrscanError, drift::{DriftEngine, DriftReport, DriftSeverity}};
+use crate::{
+    config::Config,
+    drift::{DriftEngine, DriftReport, DriftSeverity},
+    error::AdrscanError,
+};
 type Result<T> = std::result::Result<T, AdrscanError>;
 
 #[derive(Args)]
@@ -33,47 +37,55 @@ impl DiffCommand {
     #[cfg(feature = "tokio")]
     pub fn execute(&self, config: &Config) -> Result<()> {
         log::info!("Performing drift detection...");
-        
+
         // Create async runtime
-        let rt = Runtime::new().map_err(|e| AdrscanError::DriftError(format!("Failed to create async runtime: {}", e)))?;
-        
+        let rt = Runtime::new().map_err(|e| {
+            AdrscanError::DriftError(format!("Failed to create async runtime: {}", e))
+        })?;
+
         rt.block_on(async {
             let drift_engine = DriftEngine::new();
-            
+
             // Determine directories
-            let scan_dir = self.directory.as_ref()
+            let scan_dir = self
+                .directory
+                .as_ref()
                 .map(|p| p.clone())
                 .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
-            
+
             let adr_dir = self.adr_dir.as_ref().unwrap_or(&config.adr_dir);
-            
+
             // Get detection patterns from config
             let detection_patterns = &config.drift.detection_patterns;
-            
+
             // Perform drift detection
-            let drift_report = drift_engine.detect_drift(
-                adr_dir,
-                &scan_dir,
-                self.baseline.as_deref(),
-                &detection_patterns,
-            ).await?;
-            
+            let drift_report = drift_engine
+                .detect_drift(
+                    adr_dir,
+                    &scan_dir,
+                    self.baseline.as_deref(),
+                    &detection_patterns,
+                )
+                .await?;
+
             // Save current snapshot if requested
             if let Some(ref snapshot_path) = self.save_snapshot {
                 log::info!("Saving current snapshot to: {}", snapshot_path.display());
                 // The snapshot is created internally during drift detection
                 // We would need to expose it from the drift engine to save it
             }
-            
+
             // Output report based on format
             match self.format.as_str() {
                 "json" => {
-                    let json_output = drift_report.to_json()
+                    let json_output = drift_report
+                        .to_json()
                         .map_err(|e| AdrscanError::SerializationError(e.to_string()))?;
                     println!("{}", json_output);
                 }
                 "yaml" => {
-                    let yaml_output = drift_report.to_yaml()
+                    let yaml_output = drift_report
+                        .to_yaml()
                         .map_err(|e| AdrscanError::SerializationError(e.to_string()))?;
                     println!("{}", yaml_output);
                 }
@@ -81,41 +93,49 @@ impl DiffCommand {
                     self.print_console_report(&drift_report);
                 }
                 _ => {
-                    return Err(AdrscanError::InvalidArgument(
-                        format!("Unsupported output format: {}. Use 'console', 'json', or 'yaml'", self.format)
-                    ));
+                    return Err(AdrscanError::InvalidArgument(format!(
+                        "Unsupported output format: {}. Use 'console', 'json', or 'yaml'",
+                        self.format
+                    )));
                 }
             }
-            
+
             // Exit with error code if critical drift is found
-            let critical_count = drift_report.severity_summary
+            let critical_count = drift_report
+                .severity_summary
                 .get(&DriftSeverity::Critical)
                 .unwrap_or(&0);
-            
+
             if *critical_count > 0 {
                 log::warn!("Found {} critical drift items", critical_count);
                 std::process::exit(1);
             }
-            
+
             Ok(())
         })
     }
-    
+
     /// Print a human-readable console report
     fn print_console_report(&self, report: &DriftReport) {
         println!("🔍 Architectural Drift Detection Report");
         println!("=======================================");
         println!();
-        
+
         println!("📊 Summary:");
         println!("  Total Items: {}", report.total_items);
-        println!("  Scanned Directory: {}", report.scanned_directory.display());
+        println!(
+            "  Scanned Directory: {}",
+            report.scanned_directory.display()
+        );
         if let Some(ref baseline) = report.baseline_snapshot {
             println!("  Baseline: {}", baseline.display());
         }
-        println!("  Generated: {}", report.timestamp.format("%Y-%m-%d %H:%M:%S UTC"));
+        println!(
+            "  Generated: {}",
+            report.timestamp.format("%Y-%m-%d %H:%M:%S UTC")
+        );
         println!();
-        
+
         // Severity breakdown
         println!("🚨 Severity Breakdown:");
         for severity in [
@@ -137,7 +157,7 @@ impl DiffCommand {
             }
         }
         println!();
-        
+
         // Category breakdown
         if !report.category_summary.is_empty() {
             println!("📂 Category Breakdown:");
@@ -146,11 +166,11 @@ impl DiffCommand {
             }
             println!();
         }
-        
+
         // Show critical and high priority items
         let critical_items = report.items_by_severity(&DriftSeverity::Critical);
         let high_items = report.items_by_severity(&DriftSeverity::High);
-        
+
         if !critical_items.is_empty() {
             println!("🔴 Critical Issues:");
             for item in critical_items.iter().take(10) {
@@ -161,7 +181,7 @@ impl DiffCommand {
                 println!();
             }
         }
-        
+
         if !high_items.is_empty() {
             println!("🟠 High Priority Issues:");
             for item in high_items.iter().take(10) {
@@ -172,14 +192,14 @@ impl DiffCommand {
                 println!();
             }
         }
-        
+
         // Scan statistics
         println!("📈 Scan Statistics:");
         println!("  Files Scanned: {}", report.scan_stats.files_scanned);
         println!("  Lines Analyzed: {}", report.scan_stats.lines_analyzed);
         println!("  Scan Duration: {}ms", report.scan_stats.scan_duration_ms);
         println!("  ADRs Analyzed: {}", report.scan_stats.adrs_analyzed);
-        
+
         if report.total_items == 0 {
             println!();
             println!("✅ No architectural drift detected!");
@@ -190,11 +210,11 @@ impl DiffCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{Config, DriftConfig, TemplateConfig};
+    use crate::drift::{DriftCategory, DriftItem, DriftLocation, DriftReport, DriftSeverity};
     use std::fs;
     use std::path::Path;
     use tempfile::TempDir;
-    use crate::drift::{DriftReport, DriftItem, DriftSeverity, DriftCategory, DriftLocation};
-    use crate::config::{Config, TemplateConfig, DriftConfig};
 
     #[allow(dead_code)]
     fn create_test_config(adr_dir: &PathBuf) -> Config {
@@ -223,7 +243,7 @@ mod tests {
 
     fn create_test_drift_report(temp_dir: &Path) -> DriftReport {
         let mut report = DriftReport::new(temp_dir.to_path_buf(), None);
-        
+
         // Add a critical drift item
         let critical_item = DriftItem::new(
             "critical_1".to_string(),
@@ -235,9 +255,9 @@ mod tests {
         )
         .with_technology("MongoDB".to_string())
         .with_suggested_action("Remove MongoDB or update the ADR".to_string());
-        
+
         report.add_item(critical_item);
-        
+
         // Add a high priority drift item
         let high_item = DriftItem::new(
             "high_1".to_string(),
@@ -249,9 +269,9 @@ mod tests {
         )
         .with_technology("Redis".to_string())
         .with_suggested_action("Create an ADR for Redis usage".to_string());
-        
+
         report.add_item(high_item);
-        
+
         // Add a medium priority drift item
         let medium_item = DriftItem::new(
             "medium_1".to_string(),
@@ -262,9 +282,9 @@ mod tests {
             DriftLocation::new(PathBuf::from("Cargo.toml")).with_line(15),
         )
         .with_technology("Axum".to_string());
-        
+
         report.add_item(medium_item);
-        
+
         report
     }
 
@@ -277,7 +297,7 @@ mod tests {
             adr_dir: None,
             save_snapshot: None,
         };
-        
+
         assert_eq!(cmd.format, "console");
         assert!(cmd.baseline.is_none());
         assert!(cmd.directory.is_none());
@@ -288,7 +308,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let baseline_path = temp_dir.path().join("baseline.json");
         let save_path = temp_dir.path().join("snapshot.json");
-        
+
         let cmd = DiffCommand {
             baseline: Some(baseline_path.clone()),
             format: "json".to_string(),
@@ -296,7 +316,7 @@ mod tests {
             adr_dir: Some(temp_dir.path().join("adr")),
             save_snapshot: Some(save_path.clone()),
         };
-        
+
         assert_eq!(cmd.baseline, Some(baseline_path));
         assert_eq!(cmd.format, "json");
         assert_eq!(cmd.directory, Some(temp_dir.path().to_path_buf()));
@@ -307,7 +327,7 @@ mod tests {
     fn test_print_console_report_empty() {
         let temp_dir = TempDir::new().unwrap();
         let report = DriftReport::new(temp_dir.path().to_path_buf(), None);
-        
+
         let cmd = DiffCommand {
             baseline: None,
             format: "console".to_string(),
@@ -315,7 +335,7 @@ mod tests {
             adr_dir: None,
             save_snapshot: None,
         };
-        
+
         // This should not panic and should print "No drift detected"
         cmd.print_console_report(&report);
     }
@@ -324,7 +344,7 @@ mod tests {
     fn test_print_console_report_with_items() {
         let temp_dir = TempDir::new().unwrap();
         let report = create_test_drift_report(temp_dir.path());
-        
+
         let cmd = DiffCommand {
             baseline: None,
             format: "console".to_string(),
@@ -332,7 +352,7 @@ mod tests {
             adr_dir: None,
             save_snapshot: None,
         };
-        
+
         // This should not panic and should show drift items
         cmd.print_console_report(&report);
     }
@@ -341,7 +361,7 @@ mod tests {
     fn test_json_format_output() {
         let temp_dir = TempDir::new().unwrap();
         let report = create_test_drift_report(temp_dir.path());
-        
+
         // Test JSON serialization
         let json_output = report.to_json().unwrap();
         assert!(json_output.contains("\"total_items\""));
@@ -354,7 +374,7 @@ mod tests {
     fn test_yaml_format_output() {
         let temp_dir = TempDir::new().unwrap();
         let report = create_test_drift_report(temp_dir.path());
-        
+
         // Test YAML serialization
         let yaml_output = report.to_yaml().unwrap();
         assert!(yaml_output.contains("total_items:"));
@@ -367,11 +387,17 @@ mod tests {
     fn test_drift_report_severity_summary() {
         let temp_dir = TempDir::new().unwrap();
         let report = create_test_drift_report(temp_dir.path());
-        
+
         // Check severity counts
-        assert_eq!(report.severity_summary.get(&DriftSeverity::Critical), Some(&1));
+        assert_eq!(
+            report.severity_summary.get(&DriftSeverity::Critical),
+            Some(&1)
+        );
         assert_eq!(report.severity_summary.get(&DriftSeverity::High), Some(&1));
-        assert_eq!(report.severity_summary.get(&DriftSeverity::Medium), Some(&1));
+        assert_eq!(
+            report.severity_summary.get(&DriftSeverity::Medium),
+            Some(&1)
+        );
         assert_eq!(report.severity_summary.get(&DriftSeverity::Low), None);
     }
 
@@ -379,25 +405,36 @@ mod tests {
     fn test_drift_report_category_summary() {
         let temp_dir = TempDir::new().unwrap();
         let report = create_test_drift_report(temp_dir.path());
-        
+
         // Check category counts
-        assert_eq!(report.category_summary.get(&DriftCategory::ConflictingTechnology), Some(&1));
-        assert_eq!(report.category_summary.get(&DriftCategory::NewTechnology), Some(&2));
+        assert_eq!(
+            report
+                .category_summary
+                .get(&DriftCategory::ConflictingTechnology),
+            Some(&1)
+        );
+        assert_eq!(
+            report.category_summary.get(&DriftCategory::NewTechnology),
+            Some(&2)
+        );
     }
 
     #[test]
     fn test_drift_report_items_by_severity() {
         let temp_dir = TempDir::new().unwrap();
         let report = create_test_drift_report(temp_dir.path());
-        
+
         let critical_items = report.items_by_severity(&DriftSeverity::Critical);
         assert_eq!(critical_items.len(), 1);
-        assert_eq!(critical_items[0].title, "Rejected technology in use: MongoDB");
-        
+        assert_eq!(
+            critical_items[0].title,
+            "Rejected technology in use: MongoDB"
+        );
+
         let high_items = report.items_by_severity(&DriftSeverity::High);
         assert_eq!(high_items.len(), 1);
         assert_eq!(high_items[0].title, "Uncovered technology: Redis");
-        
+
         let medium_items = report.items_by_severity(&DriftSeverity::Medium);
         assert_eq!(medium_items.len(), 1);
         assert_eq!(medium_items[0].title, "New framework detected: Axum");
@@ -407,15 +444,19 @@ mod tests {
     fn test_drift_report_items_by_category() {
         let temp_dir = TempDir::new().unwrap();
         let report = create_test_drift_report(temp_dir.path());
-        
+
         let conflict_items = report.items_by_category(&DriftCategory::ConflictingTechnology);
         assert_eq!(conflict_items.len(), 1);
         assert!(conflict_items[0].title.contains("MongoDB"));
-        
+
         let new_tech_items = report.items_by_category(&DriftCategory::NewTechnology);
         assert_eq!(new_tech_items.len(), 2);
-        assert!(new_tech_items.iter().any(|item| item.title.contains("Redis")));
-        assert!(new_tech_items.iter().any(|item| item.title.contains("Axum")));
+        assert!(new_tech_items
+            .iter()
+            .any(|item| item.title.contains("Redis")));
+        assert!(new_tech_items
+            .iter()
+            .any(|item| item.title.contains("Axum")));
     }
 
     #[test]
@@ -424,11 +465,14 @@ mod tests {
             .with_line(42)
             .with_column(15)
             .with_snippet("let test = some_function();".to_string());
-        
+
         assert_eq!(location.file_path, PathBuf::from("src/test.rs"));
         assert_eq!(location.line_number, Some(42));
         assert_eq!(location.column_number, Some(15));
-        assert_eq!(location.snippet, Some("let test = some_function();".to_string()));
+        assert_eq!(
+            location.snippet,
+            Some("let test = some_function();".to_string())
+        );
     }
 
     #[test]
@@ -445,10 +489,13 @@ mod tests {
         .with_related_adr("ADR-005".to_string())
         .with_suggested_action("Review authentication implementation".to_string())
         .with_metadata("confidence".to_string(), "0.95".to_string());
-        
+
         assert_eq!(item.detected_technology, Some("JWT".to_string()));
         assert_eq!(item.related_adr, Some("ADR-005".to_string()));
-        assert_eq!(item.suggested_action, Some("Review authentication implementation".to_string()));
+        assert_eq!(
+            item.suggested_action,
+            Some("Review authentication implementation".to_string())
+        );
         assert_eq!(item.metadata.get("confidence"), Some(&"0.95".to_string()));
     }
 
@@ -456,7 +503,7 @@ mod tests {
     fn test_drift_report_summary() {
         let temp_dir = TempDir::new().unwrap();
         let report = create_test_drift_report(temp_dir.path());
-        
+
         let summary = report.summary();
         assert!(summary.contains("Total Items: 3"));
         assert!(summary.contains("Critical: 1"));
@@ -495,7 +542,7 @@ mod tests {
         .with_suggested_action("Add database indexes".to_string())
         .with_metadata("query_time".to_string(), "2.5s".to_string())
         .with_metadata("table".to_string(), "users".to_string());
-        
+
         assert_eq!(item.id, "builder_test");
         assert_eq!(item.severity, DriftSeverity::Medium);
         assert_eq!(item.category, DriftCategory::Performance);
@@ -507,13 +554,13 @@ mod tests {
     fn test_scan_statistics() {
         let temp_dir = TempDir::new().unwrap();
         let mut report = create_test_drift_report(temp_dir.path());
-        
+
         // Update scan statistics
         report.scan_stats.files_scanned = 150;
         report.scan_stats.lines_analyzed = 5000;
         report.scan_stats.scan_duration_ms = 1250;
         report.scan_stats.adrs_analyzed = 8;
-        
+
         assert_eq!(report.scan_stats.files_scanned, 150);
         assert_eq!(report.scan_stats.lines_analyzed, 5000);
         assert_eq!(report.scan_stats.scan_duration_ms, 1250);
@@ -532,9 +579,18 @@ mod tests {
     #[test]
     fn test_drift_category_display() {
         assert_eq!(DriftCategory::NewTechnology.to_string(), "New Technology");
-        assert_eq!(DriftCategory::ConflictingTechnology.to_string(), "Conflicting Technology");
-        assert_eq!(DriftCategory::DeprecatedTechnology.to_string(), "Deprecated Technology");
-        assert_eq!(DriftCategory::PatternViolation.to_string(), "Pattern Violation");
+        assert_eq!(
+            DriftCategory::ConflictingTechnology.to_string(),
+            "Conflicting Technology"
+        );
+        assert_eq!(
+            DriftCategory::DeprecatedTechnology.to_string(),
+            "Deprecated Technology"
+        );
+        assert_eq!(
+            DriftCategory::PatternViolation.to_string(),
+            "Pattern Violation"
+        );
         assert_eq!(DriftCategory::Security.to_string(), "Security");
         assert_eq!(DriftCategory::Performance.to_string(), "Performance");
         assert_eq!(DriftCategory::Database.to_string(), "Database");
@@ -546,12 +602,12 @@ mod tests {
     fn test_empty_drift_report() {
         let temp_dir = TempDir::new().unwrap();
         let report = DriftReport::new(temp_dir.path().to_path_buf(), None);
-        
+
         assert_eq!(report.total_items, 0);
         assert!(report.items.is_empty());
         assert!(report.category_summary.is_empty());
         assert!(report.severity_summary.is_empty());
-        
+
         let summary = report.summary();
         assert!(summary.contains("Total Items: 0"));
     }
@@ -560,15 +616,20 @@ mod tests {
     fn test_large_drift_report() {
         let temp_dir = TempDir::new().unwrap();
         let mut report = DriftReport::new(temp_dir.path().to_path_buf(), None);
-        
+
         // Add many drift items
         for i in 0..50 {
             let item = DriftItem::new(
                 format!("item_{}", i),
-                if i % 4 == 0 { DriftSeverity::Critical } 
-                else if i % 3 == 0 { DriftSeverity::High }
-                else if i % 2 == 0 { DriftSeverity::Medium }
-                else { DriftSeverity::Low },
+                if i % 4 == 0 {
+                    DriftSeverity::Critical
+                } else if i % 3 == 0 {
+                    DriftSeverity::High
+                } else if i % 2 == 0 {
+                    DriftSeverity::Medium
+                } else {
+                    DriftSeverity::Low
+                },
                 DriftCategory::NewTechnology,
                 format!("Technology {}", i),
                 format!("Description for technology {}", i),
@@ -576,9 +637,9 @@ mod tests {
             );
             report.add_item(item);
         }
-        
+
         assert_eq!(report.total_items, 50);
-        
+
         // Check that console output handles large reports gracefully
         let cmd = DiffCommand {
             baseline: None,
@@ -587,7 +648,7 @@ mod tests {
             adr_dir: None,
             save_snapshot: None,
         };
-        
+
         // Should not panic with large report
         cmd.print_console_report(&report);
     }

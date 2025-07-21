@@ -1,73 +1,76 @@
-# Multi-stage build for PhotonDrift ADRScan
-FROM rust:1.75-slim AS builder
+# Multi-stage Docker build for ADRScan
+# Security-hardened container following best practices
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
+# Build stage - Use official Rust image for building
+FROM rust:1.75-slim-bullseye AS builder
+
+# Install security updates and required build dependencies
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y \
     pkg-config \
     libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Create non-root user for building
+RUN groupadd -r builder && useradd -r -g builder builder
 
 # Set working directory
-WORKDIR /usr/src/app
+WORKDIR /usr/src/adrscan
 
-# Copy Cargo files for dependency caching
+# Copy dependency manifests first for better layer caching
 COPY Cargo.toml ./
 
-# Create a dummy main to build dependencies
+# Create dummy main.rs to build dependencies
 RUN mkdir src && echo "fn main() {}" > src/main.rs
+
+# Build dependencies only (this layer will be cached)
 RUN cargo build --release
-RUN rm -f target/release/deps/adrscan*
+RUN rm -rf src
 
 # Copy source code
-COPY . .
+COPY src/ src/
 
-# Build the application
+# Build the actual application
 RUN cargo build --release
 
-# Runtime stage
-FROM debian:bookworm-slim
+# Strip debug symbols for smaller binary
+RUN strip target/release/adrscan
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    libssl3 \
-    && rm -rf /var/lib/apt/lists/*
+# Verify binary works
+RUN ./target/release/adrscan --version
 
-# Create app user
-RUN useradd -r -s /bin/false -m adrscan
+# Runtime stage - Use distroless for minimal attack surface
+FROM gcr.io/distroless/cc-debian11:nonroot AS runtime
 
-# Copy binary from builder stage
-COPY --from=builder /usr/src/app/target/release/adrscan /usr/local/bin/adrscan
+# Copy CA certificates for HTTPS requests
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-# Set ownership and permissions
-RUN chown adrscan:adrscan /usr/local/bin/adrscan
-RUN chmod +x /usr/local/bin/adrscan
+# Copy the binary from builder stage
+COPY --from=builder /usr/src/adrscan/target/release/adrscan /usr/local/bin/adrscan
 
-# Switch to non-root user
-USER adrscan
+# Create directory for ADRs with proper permissions
+USER 65532:65532
+WORKDIR /workspace
 
-# Set working directory
-WORKDIR /app
+# Health check to ensure container is working
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD ["/usr/local/bin/adrscan", "--version"]
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD adrscan --version || exit 1
-
-# Default command
-ENTRYPOINT ["adrscan"]
+# Set entrypoint and default command
+ENTRYPOINT ["/usr/local/bin/adrscan"]
 CMD ["--help"]
 
-# Metadata labels
-ARG BUILDTIME
-ARG VERSION
-ARG REVISION
-
-LABEL org.opencontainers.image.created="${BUILDTIME}"
-LABEL org.opencontainers.image.description="AI-powered Architecture Decision Record (ADR) management with ML-enhanced drift detection"
-LABEL org.opencontainers.image.licenses="MIT"
-LABEL org.opencontainers.image.revision="${REVISION}"
-LABEL org.opencontainers.image.source="https://github.com/tbowman01/PhotonDrift"
+# Metadata labels following OCI standards
 LABEL org.opencontainers.image.title="ADRScan"
-LABEL org.opencontainers.image.url="https://github.com/tbowman01/PhotonDrift"
+LABEL org.opencontainers.image.description="AI-powered Architecture Decision Record (ADR) management with ML-enhanced drift detection"
+LABEL org.opencontainers.image.version="0.2.0-alpha.20250721"
 LABEL org.opencontainers.image.vendor="PhotonDrift"
-LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.source="https://github.com/tbowman01/PhotonDrift"
+LABEL org.opencontainers.image.documentation="https://github.com/tbowman01/PhotonDrift/blob/main/README.md"
+LABEL org.opencontainers.image.created="2025-07-21T01:30:00Z"
+LABEL security.scan="enabled"
+LABEL security.distroless="true"
+LABEL security.nonroot="true"
