@@ -131,7 +131,7 @@ pub struct DriftLocation {
 }
 
 /// Statistics about the drift detection scan
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ScanStatistics {
     /// Total number of files scanned
     pub files_scanned: usize,
@@ -315,19 +315,6 @@ impl DriftLocation {
     pub fn with_snippet(mut self, snippet: String) -> Self {
         self.snippet = Some(snippet);
         self
-    }
-}
-
-impl Default for ScanStatistics {
-    fn default() -> Self {
-        Self {
-            files_scanned: 0,
-            lines_analyzed: 0,
-            scan_duration_ms: 0,
-            patterns_matched: 0,
-            adrs_analyzed: 0,
-            file_types: HashMap::new(),
-        }
     }
 }
 

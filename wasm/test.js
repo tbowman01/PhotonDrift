@@ -77,13 +77,71 @@ This is a test ADR.`;
         const scanner = new ADRScan();
         
         const initFiles = await scanner.init('./test-adr');
-        console.log('   Init files:', initFiles.length);
+        console.log('   Init files:', Object.keys(initFiles).length);
         
-        const inventory = await scanner.inventory('./docs/adr');
-        console.log('   Inventory completed');
+        // Test parsing ADR content
+        const adrContent = `---
+title: Use MongoDB for data storage
+status: accepted
+date: 2024-01-01
+---
+
+# Use MongoDB for data storage
+
+We will use MongoDB as our primary database.`;
         
-        const driftReport = await scanner.diff('.');
+        const parsedAdr = scanner.parseAdr(adrContent, 'test.md');
+        console.log('   ADR parsing completed');
+        
+        // Test inventory with mock ADR files
+        const mockAdrs = {
+            'docs/adr/0001-use-mongodb.md': `---
+title: Use MongoDB for data storage
+status: accepted
+date: 2024-01-01
+tags: [database, storage]
+---
+
+# Use MongoDB for data storage
+
+We will use MongoDB as our primary database.`,
+            'docs/adr/0002-use-redis.md': `---
+title: Use Redis for caching
+status: proposed
+date: 2024-01-02
+tags: [cache, performance]
+---
+
+# Use Redis for caching
+
+We will implement Redis for caching.`
+        };
+        
+        const inventory = scanner.inventory(mockAdrs);
+        console.log('   Inventory completed - ADRs:', inventory.total_count);
+        console.log('   Status breakdown:', Object.keys(inventory.status_breakdown).length);
+        
+        // Test drift detection with mock files
+        const mockFiles = {
+            'src/database.js': 'const mongodb = require("mongodb");',
+            'src/cache.js': 'const redis = require("redis");',
+            'Dockerfile': 'FROM node:18'
+        };
+        
+        const driftReport = scanner.detectDrift(mockFiles);
         console.log('   Drift detection completed, items:', driftReport.total_items);
+        
+        // Test diff with baseline
+        const baselineFiles = {
+            'src/database.js': 'const postgresql = require("pg");'
+        };
+        
+        const diffReport = scanner.diff(mockFiles, baselineFiles);
+        console.log('   Diff with baseline completed, items:', diffReport.total_items);
+        
+        // Test proposal generation
+        const proposals = await scanner.propose(driftReport);
+        console.log('   Generated proposals:', proposals.length);
         
         console.log('');
     } catch (error) {

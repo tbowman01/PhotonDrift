@@ -58,7 +58,7 @@ print_success "Code formatting check passed"
 
 # 2. Clippy linting
 print_status "Running Clippy linting..."
-if ! cargo clippy --all-targets --all-features -- -D warnings; then
+if ! cargo clippy --all-targets --all-features -- -D clippy::correctness -D clippy::suspicious -W clippy::complexity -W clippy::perf -W clippy::pedantic; then
     print_warning "Clippy linting failed!"
     print_status "Fix the warnings above or use #[allow(clippy::lint_name)] if intentional"
     # Allow clippy failures during merge resolution

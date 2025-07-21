@@ -1,0 +1,305 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [main, develop, 'feature/*']
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      severity:
+        description: 'Minimum severity level to report'
+        required: false
+        default: 'low'
+        type: choice
+        options:
+          - low
+          - medium
+          - high
+          - critical
+
+permissions:
+  contents: read
+  security-events: write
+  issues: write
+
+jobs:
+  security-audit:
+    name: Dependency Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-audit-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-audit-
+
+      - name: Install cargo-audit
+        run: |
+          # Install latest cargo-audit
+          cargo install cargo-audit --features=fix
+
+      - name: Run security audit
+        id: audit
+        run: |
+          # Create output directory
+          mkdir -p security-reports
+          
+          # Run audit with different output formats
+          echo "::group::Running cargo audit"
+          cargo audit --deny warnings 2>&1 | tee security-reports/audit-output.txt || true
+          AUDIT_EXIT_CODE=${PIPESTATUS[0]}
+          echo "::endgroup::"
+          
+          # Generate JSON report for parsing
+          echo "::group::Generating JSON report"
+          cargo audit --json > security-reports/audit-report.json || true
+          echo "::endgroup::"
+          
+          # Generate SARIF report for GitHub Security tab
+          echo "::group::Generating SARIF report"
+          cargo audit --json | python3 -c "
+import json
+import sys
+
+# Read cargo-audit JSON output
+audit_data = json.load(sys.stdin)
+
+# Convert to SARIF format
+sarif = {
+    'version': '2.1.0',
+    'runs': [{
+        'tool': {
+            'driver': {
+                'name': 'cargo-audit',
+                'version': '0.20.0',
+                'informationUri': 'https://github.com/RustSec/cargo-audit'
+            }
+        },
+        'results': []
+    }]
+}
+
+# Convert vulnerabilities to SARIF results
+if 'vulnerabilities' in audit_data:
+    for vuln in audit_data['vulnerabilities']['list']:
+        result = {
+            'ruleId': vuln['advisory']['id'],
+            'level': 'error' if vuln['advisory']['severity'] in ['critical', 'high'] else 'warning',
+            'message': {
+                'text': f\"{vuln['advisory']['title']}: {vuln['advisory']['description']}\"
+            },
+            'locations': [{
+                'physicalLocation': {
+                    'artifactLocation': {
+                        'uri': 'Cargo.toml'
+                    }
+                }
+            }],
+            'properties': {
+                'package': vuln['package']['name'],
+                'version': vuln['package']['version'],
+                'severity': vuln['advisory']['severity'],
+                'cve': vuln['advisory'].get('cve', 'N/A'),
+                'url': vuln['advisory'].get('url', '')
+            }
+        }
+        sarif['runs'][0]['results'].append(result)
+
+# Output SARIF
+print(json.dumps(sarif, indent=2))
+" > security-reports/audit-report.sarif || echo '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"cargo-audit"}},"results":[]}]}' > security-reports/audit-report.sarif
+          echo "::endgroup::"
+          
+          # Set output
+          echo "exit_code=$AUDIT_EXIT_CODE" >> $GITHUB_OUTPUT
+          
+          # Count vulnerabilities
+          VULN_COUNT=$(cat security-reports/audit-report.json | jq '.vulnerabilities.count // 0' 2>/dev/null || echo "0")
+          echo "vulnerability_count=$VULN_COUNT" >> $GITHUB_OUTPUT
+          
+          # Exit with audit code
+          exit $AUDIT_EXIT_CODE
+
+      - name: Upload SARIF report
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: security-reports/audit-report.sarif
+          category: cargo-audit
+
+      - name: Upload audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-audit-reports
+          path: security-reports/
+          retention-days: 30
+
+      - name: Create issue for new vulnerabilities
+        if: failure() && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('security-reports/audit-report.json', 'utf8'));
+            
+            if (report.vulnerabilities && report.vulnerabilities.count > 0) {
+              const title = `[Security] ${report.vulnerabilities.count} vulnerabilities found in dependencies`;
+              
+              let body = `## 🚨 Security Audit Results\n\n`;
+              body += `The automated security audit found **${report.vulnerabilities.count}** vulnerabilities.\n\n`;
+              
+              // Group by severity
+              const bySeverity = {};
+              for (const vuln of report.vulnerabilities.list) {
+                const severity = vuln.advisory.severity || 'unknown';
+                if (!bySeverity[severity]) bySeverity[severity] = [];
+                bySeverity[severity].push(vuln);
+              }
+              
+              // Format vulnerabilities
+              for (const [severity, vulns] of Object.entries(bySeverity)) {
+                body += `### ${severity.toUpperCase()} (${vulns.length})\n\n`;
+                for (const vuln of vulns) {
+                  body += `- **${vuln.package.name} v${vuln.package.version}**\n`;
+                  body += `  - ${vuln.advisory.title}\n`;
+                  body += `  - ID: ${vuln.advisory.id}\n`;
+                  if (vuln.advisory.cve) body += `  - CVE: ${vuln.advisory.cve}\n`;
+                  body += `  - [More info](${vuln.advisory.url})\n\n`;
+                }
+              }
+              
+              body += `## Actions Required\n\n`;
+              body += `1. Review the vulnerabilities\n`;
+              body += `2. Update affected dependencies\n`;
+              body += `3. Test the updates\n`;
+              body += `4. Deploy the fixes\n\n`;
+              body += `---\n`;
+              body += `*This issue was automatically created by the security audit workflow.*`;
+              
+              // Check if similar issue already exists
+              const issues = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                labels: 'security,dependencies'
+              });
+              
+              const existingIssue = issues.data.find(issue => 
+                issue.title.includes('[Security]') && 
+                issue.title.includes('vulnerabilities found in dependencies')
+              );
+              
+              if (existingIssue) {
+                // Update existing issue
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: existingIssue.number,
+                  body: body
+                });
+              } else {
+                // Create new issue
+                await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: title,
+                  body: body,
+                  labels: ['security', 'dependencies', 'automated']
+                });
+              }
+            }
+
+      - name: Comment PR with audit results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const exitCode = '${{ steps.audit.outputs.exit_code }}';
+            const vulnCount = '${{ steps.audit.outputs.vulnerability_count }}';
+            
+            let comment = '## 🔒 Security Audit Results\n\n';
+            
+            if (exitCode === '0') {
+              comment += '✅ **All dependencies passed security audit!**\n\n';
+              comment += 'No known vulnerabilities detected.';
+            } else {
+              comment += `⚠️ **Security audit found ${vulnCount} vulnerabilities**\n\n`;
+              
+              try {
+                const output = fs.readFileSync('security-reports/audit-output.txt', 'utf8');
+                comment += '<details>\n<summary>Click to see details</summary>\n\n';
+                comment += '```\n' + output + '\n```\n';
+                comment += '</details>\n\n';
+                comment += '**Action Required**: Please review and update the affected dependencies.';
+              } catch (e) {
+                comment += 'Please check the workflow logs for details.';
+              }
+            }
+            
+            // Find and update or create comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('Security Audit Results')
+            );
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
+
+  cargo-deny:
+    name: License and Security Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install cargo-deny
+        run: cargo install cargo-deny
+      
+      - name: Check licenses and security
+        run: |
+          # Create default config if not exists
+          if [ ! -f deny.toml ]; then
+            cargo deny init
+          fi
+          
+          # Run cargo deny check
+          cargo deny check --show-stats

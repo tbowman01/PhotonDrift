@@ -1,0 +1,111 @@
+# cargo-deny configuration for PhotonDrift
+# https://github.com/EmbarkStudios/cargo-deny
+
+# This section is used to configure cargo-deny behavior
+[graph]
+# All targets are included by default
+targets = []
+# When creating the dependency graph used, this field can be used to prune crates from the graph
+exclude = []
+
+[advisories]
+# The advisories section is used to configure how security advisories are handled
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/RustSec/advisory-db"]
+
+# Deny all security vulnerabilities
+vulnerability = "deny"
+# Deny unmaintained crates
+unmaintained = "deny"
+# Warn for security notices
+notice = "warn"
+# Warn on crates that have security vulnerabilities in their license
+unsound = "deny"
+# Warn when a crate marked as yanked is encountered
+yanked = "warn"
+
+# Ignore specific advisories
+ignore = [
+    "RUSTSEC-2024-0436", # paste - unmaintained, tracked in issue #45
+]
+
+[licenses]
+# Configuration for license checking
+# Deny crates with no license information
+unlicensed = "deny"
+# Allow commonly used licenses
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+]
+# Deny specific licenses
+deny = [
+    "GPL-2.0",
+    "GPL-3.0",
+    "AGPL-3.0",
+]
+# Allow copyleft licenses for specific crates
+copyleft = "warn"
+# Confidence threshold for license detection (0.0 - 1.0)
+confidence-threshold = 0.8
+# Allow multiple licenses for a crate
+allow-osi-fsf-free = "both"
+# Default license to use if none is detected
+default = "deny"
+
+# Exceptions for specific crates
+exceptions = [
+    # Example: { allow = ["GPL-3.0"], name = "some-gpl-crate" },
+]
+
+[[licenses.clarify]]
+# Example of clarifying a license for a crate
+# name = "ring"
+# expression = "MIT AND ISC AND OpenSSL"
+# license-files = [
+#     { path = "LICENSE", hash = 0xbd0eed23 }
+# ]
+
+[bans]
+# Configuration for banned crates
+# Deny multiple versions of the same crate
+multiple-versions = "warn"
+# Deny wildcard dependencies
+wildcards = "allow"
+# Highlight specific crates
+highlight = "all"
+# Allow certain duplicate crates
+# workspace-default-features = "allow"
+# external-default-features = "allow"
+
+# Deny specific crates
+deny = [
+    # Example: { name = "openssl", version = "*" },
+]
+
+# Skip certain duplicate crates
+skip = [
+    # Example: { name = "winapi", version = "0.2.8" },
+]
+
+# Skip duplicate crates that are only in the tree for a specific target
+skip-tree = [
+    # Example: { name = "winapi", version = "0.2.8", depth = 20 },
+]
+
+[sources]
+# Configuration for crate sources
+# Deny crates from unknown registries
+unknown-registry = "warn"
+# Deny crates from unknown git sources
+unknown-git = "warn"
+# Allow crates from crates.io
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# Allow git sources
+allow-git = []

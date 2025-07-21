@@ -81,3 +81,13 @@ path = "src/main.rs"
 lto = true
 codegen-units = 1
 strip = true
+opt-level = "s"  # Optimize for size
+panic = "abort"  # Reduce WASM size
+
+# WASM-specific optimizations
+[profile.release.package.adrscan]
+opt-level = "z"  # Aggressive size optimization for WASM
+
+# Optimize specific dependencies for size
+[profile.release.package."*"]
+opt-level = "s"

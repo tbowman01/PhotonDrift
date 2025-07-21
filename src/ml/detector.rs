@@ -316,11 +316,7 @@ impl MLDriftDetector {
         }
 
         // TODO: Implement online learning feedback mechanism
-        log::debug!(
-            "Received feedback for item {}: correct={}",
-            item_id,
-            is_correct
-        );
+        log::debug!("Received feedback for item {item_id}: correct={is_correct}");
 
         // Update metrics based on feedback
         if is_correct {
@@ -356,13 +352,12 @@ impl MLDriftDetector {
 
             // Create parent directory if it doesn't exist
             if let Some(parent) = model_path.parent() {
-                std::fs::create_dir_all(parent).map_err(|e| crate::error::AdrscanError::Io(e))?;
+                std::fs::create_dir_all(parent).map_err(crate::error::AdrscanError::Io)?;
             }
 
             // TODO: Implement actual model serialization
             let model_data = model.serialize()?;
-            std::fs::write(model_path, model_data)
-                .map_err(|e| crate::error::AdrscanError::Io(e))?;
+            std::fs::write(model_path, model_data).map_err(crate::error::AdrscanError::Io)?;
 
             log::info!("Model saved successfully");
         } else {
@@ -525,8 +520,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_enhance_detection_disabled() {
-        let mut config = MLConfig::default();
-        config.enabled = false;
+        let config = MLConfig {
+            enabled: false,
+            ..Default::default()
+        };
 
         let mut detector = MLDriftDetector::new(config);
         let drift_items = vec![create_test_drift_item()];
@@ -539,19 +536,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_enhance_detection_with_mock_model() {
-        let mut config = MLConfig::default();
-        config.enabled = true;
-        config.confidence_threshold = 0.5; // Lower threshold for test
+        let config = MLConfig {
+            enabled: true,
+            confidence_threshold: 0.5, // Lower threshold for test
+            ..Default::default()
+        };
 
         let mut detector = MLDriftDetector::new(config);
 
-        // Train mock model
-        let training_data = vec![
-            (create_test_drift_item(), true),
-            (create_test_drift_item(), false),
-        ];
-
-        detector.train_model(training_data).await.unwrap();
+        // Load mock model from file to use MockAnomalyModel instead of training
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let model_path = temp_dir.path().join("mock_model.dat");
+        std::fs::write(&model_path, "mock model data").unwrap();
+        detector.load_model(&model_path).await.unwrap();
 
         let drift_items = vec![create_test_drift_item()];
         let results = detector.enhance_detection(drift_items).await.unwrap();
@@ -585,8 +582,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_train_svm_model() {
-        let mut config = MLConfig::default();
-        config.enabled = true;
+        let config = MLConfig {
+            enabled: true,
+            ..Default::default()
+        };
 
         let mut detector = MLDriftDetector::new(config);
 
@@ -596,12 +595,12 @@ mod tests {
         // Add normal samples (not anomalies)
         for i in 0..5 {
             let item = DriftItem::new(
-                format!("normal_{}", i),
+                format!("normal_{i}"),
                 crate::drift::DriftSeverity::Low,
                 crate::drift::DriftCategory::Configuration,
                 "Normal change".to_string(),
                 "Regular configuration update".to_string(),
-                crate::drift::DriftLocation::new(PathBuf::from(format!("config_{}.rs", i))),
+                crate::drift::DriftLocation::new(PathBuf::from(format!("config_{i}.rs"))),
             );
             training_data.push((item, false)); // false = not anomaly
         }
@@ -609,12 +608,12 @@ mod tests {
         // Add some anomalous samples
         for i in 0..2 {
             let item = DriftItem::new(
-                format!("anomaly_{}", i),
+                format!("anomaly_{i}"),
                 crate::drift::DriftSeverity::Critical,
                 crate::drift::DriftCategory::NewTechnology,
                 "Major architectural change".to_string(),
                 "Complete system overhaul with new technology stack".to_string(),
-                crate::drift::DriftLocation::new(PathBuf::from(format!("major_{}.rs", i))),
+                crate::drift::DriftLocation::new(PathBuf::from(format!("major_{i}.rs"))),
             );
             training_data.push((item, true)); // true = anomaly
         }

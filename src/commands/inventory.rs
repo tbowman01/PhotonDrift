@@ -142,11 +142,11 @@ impl InventoryCommand {
         let adr_doc = AdrParser::parse_file(file_path)?;
 
         // Get file metadata
-        let metadata = std::fs::metadata(file_path).map_err(|e| AdrscanError::Io(e))?;
+        let metadata = std::fs::metadata(file_path).map_err(AdrscanError::Io)?;
         let file_size = metadata.len();
 
         // Count lines
-        let content = std::fs::read_to_string(file_path).map_err(|e| AdrscanError::Io(e))?;
+        let content = std::fs::read_to_string(file_path).map_err(AdrscanError::Io)?;
         let line_count = content.lines().count();
 
         // Format date
@@ -192,7 +192,7 @@ impl InventoryCommand {
     }
 
     /// Sort ADRs based on sort criteria
-    fn sort_adrs(&self, adrs: &mut Vec<AdrSummary>) {
+    fn sort_adrs(&self, adrs: &mut [AdrSummary]) {
         match self.sort_by.as_str() {
             "date" => {
                 adrs.sort_by(|a, b| {
@@ -285,12 +285,15 @@ impl InventoryCommand {
             "json" => {
                 let json_output = serde_json::to_string_pretty(inventory)
                     .map_err(|e| AdrscanError::SerializationError(e.to_string()))?;
-                println!("{}", json_output);
+                println!("{json_output}");
             }
             "csv" => {
                 self.output_csv(inventory)?;
             }
-            "console" | _ => {
+            "console" => {
+                self.output_console(inventory)?;
+            }
+            _ => {
                 self.output_console(inventory)?;
             }
         }
@@ -339,7 +342,7 @@ impl InventoryCommand {
             let mut status_pairs: Vec<_> = inventory.status_breakdown.iter().collect();
             status_pairs.sort_by(|a, b| b.1.cmp(a.1)); // Sort by count descending
             for (status, count) in status_pairs {
-                println!("  {}: {}", status, count);
+                println!("  {status}: {count}");
             }
             println!();
         }
@@ -351,7 +354,7 @@ impl InventoryCommand {
             tag_pairs.sort_by(|a, b| b.1.cmp(a.1)); // Sort by count descending
             for (tag, count) in tag_pairs.iter().take(10) {
                 // Show top 10
-                println!("  {}: {}", tag, count);
+                println!("  {tag}: {count}");
             }
             if tag_pairs.len() > 10 {
                 println!("  ... and {} more", tag_pairs.len() - 10);
@@ -377,8 +380,8 @@ impl InventoryCommand {
         if !inventory.adrs.is_empty() {
             println!("📋 ADR Details:");
             println!(
-                "  {:<4} {:<30} {:<12} {:<12} {}",
-                "ID", "Title", "Status", "Date", "Tags"
+                "  {:<4} {:<30} {:<12} {:<12} Tags",
+                "ID", "Title", "Status", "Date"
             );
             println!("  {}", "─".repeat(80));
 
