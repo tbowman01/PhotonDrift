@@ -50,7 +50,7 @@ sha2 = "0.10"
 # Machine Learning dependencies (conditional on ml feature)
 smartcore = { version = "0.3", optional = true }
 ndarray = { version = "0.15", optional = true }
-rand = { version = "0.8", optional = true }
+rand = { version = "0.9", optional = true }
 nalgebra = { version = "0.32", optional = true }
 
 # WebAssembly bindings (only for WASM target)
