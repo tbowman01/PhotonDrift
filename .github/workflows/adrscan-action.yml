@@ -61,7 +61,7 @@ jobs:
         components: rustfmt, clippy
     
     - name: Cache Rust dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -201,7 +201,7 @@ jobs:
     
     - name: Upload drift artifacts
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: adrscan-reports
         path: |

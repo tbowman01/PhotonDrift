@@ -41,7 +41,7 @@ jobs:
         registry-url: 'https://registry.npmjs.org'
     
     - name: Cache dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -70,7 +70,7 @@ jobs:
       run: cd wasm && npm test
     
     - name: Upload WASM artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: wasm-modules
         path: |
@@ -99,7 +99,7 @@ jobs:
         node-version: '18'
     
     - name: Download WASM artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: wasm-modules
     
@@ -136,7 +136,7 @@ jobs:
         node-version: '18'
     
     - name: Download WASM artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: wasm-modules
     
