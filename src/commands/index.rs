@@ -1,7 +1,7 @@
 use chrono::NaiveDate;
 use clap::Args;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::{config::Config, error::AdrscanError, parser::AdrParser};
 type Result<T> = std::result::Result<T, AdrscanError>;
@@ -250,7 +250,7 @@ impl IndexCommand {
     }
 
     /// Determine output path for index file
-    fn get_output_path(&self, adr_dir: &PathBuf) -> PathBuf {
+    fn get_output_path(&self, adr_dir: &Path) -> PathBuf {
         if let Some(ref output) = self.output {
             output.clone()
         } else {
@@ -259,11 +259,7 @@ impl IndexCommand {
     }
 
     /// Generate default index content
-    fn generate_default_index(
-        &self,
-        entries: &[AdrIndexEntry],
-        _adr_dir: &PathBuf,
-    ) -> Result<String> {
+    fn generate_default_index(&self, entries: &[AdrIndexEntry], _adr_dir: &Path) -> Result<String> {
         let mut content = String::new();
 
         // Header
@@ -301,14 +297,9 @@ impl IndexCommand {
         if entries.is_empty() {
             content.push_str("*No ADRs found.*\n");
         } else {
-            // Table header
-            if self.badges {
-                content.push_str("| Number | Title | Status | Date | Deciders |\n");
-                content.push_str("|--------|-------|--------|------|----------|\n");
-            } else {
-                content.push_str("| Number | Title | Status | Date | Deciders |\n");
-                content.push_str("|--------|-------|--------|------|----------|\n");
-            }
+            // Table header (same regardless of badges setting)
+            content.push_str("| Number | Title | Status | Date | Deciders |\n");
+            content.push_str("|--------|-------|--------|------|----------|\n");
 
             // Table rows
             for entry in entries {
@@ -359,7 +350,7 @@ impl IndexCommand {
         &self,
         entries: &[AdrIndexEntry],
         template_path: &PathBuf,
-        _adr_dir: &PathBuf,
+        _adr_dir: &Path,
     ) -> Result<String> {
         let template_content = std::fs::read_to_string(template_path).map_err(AdrscanError::Io)?;
 

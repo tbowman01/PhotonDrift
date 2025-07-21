@@ -520,8 +520,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_enhance_detection_disabled() {
-        let mut config = MLConfig::default();
-        config.enabled = false;
+        let config = MLConfig {
+            enabled: false,
+            ..Default::default()
+        };
 
         let mut detector = MLDriftDetector::new(config);
         let drift_items = vec![create_test_drift_item()];
@@ -534,9 +536,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_enhance_detection_with_mock_model() {
-        let mut config = MLConfig::default();
-        config.enabled = true;
-        config.confidence_threshold = 0.5; // Lower threshold for test
+        let config = MLConfig {
+            enabled: true,
+            confidence_threshold: 0.5, // Lower threshold for test
+            ..Default::default()
+        };
 
         let mut detector = MLDriftDetector::new(config);
 
@@ -580,8 +584,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_train_svm_model() {
-        let mut config = MLConfig::default();
-        config.enabled = true;
+        let config = MLConfig {
+            enabled: true,
+            ..Default::default()
+        };
 
         let mut detector = MLDriftDetector::new(config);
 

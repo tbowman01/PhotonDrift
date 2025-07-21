@@ -192,7 +192,7 @@ impl InventoryCommand {
     }
 
     /// Sort ADRs based on sort criteria
-    fn sort_adrs(&self, adrs: &mut Vec<AdrSummary>) {
+    fn sort_adrs(&self, adrs: &mut [AdrSummary]) {
         match self.sort_by.as_str() {
             "date" => {
                 adrs.sort_by(|a, b| {
@@ -290,7 +290,10 @@ impl InventoryCommand {
             "csv" => {
                 self.output_csv(inventory)?;
             }
-            "console" | _ => {
+            "console" => {
+                self.output_console(inventory)?;
+            }
+            _ => {
                 self.output_console(inventory)?;
             }
         }

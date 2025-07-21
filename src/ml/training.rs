@@ -43,6 +43,7 @@ pub struct TrainingMetadata {
 /// Model trainer for different ML algorithms
 pub struct ModelTrainer {
     /// Feature extractor
+    #[allow(dead_code)]
     feature_extractor: FeatureExtractor,
 
     /// Training configuration
@@ -340,7 +341,7 @@ impl ModelTrainer {
     pub fn optimize_hyperparameters(
         &self,
         model_type: ModelType,
-        training_data: &TrainingData,
+        _training_data: &TrainingData,
         n_trials: usize,
     ) -> DriftResult<HyperparameterResult> {
         let start_time = std::time::Instant::now();

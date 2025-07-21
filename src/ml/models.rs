@@ -77,13 +77,16 @@ pub struct IsolationForestModel {
     n_trees: usize,
 
     /// Maximum tree depth
+    #[allow(dead_code)]
     max_depth: usize,
 
     /// Sample size for each tree
+    #[allow(dead_code)]
     sample_size: usize,
 
     /// Real isolation forest model (when ML feature enabled)
     #[cfg(feature = "ml")]
+    #[allow(dead_code)]
     model: Option<String>, // Placeholder for now
 
     /// Fallback trees for non-ML builds
@@ -99,6 +102,7 @@ pub struct IsolationForestModel {
 
 /// Simple isolation tree structure
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct IsolationTree {
     /// Feature to split on
     split_feature: usize,
@@ -252,6 +256,7 @@ impl IsolationForestModel {
             .min(1.0)
     }
 
+    #[allow(dead_code)]
     fn calculate_path_length(&self, _tree: &IsolationTree, _features: &DriftFeatures) -> f64 {
         // Simplified path length calculation
         // TODO: Implement actual tree traversal
@@ -518,7 +523,7 @@ impl OneClassSVMModel {
                 self.feature_stds[i] += diff * diff;
             }
         }
-        for (i, std) in self.feature_stds.iter_mut().enumerate() {
+        for std in self.feature_stds.iter_mut() {
             *std = (*std / data.len() as f64).sqrt().max(1e-8); // Avoid division by zero
         }
     }
