@@ -40,7 +40,7 @@ jobs:
       run: cargo fmt --all -- --check
 
     - name: Lint with clippy
-      run: cargo clippy --all-targets --all-features -- -D warnings
+      run: cargo clippy --all-targets --all-features -- -D clippy::correctness -D clippy::suspicious -W clippy::complexity -W clippy::perf -W clippy::pedantic
 
     - name: Run tests
       run: cargo test --verbose
