@@ -1,4 +1,4 @@
-# PhotonDrift - AI-Powered ADR Management
+# PhotonDrift - The Next Generation AI-Powered ADR Management Tool
 
 > Next-generation Architecture Decision Record (ADR) management with ML-enhanced drift detection for intelligent development governance.
 
