@@ -1,0 +1,146 @@
+name: ADRScan - Enterprise Architecture Governance
+
+on:
+  pull_request:
+    branches: [ main, release/* ]
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: '0 8 * * MON'  # Weekly architecture review
+
+env:
+  ADR_DIRECTORY: './architecture/decisions'
+  SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+
+jobs:
+  architecture-governance:
+    runs-on: ubuntu-latest
+    name: Architecture Governance Check
+    
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+      
+    steps:
+    - name: Checkout with full history
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Validate ADR structure
+      run: |
+        echo "🔍 Validating ADR directory structure..."
+        if [ ! -d "$ADR_DIRECTORY" ]; then
+          echo "❌ ADR directory not found: $ADR_DIRECTORY"
+          exit 1
+        fi
+        
+        # Check for required ADRs
+        REQUIRED_ADRS=("0001-record-architecture-decisions.md")
+        for adr in "${REQUIRED_ADRS[@]}"; do
+          if [ ! -f "$ADR_DIRECTORY/$adr" ]; then
+            echo "❌ Required ADR missing: $adr"
+            exit 1
+          fi
+        done
+        
+        echo "✅ ADR structure validation passed"
+    
+    - name: Run architectural drift analysis
+      uses: tbowman01/PhotonDrift@main
+      id: drift-analysis
+      with:
+        adr-directory: ${{ env.ADR_DIRECTORY }}
+        target-directory: '.'
+        severity-threshold: 'low'  # Catch all drift for governance
+        fail-on-drift: false  # Let workflow complete for reporting
+        create-issues: true
+        output-format: 'json'
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Generate architecture compliance report
+      run: |
+        echo "📊 Generating architecture compliance report..."
+        
+        cat << EOF > architecture-report.md
+        # Architecture Compliance Report
+        
+        **Generated:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        **Repository:** ${{ github.repository }}
+        **Branch:** ${{ github.ref_name }}
+        **Commit:** ${{ github.sha }}
+        
+        ## Executive Summary
+        
+        - **Drift Status:** ${{ steps.drift-analysis.outputs.drift-detected == 'true' && '⚠️ DRIFT DETECTED' || '✅ COMPLIANT' }}
+        - **Total Issues:** ${{ steps.drift-analysis.outputs.drift-count }}
+        - **Risk Level:** ${{ steps.drift-analysis.outputs.drift-count > 5 && 'HIGH' || steps.drift-analysis.outputs.drift-count > 0 && 'MEDIUM' || 'LOW' }}
+        
+        ## Detailed Analysis
+        
+        EOF
+        
+        if [ -f "drift-report.json" ]; then
+          echo "### Drift Items by Severity" >> architecture-report.md
+          echo "" >> architecture-report.md
+          jq -r '
+            .severity_summary | to_entries | 
+            map("- **\(.key):** \(.value)") | 
+            join("\n")
+          ' drift-report.json >> architecture-report.md || true
+        fi
+    
+    - name: Fail on critical/high drift in production
+      if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')) && steps.drift-analysis.outputs.drift-detected == 'true'
+      run: |
+        # Check if critical or high severity drift exists
+        CRITICAL=$(jq '.severity_summary.Critical // 0' drift-report.json 2>/dev/null || echo "0")
+        HIGH=$(jq '.severity_summary.High // 0' drift-report.json 2>/dev/null || echo "0")
+        
+        if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
+          echo "❌ Critical or High severity drift detected in production branch"
+          echo "Critical: $CRITICAL, High: $HIGH"
+          echo "Architecture governance policies require resolution before deployment"
+          exit 1
+        fi
+    
+    - name: Notify architecture team
+      if: steps.drift-analysis.outputs.drift-detected == 'true'
+      run: |
+        if [ -n "$SLACK_WEBHOOK" ]; then
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{
+              \"text\": \"🏗️ Architecture Drift Alert\",
+              \"blocks\": [
+                {
+                  \"type\": \"section\",
+                  \"text\": {
+                    \"type\": \"mrkdwn\",
+                    \"text\": \"*Architecture drift detected in ${{ github.repository }}*\n\n• Total items: ${{ steps.drift-analysis.outputs.drift-count }}\n• Branch: ${{ github.ref_name }}\n• <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>\"
+                  }
+                }
+              ]
+            }" \
+            "$SLACK_WEBHOOK" || echo "Failed to send Slack notification"
+        fi
+    
+    - name: Upload compliance artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: architecture-compliance-${{ github.run_number }}
+        path: |
+          architecture-report.md
+          drift-report.json
+          adr-inventory.json
+          .adrscan-snapshot.json
+        retention-days: 90  # Keep for audit purposes
+    
+    - name: Update architecture dashboard
+      if: github.ref == 'refs/heads/main'
+      run: |
+        echo "📈 Updating architecture compliance dashboard..."
+        # Add logic to update your architecture dashboard/metrics
+        # This could push to a database, update a wiki, etc.
+        echo "Dashboard update would happen here"
