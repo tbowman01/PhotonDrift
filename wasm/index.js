@@ -32,23 +32,47 @@ class ADRScan {
     }
 
     /**
-     * Perform inventory scan of ADRs
-     * @param {string} directory - Directory to scan
-     * @returns {Promise<Object>} - Inventory results
+     * Parse ADR content
+     * @param {string} content - ADR markdown content
+     * @param {string} filename - Filename for context
+     * @returns {Object} - Parsed ADR data
      */
-    async inventory(directory = './docs/adr') {
-        const result = await this.instance.inventory(directory);
+    parseAdr(content, filename) {
+        const result = this.instance.parse_adr(content, filename);
+        return JSON.parse(result);
+    }
+
+    /**
+     * Perform inventory scan of ADRs
+     * @param {Object} files - Object mapping file paths to ADR content
+     * @returns {Object} - Inventory results with statistics
+     */
+    inventory(files) {
+        const filesJson = JSON.stringify(files);
+        const result = this.instance.inventory(filesJson);
         return JSON.parse(result);
     }
 
     /**
      * Detect architectural drift
-     * @param {string} directory - Directory to analyze
-     * @param {string} [baseline] - Optional baseline snapshot
-     * @returns {Promise<DriftReport>} - Drift detection results
+     * @param {Object} files - Object mapping file paths to content
+     * @returns {Object} - Drift detection results
      */
-    async diff(directory = '.', baseline = null) {
-        return await this.instance.diff(directory, baseline);
+    detectDrift(files) {
+        const filesJson = JSON.stringify(files);
+        return this.instance.detect_drift(filesJson);
+    }
+
+    /**
+     * Compare current state against baseline (full diff functionality)
+     * @param {Object} currentFiles - Current file contents
+     * @param {Object} [baseline] - Optional baseline to compare against
+     * @returns {Object} - Diff report with changes detected
+     */
+    diff(currentFiles, baseline = null) {
+        const currentJson = JSON.stringify(currentFiles);
+        const baselineJson = baseline ? JSON.stringify(baseline) : null;
+        return this.instance.diff(currentJson, baselineJson);
     }
 
     /**
@@ -70,13 +94,16 @@ class ADRScan {
     }
 
     /**
-     * Update configuration
+     * Update configuration (recreate instance with new config)
      * @param {Object} config - New configuration
      */
     updateConfig(config) {
         const wasmConfig = new wasm.WasmConfig();
-        Object.assign(wasmConfig, config);
-        this.instance.update_config(wasmConfig);
+        if (config.adrDir) wasmConfig.adr_dir = config.adrDir;
+        if (config.templateFormat) wasmConfig.template_format = config.templateFormat;
+        if (config.driftEnabled !== undefined) wasmConfig.drift_enabled = config.driftEnabled;
+        
+        this.instance = new wasm.AdrscanWasm(wasmConfig);
     }
 }
 

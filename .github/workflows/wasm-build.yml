@@ -50,18 +50,22 @@ jobs:
         key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
     
     - name: Build WASM module (Node.js target)
-      run: wasm-pack build --target nodejs --out-dir wasm --scope adrscan
+      run: wasm-pack build --target nodejs --out-dir pkg --scope adrscan --features wasm
+    
+    - name: Copy Node.js build to wasm directory
+      run: |
+        mkdir -p wasm
+        cp -r pkg/* wasm/
+        cp wasm/package.json wasm/package.json.backup
+        cp wasm/index.js wasm/
+        # Restore original package.json with our customizations
+        cp wasm/package.json.backup wasm/package.json
     
     - name: Build WASM module (Web target)  
-      run: wasm-pack build --target web --out-dir wasm-web --scope adrscan
+      run: wasm-pack build --target web --out-dir wasm-web --scope adrscan --features wasm
     
     - name: Build WASM module (Bundler target)
-      run: wasm-pack build --target bundler --out-dir wasm-bundler --scope adrscan
-    
-    - name: Copy package.json and index.js
-      run: |
-        cp wasm/package.json wasm/
-        cp wasm/index.js wasm/
+      run: wasm-pack build --target bundler --out-dir wasm-bundler --scope adrscan --features wasm
     
     - name: Install NPM dependencies
       run: cd wasm && npm install
@@ -116,10 +120,20 @@ jobs:
           // Test basic functionality
           const scanner = new ADRScan({
             adrDir: './docs/adr',
-            templateFormat: 'madr'
+            templateFormat: 'madr',
+            driftEnabled: true
           });
           
           console.log('ADRScan instance created successfully');
+          
+          // Test init functionality
+          const initFiles = scanner.init('./test-adr');
+          console.log('Init test completed');
+          
+          // Test utility functions
+          const template = utils.getDefaultTemplate();
+          console.log('Template length:', template.length);
+          console.log('All integration tests passed!');
         "
 
   benchmark-wasm:
@@ -142,5 +156,8 @@ jobs:
     
     - name: Run performance benchmarks
       run: |
-        echo "WASM performance benchmarks would run here"
-        echo "Comparing WASM vs native performance"
+        cd wasm
+        npm install
+        echo "🏎️ Running WASM performance benchmarks..."
+        node benchmark.js
+        echo "Benchmark results saved for comparison"

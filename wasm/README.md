@@ -1,6 +1,9 @@
-# ADRScan WebAssembly Module
+# @adrscan/wasm
 
-WebAssembly bindings for ADRScan - Architecture Decision Record management and drift detection.
+> WebAssembly module for ADRScan - AI-powered Architecture Decision Record management with ML-enhanced drift detection
+
+[![npm version](https://badge.fury.io/js/%40adrscan%2Fwasm.svg)](https://badge.fury.io/js/%40adrscan%2Fwasm)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Installation
 
@@ -8,7 +11,7 @@ WebAssembly bindings for ADRScan - Architecture Decision Record management and d
 npm install @adrscan/wasm
 ```
 
-## Usage
+## Quick Start
 
 ### Node.js
 
@@ -22,21 +25,36 @@ const scanner = new ADRScan({
     driftEnabled: true
 });
 
-// Initialize ADR directory
+// Initialize ADR directory structure
 const initFiles = await scanner.init('./docs/adr');
-console.log('Files to create:', initFiles);
+console.log('Files to create:', Object.keys(initFiles));
 
-// Scan existing ADRs
-const inventory = await scanner.inventory('./docs/adr');
-console.log('Inventory:', inventory);
+// Parse ADR content
+const adrContent = `---
+title: Use MongoDB for data storage
+status: accepted
+date: 2024-01-01
+---
 
-// Detect drift
-const driftReport = await scanner.diff('.');
-console.log('Drift items:', driftReport.total_items);
+# Use MongoDB for data storage
+
+We will use MongoDB as our primary database.`;
+
+const parsed = scanner.parseAdr(adrContent, 'example.md');
+console.log('Parsed ADR:', parsed);
+
+// Detect drift in codebase
+const files = {
+    'src/database.js': 'const mongodb = require("mongodb");',
+    'src/cache.js': 'const redis = require("redis");'
+};
+
+const driftReport = scanner.detectDrift(files);
+console.log('Drift detected:', driftReport.total_items);
 
 // Generate proposals
 const proposals = await scanner.propose(driftReport);
-console.log('Generated proposals:', proposals);
+console.log('Generated proposals:', proposals.length);
 ```
 
 ### Browser/ES Modules

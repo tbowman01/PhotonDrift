@@ -113,6 +113,12 @@ struct IsolationTree {
     is_leaf: bool,
 }
 
+impl Default for IsolationForestModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IsolationForestModel {
     pub fn new() -> Self {
         Self {
@@ -372,6 +378,12 @@ pub struct OneClassSVMModel {
     /// Statistics for normalization
     feature_means: Vec<f64>,
     feature_stds: Vec<f64>,
+}
+
+impl Default for OneClassSVMModel {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl OneClassSVMModel {
@@ -862,6 +874,12 @@ pub struct LOFModel {
     feature_stds: Vec<f64>,
 }
 
+impl Default for LOFModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LOFModel {
     /// Create a new LOF model with default k=20
     pub fn new() -> Self {
@@ -1219,7 +1237,7 @@ impl LOFModel {
 
         // Technology diversity factor
         if features.tech_diversity > 3 {
-            anomaly_factors += (features.tech_diversity as f64 / 10.0);
+            anomaly_factors += features.tech_diversity as f64 / 10.0;
         }
 
         // Pattern frequency factor (rare patterns = higher anomaly)
@@ -1229,12 +1247,12 @@ impl LOFModel {
 
         // File count factor
         if features.file_count > 5 {
-            anomaly_factors += (features.file_count as f64 / 20.0);
+            anomaly_factors += features.file_count as f64 / 20.0;
         }
 
         // Text features factor
         if features.text_features.tech_term_count > 10 {
-            anomaly_factors += (features.text_features.tech_term_count as f64 / 50.0);
+            anomaly_factors += features.text_features.tech_term_count as f64 / 50.0;
         }
 
         // Structural complexity factor
@@ -1353,6 +1371,12 @@ pub struct StatisticalModel {
     threshold: f64,
 }
 
+impl Default for StatisticalModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StatisticalModel {
     pub fn new() -> Self {
         Self {
@@ -1369,7 +1393,7 @@ impl StatisticalModel {
 
 impl AnomalyModel for StatisticalModel {
     fn predict(&self, features: &DriftFeatures) -> DriftResult<Prediction> {
-        let feature_values = vec![
+        let feature_values = [
             features.complexity_score,
             features.file_count as f64,
             features.tech_diversity as f64,
@@ -1399,7 +1423,7 @@ impl AnomalyModel for StatisticalModel {
     }
 
     fn explain(&self, features: &DriftFeatures) -> Option<String> {
-        let feature_values = vec![
+        let feature_values = [
             ("complexity", features.complexity_score),
             ("file_count", features.file_count as f64),
             ("tech_diversity", features.tech_diversity as f64),
@@ -1412,8 +1436,7 @@ impl AnomalyModel for StatisticalModel {
                 let z_score = (value - self.means[i]).abs() / self.std_devs[i];
                 if z_score > self.threshold {
                     explanations.push(format!(
-                        "{} is {} standard deviations from normal",
-                        name, z_score
+                        "{name} is {z_score} standard deviations from normal"
                     ));
                 }
             }
@@ -1455,6 +1478,12 @@ pub enum VotingStrategy {
 
     /// Maximum anomaly score
     Maximum,
+}
+
+impl Default for EnsembleModel {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl EnsembleModel {
@@ -1801,14 +1830,14 @@ mod tests {
 
         // Test untrained scoring (fallback)
         let score_untrained = svm.calculate_anomaly_score(&features);
-        assert!(score_untrained >= 0.0 && score_untrained <= 1.0);
+        assert!((0.0..=1.0).contains(&score_untrained));
 
         // Train and test trained scoring
         let training_features = vec![create_test_features(); 5];
         svm.train(&training_features).unwrap();
 
         let score_trained = svm.calculate_anomaly_score(&features);
-        assert!(score_trained >= 0.0 && score_trained <= 1.0);
+        assert!((0.0..=1.0).contains(&score_trained));
     }
 
     #[test]
@@ -2105,7 +2134,7 @@ mod tests {
         normal_features.pattern_frequency = 0.8;
 
         let normal_score = lof.calculate_lof_score(&normal_features);
-        assert!(normal_score >= 0.1 && normal_score <= 5.0); // Should be reasonable (broader range for real LOF)
+        assert!((0.1..=5.0).contains(&normal_score)); // Should be reasonable (broader range for real LOF)
 
         // Test anomalous point (should have higher LOF score)
         let mut anomaly_features = create_test_features();
@@ -2128,13 +2157,13 @@ mod tests {
         features.complexity_score = 0.2;
         features.tech_diversity = 1;
         let normal_anomaly = lof.calculate_anomaly_score(&features);
-        assert!(normal_anomaly >= 0.0 && normal_anomaly <= 1.0);
+        assert!((0.0..=1.0).contains(&normal_anomaly));
 
         // High complexity case should give higher anomaly score
         features.complexity_score = 0.9;
         features.tech_diversity = 5;
         let high_anomaly = lof.calculate_anomaly_score(&features);
-        assert!(high_anomaly >= 0.0 && high_anomaly <= 1.0);
+        assert!((0.0..=1.0).contains(&high_anomaly));
         assert!(high_anomaly >= normal_anomaly); // Should be higher
     }
 
@@ -2166,7 +2195,7 @@ mod tests {
         features.structural_features.coupling_strength = 0.3;
 
         let normal_score = lof.fallback_lof_score(&features);
-        assert!(normal_score >= 1.0 && normal_score <= 1.5); // Should be near normal
+        assert!((1.0..=1.5).contains(&normal_score)); // Should be near normal
     }
 
     #[test]

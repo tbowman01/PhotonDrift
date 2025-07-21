@@ -62,7 +62,7 @@ fn main() {
     let config = match Config::load(cli.config.as_deref()) {
         Ok(config) => config,
         Err(e) => {
-            eprintln!("Error loading configuration: {}", e);
+            eprintln!("Error loading configuration: {e}");
             process::exit(1);
         }
     };
@@ -77,7 +77,7 @@ fn main() {
     };
 
     if let Err(e) = result {
-        eprintln!("Error: {}", e);
+        eprintln!("Error: {e}");
         process::exit(1);
     }
 }

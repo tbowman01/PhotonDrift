@@ -169,7 +169,7 @@ impl Config {
         } else {
             // Try to find config file in current directory and parent directories
             let mut current_dir = env::current_dir().map_err(|e| {
-                AdrscanError::ConfigError(format!("Cannot get current directory: {}", e))
+                AdrscanError::ConfigError(format!("Cannot get current directory: {e}"))
             })?;
 
             loop {
@@ -198,15 +198,15 @@ impl Config {
 
     fn load_from_file(path: &Path) -> Result<Self> {
         let content = std::fs::read_to_string(path)
-            .map_err(|e| AdrscanError::ConfigError(format!("Failed to read config file: {}", e)))?;
+            .map_err(|e| AdrscanError::ConfigError(format!("Failed to read config file: {e}")))?;
 
         let config = if path.extension().and_then(|s| s.to_str()) == Some("toml") {
             toml::from_str(&content)
-                .map_err(|e| AdrscanError::ConfigError(format!("Invalid TOML config: {}", e)))?
+                .map_err(|e| AdrscanError::ConfigError(format!("Invalid TOML config: {e}")))?
         } else {
             // Assume YAML
             serde_yaml::from_str(&content)
-                .map_err(|e| AdrscanError::ConfigError(format!("Invalid YAML config: {}", e)))?
+                .map_err(|e| AdrscanError::ConfigError(format!("Invalid YAML config: {e}")))?
         };
 
         Ok(config)
@@ -215,19 +215,16 @@ impl Config {
     /// Save configuration to file
     pub fn save(&self, path: &Path) -> Result<()> {
         let content = if path.extension().and_then(|s| s.to_str()) == Some("toml") {
-            toml::to_string_pretty(self).map_err(|e| {
-                AdrscanError::ConfigError(format!("Failed to serialize TOML: {}", e))
-            })?
+            toml::to_string_pretty(self)
+                .map_err(|e| AdrscanError::ConfigError(format!("Failed to serialize TOML: {e}")))?
         } else {
             // Default to YAML
-            serde_yaml::to_string(self).map_err(|e| {
-                AdrscanError::ConfigError(format!("Failed to serialize YAML: {}", e))
-            })?
+            serde_yaml::to_string(self)
+                .map_err(|e| AdrscanError::ConfigError(format!("Failed to serialize YAML: {e}")))?
         };
 
-        std::fs::write(path, content).map_err(|e| {
-            AdrscanError::ConfigError(format!("Failed to write config file: {}", e))
-        })?;
+        std::fs::write(path, content)
+            .map_err(|e| AdrscanError::ConfigError(format!("Failed to write config file: {e}")))?;
 
         Ok(())
     }
@@ -278,7 +275,7 @@ impl Config {
                 "true" | "1" | "yes" | "on" => self.drift.enabled = true,
                 "false" | "0" | "no" | "off" => self.drift.enabled = false,
                 _ => return Err(AdrscanError::ConfigError(
-                    format!("Invalid value for ADRSCAN_DRIFT_ENABLED: '{}'. Expected true/false, 1/0, yes/no, or on/off", enabled)
+                    format!("Invalid value for ADRSCAN_DRIFT_ENABLED: '{enabled}'. Expected true/false, 1/0, yes/no, or on/off")
                 )),
             }
         }
@@ -422,21 +419,20 @@ impl Config {
 
         let content = match format {
             "toml" => toml::to_string_pretty(&config).map_err(|e| {
-                AdrscanError::ConfigError(format!("Failed to serialize sample TOML: {}", e))
+                AdrscanError::ConfigError(format!("Failed to serialize sample TOML: {e}"))
             })?,
             "yaml" | "yml" => serde_yaml::to_string(&config).map_err(|e| {
-                AdrscanError::ConfigError(format!("Failed to serialize sample YAML: {}", e))
+                AdrscanError::ConfigError(format!("Failed to serialize sample YAML: {e}"))
             })?,
             _ => {
                 return Err(AdrscanError::ConfigError(format!(
-                    "Unsupported config format: {}. Use 'toml' or 'yaml'",
-                    format
+                    "Unsupported config format: {format}. Use 'toml' or 'yaml'"
                 )))
             }
         };
 
         std::fs::write(path, content).map_err(|e| {
-            AdrscanError::ConfigError(format!("Failed to write sample config: {}", e))
+            AdrscanError::ConfigError(format!("Failed to write sample config: {e}"))
         })?;
 
         Ok(())

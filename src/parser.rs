@@ -60,7 +60,7 @@ pub struct AdrParser;
 impl AdrParser {
     /// Parse an ADR file
     pub fn parse_file(path: &Path) -> Result<AdrDocument> {
-        let content = std::fs::read_to_string(path).map_err(|e| AdrscanError::Io(e))?;
+        let content = std::fs::read_to_string(path).map_err(AdrscanError::Io)?;
 
         Self::parse_content(&content, path.to_path_buf())
     }
@@ -81,8 +81,8 @@ impl AdrParser {
     /// Extract frontmatter from markdown content (supports YAML --- and TOML +++)
     fn extract_frontmatter(content: &str) -> Result<(String, String)> {
         // Check for YAML frontmatter (---)
-        if content.starts_with("---\n") {
-            let content_without_first_delimiter = &content[4..]; // Skip first "---\n"
+        if let Some(content_without_first_delimiter) = content.strip_prefix("---\n") {
+            // Skip first "---\n"
 
             if let Some(end_pos) = content_without_first_delimiter.find("\n---\n") {
                 let frontmatter = content_without_first_delimiter[..end_pos].to_string();
@@ -95,8 +95,8 @@ impl AdrParser {
             }
         }
         // Check for TOML frontmatter (+++)
-        else if content.starts_with("+++\n") {
-            let content_without_first_delimiter = &content[4..]; // Skip first "+++\n"
+        else if let Some(content_without_first_delimiter) = content.strip_prefix("+++\n") {
+            // Skip first "+++\n"
 
             if let Some(end_pos) = content_without_first_delimiter.find("\n+++\n") {
                 let frontmatter = content_without_first_delimiter[..end_pos].to_string();
@@ -287,7 +287,7 @@ impl AdrParser {
     // YAML helper functions
     fn extract_yaml_string_field(mapping: &serde_yaml::Mapping, field: &str) -> Option<String> {
         mapping
-            .get(&serde_yaml::Value::String(field.to_string()))
+            .get(serde_yaml::Value::String(field.to_string()))
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
     }
@@ -297,7 +297,7 @@ impl AdrParser {
         field: &str,
     ) -> Option<Vec<String>> {
         mapping
-            .get(&serde_yaml::Value::String(field.to_string()))
+            .get(serde_yaml::Value::String(field.to_string()))
             .and_then(|v| {
                 if let Some(arr) = v.as_sequence() {
                     Some(

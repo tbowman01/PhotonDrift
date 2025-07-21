@@ -97,7 +97,7 @@ pub enum SnapshotEntryType {
 }
 
 /// Statistics about the snapshot
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SnapshotStatistics {
     /// Total number of files scanned
     pub files_scanned: usize,
@@ -241,7 +241,7 @@ impl Snapshot {
         let json = serde_json::to_string_pretty(self)
             .map_err(|e| AdrscanError::SerializationError(e.to_string()))?;
 
-        std::fs::write(path, json).map_err(|e| AdrscanError::Io(e))?;
+        std::fs::write(path, json).map_err(AdrscanError::Io)?;
 
         log::info!("Snapshot saved to: {}", path.display());
         Ok(())
@@ -258,7 +258,7 @@ impl Snapshot {
         })?;
 
         let snapshot: Self = serde_json::from_str(&content).map_err(|e| {
-            AdrscanError::SerializationError(format!("Invalid snapshot format: {}", e))
+            AdrscanError::SerializationError(format!("Invalid snapshot format: {e}"))
         })?;
 
         log::info!("Snapshot loaded from: {}", path.display());
@@ -395,19 +395,6 @@ impl SnapshotComparison {
             .collect();
 
         (added_tech, removed_tech, modified_tech)
-    }
-}
-
-impl Default for SnapshotStatistics {
-    fn default() -> Self {
-        Self {
-            files_scanned: 0,
-            technologies_detected: 0,
-            file_types: HashMap::new(),
-            technology_categories: HashMap::new(),
-            lines_of_code: 0,
-            scan_duration_ms: 0,
-        }
     }
 }
 

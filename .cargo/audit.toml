@@ -1,0 +1,48 @@
+# cargo-audit configuration for PhotonDrift
+# https://github.com/RustSec/cargo-audit
+
+[advisories]
+# Path to the advisory database
+db-path = "~/.cargo/advisory-db"
+
+# URLs to advisory databases
+db-urls = ["https://github.com/RustSec/advisory-db"]
+
+# Deny any vulnerabilities
+vulnerability = "deny"
+
+# Warn on unmaintained crates
+unmaintained = "warn"
+
+# Warn on crates that have been yanked from crates.io
+yanked = "warn"
+
+# Warn on security notices
+notice = "warn"
+
+# Threshold for CVSS scores (0-10)
+# Vulnerabilities with scores lower than this will be ignored
+# severity-threshold = 
+
+[packages]
+# List of packages to skip auditing
+# ignore = ["RUSTSEC-2020-0001", "RUSTSEC-2020-0002"]
+
+# We're tracking the paste crate issue separately in #45
+ignore = [
+    "RUSTSEC-2024-0436", # paste crate - unmaintained, tracking in issue #45
+]
+
+# Warn for sources other than crates.io
+source = "warn"
+
+[output]
+# Deny warnings from cargo-audit, exiting with a non-zero code
+deny = ["vulnerabilities"]
+
+# Format to use for outputting warnings
+# Options: "terminal" (default), "json", "markdown"
+# format = "terminal"
+
+# Show inverse dependency tree along with advisories
+show-tree = true

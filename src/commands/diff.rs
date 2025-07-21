@@ -40,7 +40,7 @@ impl DiffCommand {
 
         // Create async runtime
         let rt = Runtime::new().map_err(|e| {
-            AdrscanError::DriftError(format!("Failed to create async runtime: {}", e))
+            AdrscanError::DriftError(format!("Failed to create async runtime: {e}"))
         })?;
 
         rt.block_on(async {
@@ -49,8 +49,7 @@ impl DiffCommand {
             // Determine directories
             let scan_dir = self
                 .directory
-                .as_ref()
-                .map(|p| p.clone())
+                .clone()
                 .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
 
             let adr_dir = self.adr_dir.as_ref().unwrap_or(&config.adr_dir);
@@ -64,7 +63,7 @@ impl DiffCommand {
                     adr_dir,
                     &scan_dir,
                     self.baseline.as_deref(),
-                    &detection_patterns,
+                    detection_patterns,
                 )
                 .await?;
 
@@ -81,13 +80,13 @@ impl DiffCommand {
                     let json_output = drift_report
                         .to_json()
                         .map_err(|e| AdrscanError::SerializationError(e.to_string()))?;
-                    println!("{}", json_output);
+                    println!("{json_output}");
                 }
                 "yaml" => {
                     let yaml_output = drift_report
                         .to_yaml()
                         .map_err(|e| AdrscanError::SerializationError(e.to_string()))?;
-                    println!("{}", yaml_output);
+                    println!("{yaml_output}");
                 }
                 "console" => {
                     self.print_console_report(&drift_report);
@@ -107,7 +106,7 @@ impl DiffCommand {
                 .unwrap_or(&0);
 
             if *critical_count > 0 {
-                log::warn!("Found {} critical drift items", critical_count);
+                log::warn!("Found {critical_count} critical drift items");
                 std::process::exit(1);
             }
 
@@ -153,7 +152,7 @@ impl DiffCommand {
                     DriftSeverity::Low => "🔵",
                     _ => "⚪",
                 };
-                println!("  {} {}: {}", icon, severity, count);
+                println!("  {icon} {severity}: {count}");
             }
         }
         println!();
@@ -162,7 +161,7 @@ impl DiffCommand {
         if !report.category_summary.is_empty() {
             println!("📂 Category Breakdown:");
             for (category, count) in &report.category_summary {
-                println!("  {}: {}", category, count);
+                println!("  {category}: {count}");
             }
             println!();
         }
@@ -176,7 +175,7 @@ impl DiffCommand {
             for item in critical_items.iter().take(10) {
                 println!("  • {} ({})", item.title, item.location.file_path.display());
                 if let Some(ref action) = item.suggested_action {
-                    println!("    💡 {}", action);
+                    println!("    💡 {action}");
                 }
                 println!();
             }
@@ -187,7 +186,7 @@ impl DiffCommand {
             for item in high_items.iter().take(10) {
                 println!("  • {} ({})", item.title, item.location.file_path.display());
                 if let Some(ref action) = item.suggested_action {
-                    println!("    💡 {}", action);
+                    println!("    💡 {action}");
                 }
                 println!();
             }
@@ -620,7 +619,7 @@ mod tests {
         // Add many drift items
         for i in 0..50 {
             let item = DriftItem::new(
-                format!("item_{}", i),
+                format!("item_{i}"),
                 if i % 4 == 0 {
                     DriftSeverity::Critical
                 } else if i % 3 == 0 {
@@ -631,9 +630,9 @@ mod tests {
                     DriftSeverity::Low
                 },
                 DriftCategory::NewTechnology,
-                format!("Technology {}", i),
-                format!("Description for technology {}", i),
-                DriftLocation::new(PathBuf::from(format!("src/file_{}.rs", i))),
+                format!("Technology {i}"),
+                format!("Description for technology {i}"),
+                DriftLocation::new(PathBuf::from(format!("src/file_{i}.rs"))),
             );
             report.add_item(item);
         }
