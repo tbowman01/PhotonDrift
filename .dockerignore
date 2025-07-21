@@ -1,0 +1,83 @@
+# Docker ignore file for ADRScan
+# Excludes unnecessary files from Docker build context
+
+# Build artifacts
+target/
+Cargo.lock
+
+# Git and development files
+.git/
+.gitignore
+.github/
+.vscode/
+.idea/
+
+# Documentation and examples
+docs/
+examples/
+*.md
+!README.md
+
+# Test files
+tests/
+**/tests/
+**/*_test.rs
+**/*_spec.rs
+
+# Development and CI files
+.env*
+.travis.yml
+.circleci/
+codecov.yml
+.coverage/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.log
+
+# IDE and editor files
+*.sublime-*
+*.code-workspace
+.vs/
+
+# Runtime and data files
+.adrscan-snapshot.json
+drift-report.json
+drift-analysis.json
+adr-inventory.json
+
+# WASM build outputs
+wasm/
+wasm-web/
+wasm-bundler/
+pkg/
+
+# Node.js (if present)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Rust development
+**/*.rs.bk
+.cargo/
+
+# Security and secrets
+secrets/
+*.key
+*.pem
+*.crt
+!ca-certificates.crt
+
+# Swarm coordination files
+.swarm/
+.hive-mind/
+hive-mind-prompt-swarm-*
