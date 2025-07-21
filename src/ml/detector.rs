@@ -543,7 +543,6 @@ mod tests {
         };
 
         let mut detector = MLDriftDetector::new(config);
-
         // Load mock model for testing
         let temp_dir = tempfile::TempDir::new().unwrap();
         let model_path = temp_dir.path().join("mock_model.dat");
