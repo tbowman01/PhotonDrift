@@ -1,32 +1,67 @@
 {
   "name": "photondrift-adr-manager",
   "displayName": "PhotonDrift ADR Manager",
-  "description": "AI-powered Architecture Decision Record (ADR) management with ML-enhanced drift detection",
-  "version": "0.1.0",
+  "description": "AI-powered Architecture Decision Record (ADR) management with machine learning-enhanced drift detection, intelligent governance, and automated compliance tracking for enterprise development teams.",
+  "version": "1.0.0",
   "publisher": "photondrift",
-  "repository": {
-    "type": "git",
+  "author": {
+    "name": "PhotonDrift Team",
     "url": "https://github.com/tbowman01/PhotonDrift"
   },
   "license": "MIT",
+  "homepage": "https://github.com/tbowman01/PhotonDrift",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tbowman01/PhotonDrift.git",
+    "directory": "vscode-extension"
+  },
+  "bugs": {
+    "url": "https://github.com/tbowman01/PhotonDrift/issues"
+  },
+  "qna": "https://github.com/tbowman01/PhotonDrift/discussions",
   "icon": "resources/icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
+  "preview": false,
+  "badges": [
+    {
+      "url": "https://img.shields.io/github/actions/workflow/status/tbowman01/PhotonDrift/ci.yml",
+      "href": "https://github.com/tbowman01/PhotonDrift/actions",
+      "description": "Build Status"
+    },
+    {
+      "url": "https://img.shields.io/github/license/tbowman01/PhotonDrift",
+      "href": "https://github.com/tbowman01/PhotonDrift/blob/main/LICENSE",
+      "description": "License"
+    }
+  ],
   "categories": [
     "Other",
     "Snippets",
+    "Formatters",
     "Linters",
-    "Formatters"
+    "Machine Learning"
   ],
   "keywords": [
-    "adr",
-    "architecture",
-    "decision record",
-    "drift detection",
-    "ml",
-    "ai",
-    "documentation"
+    "ADR",
+    "Architecture",
+    "Decision Records",
+    "Documentation",
+    "Drift Detection",
+    "AI",
+    "Machine Learning",
+    "Governance",
+    "PhotonDrift",
+    "Enterprise",
+    "Compliance",
+    "Analysis",
+    "Templates",
+    "Markdown"
   ],
   "activationEvents": [
     "onLanguage:markdown",
@@ -57,41 +92,75 @@
         "path": "./syntaxes/adr-markdown.tmGrammar.json"
       }
     ],
+    "keybindings": [
+      {
+        "command": "photondrift.createAdr",
+        "key": "ctrl+alt+n",
+        "mac": "cmd+alt+n"
+      },
+      {
+        "command": "photondrift.init",
+        "key": "ctrl+alt+i",
+        "mac": "cmd+alt+i"
+      },
+      {
+        "command": "photondrift.runDriftDetection",
+        "key": "ctrl+alt+d",
+        "mac": "cmd+alt+d"
+      },
+      {
+        "command": "photondrift.generateIndex",
+        "key": "ctrl+alt+x",
+        "mac": "cmd+alt+x"
+      },
+      {
+        "command": "photondrift.showInventory",
+        "key": "ctrl+alt+v",
+        "mac": "cmd+alt+v"
+      }
+    ],
     "commands": [
       {
         "command": "photondrift.init",
-        "title": "Initialize ADR Structure",
-        "category": "PhotonDrift"
+        "title": "Initialize ADR Directory",
+        "category": "PhotonDrift",
+        "icon": "$(folder-opened)"
       },
       {
         "command": "photondrift.createAdr",
         "title": "Create New ADR",
-        "category": "PhotonDrift"
+        "category": "PhotonDrift",
+        "icon": "$(add)"
       },
       {
         "command": "photondrift.runDriftDetection",
-        "title": "Run Drift Detection",
-        "category": "PhotonDrift"
+        "title": "Detect Drift",
+        "category": "PhotonDrift",
+        "icon": "$(search)"
       },
       {
         "command": "photondrift.generateIndex",
-        "title": "Generate ADR Index",
-        "category": "PhotonDrift"
+        "title": "Generate Index",
+        "category": "PhotonDrift",
+        "icon": "$(list-tree)"
       },
       {
         "command": "photondrift.showInventory",
-        "title": "Show ADR Inventory",
-        "category": "PhotonDrift"
+        "title": "Validate ADRs",
+        "category": "PhotonDrift",
+        "icon": "$(checklist)"
       },
       {
         "command": "photondrift.proposeAdr",
         "title": "Propose ADR for Changes",
-        "category": "PhotonDrift"
+        "category": "PhotonDrift",
+        "icon": "$(lightbulb)"
       },
       {
         "command": "photondrift.openSettings",
-        "title": "Open PhotonDrift Settings",
-        "category": "PhotonDrift"
+        "title": "Open Settings",
+        "category": "PhotonDrift",
+        "icon": "$(settings)"
       }
     ],
     "menus": {
@@ -107,6 +176,13 @@
           "command": "photondrift.proposeAdr",
           "when": "editorHasSelection",
           "group": "photondrift@1"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "photondrift.runDriftDetection",
+          "when": "resourceExtname == .md || resourceExtname == .adr.md",
+          "group": "navigation@1"
         }
       ],
       "commandPalette": [
@@ -136,7 +212,14 @@
         "photondrift.adrDirectory": {
           "type": "string",
           "default": "docs/adr",
-          "description": "Directory where ADR files are stored"
+          "description": "Directory where ADR files are stored",
+          "scope": "resource"
+        },
+        "photondrift.templateDirectory": {
+          "type": "string",
+          "default": "",
+          "description": "Custom template directory (optional)",
+          "scope": "resource"
         },
         "photondrift.executable": {
           "type": "string",
@@ -147,6 +230,11 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically detect drift on file changes"
+        },
+        "photondrift.autoValidation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically validate ADRs on save"
         },
         "photondrift.enableMLFeatures": {
           "type": "boolean",
@@ -178,7 +266,39 @@
             "alexandrian"
           ],
           "default": "madr",
-          "description": "ADR template format to use"
+          "description": "ADR template format to use",
+          "enumDescriptions": [
+            "Markdown Architectural Decision Records (MADR) format",
+            "Michael Nygard's ADR format", 
+            "Alexandrian pattern format"
+          ]
+        },
+        "photondrift.ml": {
+          "type": "object",
+          "description": "Machine Learning configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable ML features"
+            },
+            "modelType": {
+              "type": "string",
+              "enum": ["IsolationForest", "OneClassSVM", "LOF", "Statistical", "Ensemble"],
+              "default": "Ensemble",
+              "description": "ML model type for drift detection"
+            },
+            "onlineLearning": {
+              "type": "boolean", 
+              "default": true,
+              "description": "Enable online learning from feedback"
+            },
+            "maxTrainingSamples": {
+              "type": "number",
+              "default": 10000,
+              "description": "Maximum samples for training"
+            }
+          }
         }
       }
     },
@@ -193,11 +313,16 @@
       }
     ],
     "views": {
-      "explorer": [
+      "photondrift": [
         {
           "id": "photondriftAdrTree",
           "name": "ADR Documents",
-          "when": "workspaceHasAdrFiles"
+          "when": "workspaceHasAdrFiles || config.photondrift.adrDirectory"
+        },
+        {
+          "id": "photondriftDriftView",
+          "name": "Drift Analysis", 
+          "when": "photondrift:driftDetected"
         }
       ]
     },
@@ -215,6 +340,23 @@
         "view": "photondriftAdrTree",
         "contents": "No ADR files found in workspace.\n[Initialize ADR Structure](command:photondrift.init)\n[Create New ADR](command:photondrift.createAdr)"
       }
+    ],
+    "problemMatchers": [
+      {
+        "name": "photondrift",
+        "owner": "photondrift",
+        "fileLocation": "relative",
+        "pattern": [
+          {
+            "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+            "file": 1,
+            "line": 2,
+            "column": 3,
+            "severity": 4,
+            "message": 5
+          }
+        ]
+      }
     ]
   },
   "scripts": {
@@ -223,9 +365,12 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
+    "lint:fix": "eslint src --ext ts --fix",
     "test": "node ./out/test/runTest.js",
-    "package": "vsce package",
-    "publish": "vsce publish"
+    "test:integration": "node ./out/test/runTest.js --integration",
+    "package": "vsce package --out dist/",
+    "publish": "vsce publish",
+    "check-package": "vsce package --no-yarn --out extension-test.vsix && rm extension-test.vsix"
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",

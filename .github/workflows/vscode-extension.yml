@@ -1,0 +1,242 @@
+name: VS Code Extension CI/CD
+
+on:
+  push:
+    branches: [ main, develop, feature/vscode-extension ]
+    paths:
+      - 'vscode-extension/**'
+      - '.github/workflows/vscode-extension.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'vscode-extension/**'
+  release:
+    types: [ published ]
+  workflow_dispatch:
+    inputs:
+      publish_extension:
+        description: 'Publish to VS Code Marketplace'
+        required: false
+        default: 'false'
+        type: boolean
+
+defaults:
+  run:
+    working-directory: ./vscode-extension
+
+jobs:
+  test-and-build:
+    name: Test and Build Extension
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [16, 18, 20]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: vscode-extension/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run type checking
+        run: npm run compile
+
+      - name: Run tests
+        run: npm test
+
+      - name: Package extension
+        run: |
+          npm install -g @vscode/vsce
+          vsce package --out photondrift-adr-manager-${{ matrix.node-version }}.vsix
+
+      - name: Upload extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-${{ matrix.node-version }}
+          path: vscode-extension/*.vsix
+          retention-days: 30
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ${{ matrix.os }}
+    needs: test-and-build
+    
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        vscode-version: ['stable', 'insiders']
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: vscode-extension/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          VSCODE_VERSION: ${{ matrix.vscode-version }}
+
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    needs: test-and-build
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: vscode-extension/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check package.json validity
+        run: |
+          npm run check-package
+          echo "✅ package.json is valid for marketplace"
+
+      - name: Validate extension manifest
+        run: |
+          npm install -g @vscode/vsce
+          vsce package --no-yarn --out extension-test.vsix
+          echo "✅ Extension packaging successful"
+
+      - name: Security audit
+        run: |
+          npm audit --audit-level=moderate
+          echo "✅ Security audit passed"
+
+      - name: Check bundle size
+        run: |
+          BUNDLE_SIZE=$(stat -f%z extension-test.vsix 2>/dev/null || stat -c%s extension-test.vsix)
+          MAX_SIZE=10485760  # 10MB
+          if [ $BUNDLE_SIZE -gt $MAX_SIZE ]; then
+            echo "❌ Bundle size ($BUNDLE_SIZE bytes) exceeds maximum ($MAX_SIZE bytes)"
+            exit 1
+          fi
+          echo "✅ Bundle size ($BUNDLE_SIZE bytes) is within limits"
+
+  publish-ovsx:
+    name: Publish to Open VSX Registry
+    runs-on: ubuntu-latest
+    needs: [test-and-build, integration-test, quality-gate]
+    if: |
+      (github.event_name == 'release' && github.event.action == 'published') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_extension == 'true') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: vscode-extension/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download extension artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: extension-18
+          path: vscode-extension/
+
+      - name: Publish to Open VSX Registry
+        run: |
+          npm install -g ovsx
+          ovsx publish *.vsix --pat ${{ secrets.OVSX_TOKEN }}
+        env:
+          OVSX_TOKEN: ${{ secrets.OVSX_TOKEN }}
+
+  publish-marketplace:
+    name: Publish to VS Code Marketplace
+    runs-on: ubuntu-latest
+    needs: [test-and-build, integration-test, quality-gate]
+    if: |
+      (github.event_name == 'release' && github.event.action == 'published') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_extension == 'true')
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: vscode-extension/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download extension artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: extension-18
+          path: vscode-extension/
+
+      - name: Publish to VS Code Marketplace
+        run: |
+          npm install -g @vscode/vsce
+          vsce publish --packagePath *.vsix --pat ${{ secrets.VSCODE_TOKEN }}
+        env:
+          VSCODE_TOKEN: ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
+
+      - name: Create GitHub Release Asset
+        if: github.event_name == 'release'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: vscode-extension/photondrift-adr-manager-18.vsix
+          asset_name: photondrift-adr-manager.vsix
+          asset_content_type: application/octet-stream
+
+  notification:
+    name: Publication Notification
+    runs-on: ubuntu-latest
+    needs: [publish-marketplace, publish-ovsx]
+    if: always() && (needs.publish-marketplace.result == 'success' || needs.publish-ovsx.result == 'success')
+    
+    steps:
+      - name: Success notification
+        run: |
+          echo "🚀 PhotonDrift ADR Manager extension successfully published!"
+          echo ""
+          echo "📦 VS Code Marketplace: https://marketplace.visualstudio.com/items?itemName=photondrift.photondrift-adr-manager"
+          echo "📦 Open VSX Registry: https://open-vsx.org/extension/photondrift/photondrift-adr-manager"
+          echo ""
+          echo "🎯 Installation command:"
+          echo "code --install-extension photondrift.photondrift-adr-manager"
