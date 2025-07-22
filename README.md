@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/photondrift_logo.png" alt=PhotonDrift Logo" width="200"/></p>
+<p align="center"><img src="assets/photondrift_logo.png" alt=PhotonDrift Logo" width="400"/></p>
 # PhotonDrift - AI-Powered ADR Management
 
 > Next-generation Architecture Decision Record (ADR) management with ML-enhanced drift detection for intelligent development governance.
