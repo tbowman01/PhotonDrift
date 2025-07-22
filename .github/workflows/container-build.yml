@@ -72,15 +72,15 @@ jobs:
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build container image
+      - name: Build container image for testing (single platform)
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: false
           load: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -89,8 +89,8 @@ jobs:
         run: |
           echo "🧪 Testing container functionality..."
           
-          # Get the built image tag
-          IMAGE_TAG=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-${{ github.sha }}
+          # Use the test image tag
+          IMAGE_TAG=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test
           
           # Test basic functionality
           docker run --rm $IMAGE_TAG --version
@@ -112,14 +112,14 @@ jobs:
       - name: Basic security scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test
           format: 'table'
           severity: 'CRITICAL,HIGH'
 
       - name: Basic security check
         run: |
           echo "🔒 Basic security check..."
-          IMAGE_TAG=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-${{ github.sha }}
+          IMAGE_TAG=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test
           
           # Check non-root user
           USER_ID=$(docker run --rm $IMAGE_TAG sh -c 'id -u' 2>/dev/null || echo "1000")
@@ -129,7 +129,7 @@ jobs:
           fi
           echo "✅ Container runs as non-root user ($USER_ID)"
 
-      - name: Push container image
+      - name: Build and push multi-platform container image
         if: |
           (github.event_name == 'push' && contains(fromJSON('["refs/heads/main", "refs/heads/develop", "refs/heads/testing/dogfood1"]'), github.ref)) ||
           (github.event_name == 'release') ||
@@ -146,6 +146,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: true
+          sbom: true
 
       - name: Generate artifact attestation
         if: steps.push.outcome == 'success'
