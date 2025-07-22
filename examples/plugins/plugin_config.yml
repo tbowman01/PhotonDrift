@@ -1,0 +1,171 @@
+# PhotonDrift Plugin Configuration Example
+# This file demonstrates how to configure plugins for PhotonDrift
+
+# Plugin directories to scan for available plugins
+plugin_directories:
+  - "./examples/plugins"
+  - "./plugins"
+  - "~/.photondrift/plugins"
+  - "/usr/local/lib/photondrift/plugins"
+
+# Enabled plugins configuration
+plugins:
+  security_analyzer:
+    enabled: true
+    priority: 1
+    config:
+      security_levels: ["low", "medium", "high", "critical"]
+      compliance_frameworks: ["GDPR", "CCPA", "SOX", "HIPAA"]
+      auto_scan: true
+      scan_interval: "5m"
+    triggers:
+      - "file_change"
+      - "adr_create"
+      - "adr_update"
+    
+  performance_analyzer:
+    enabled: true
+    priority: 2
+    config:
+      performance_thresholds:
+        response_time_ms: 500
+        memory_usage_mb: 512
+        cpu_usage_percent: 80
+      benchmark_suites: ["load_test", "stress_test"]
+      auto_benchmark: false
+    triggers:
+      - "performance_drift"
+      - "adr_create"
+
+  template_generator:
+    enabled: true
+    priority: 3
+    config:
+      template_sources:
+        - "local"
+        - "marketplace"
+      auto_update: true
+      update_interval: "1d"
+    triggers:
+      - "template_request"
+
+# Plugin marketplace settings
+marketplace:
+  enabled: true
+  registry_url: "https://plugins.photondrift.io"
+  auto_update: false
+  check_interval: "1d"
+  trusted_publishers:
+    - "photondrift-official"
+    - "security-team"
+    - "performance-team"
+
+# Security settings for plugin execution
+security:
+  sandbox_enabled: true
+  max_execution_time_ms: 5000
+  max_memory_bytes: 52428800  # 50MB
+  allowed_file_operations:
+    - "read"
+    - "write_temp"
+  network_access: false
+  
+  # Code signing verification
+  verify_signatures: true
+  trusted_keys:
+    - "photondrift-official-key"
+  
+  # Plugin validation rules
+  validation_rules:
+    - "no_external_network_calls"
+    - "no_system_commands"
+    - "limited_file_system_access"
+
+# Logging configuration for plugins
+logging:
+  level: "info"
+  plugin_logs_directory: "./logs/plugins"
+  max_log_size_mb: 10
+  max_log_files: 5
+  include_performance_metrics: true
+
+# Performance monitoring for plugins
+monitoring:
+  enabled: true
+  metrics_retention_days: 30
+  alert_thresholds:
+    execution_time_ms: 2000
+    memory_usage_mb: 30
+    error_rate_percent: 5
+  
+  # Plugin performance tracking
+  track_metrics:
+    - "execution_time"
+    - "memory_usage"  
+    - "success_rate"
+    - "drift_detection_accuracy"
+
+# Plugin development settings
+development:
+  # Hot reload for development
+  hot_reload_enabled: true
+  reload_watch_directories:
+    - "./examples/plugins"
+    - "./src/plugins"
+  
+  # Debug settings
+  debug_mode: false
+  verbose_logging: false
+  
+  # Testing configuration
+  test_mode: false
+  mock_data_directory: "./test_data/plugins"
+
+# Integration settings
+integrations:
+  # IDE integration settings
+  ide:
+    vscode:
+      extension_id: "photondrift.adr-manager"
+      auto_register_plugins: true
+    intellij:
+      plugin_id: "com.photondrift.adr"
+      auto_register_plugins: true
+  
+  # CI/CD integration
+  cicd:
+    github_actions:
+      auto_run_plugins: true
+      failure_mode: "warning"  # or "error"
+    jenkins:
+      auto_run_plugins: false
+
+# Custom plugin types
+custom_plugin_types:
+  compliance_checker:
+    interface: "CompliancePlugin"
+    required_methods: ["check_compliance", "get_frameworks"]
+  
+  ai_assistant:
+    interface: "AIPlugin" 
+    required_methods: ["analyze_context", "generate_suggestions"]
+  
+  report_generator:
+    interface: "ReportPlugin"
+    required_methods: ["generate_report", "export_formats"]
+
+# Plugin API configuration
+api:
+  version: "1.0.0"
+  backward_compatibility: true
+  deprecated_methods_warning: true
+  
+  # Rate limiting for plugin operations
+  rate_limits:
+    max_requests_per_minute: 60
+    max_concurrent_executions: 5
+  
+  # Plugin communication
+  inter_plugin_communication: true
+  event_system: true
+  shared_context: true
