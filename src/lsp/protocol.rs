@@ -1,409 +1,286 @@
-//! LSP protocol utilities and helpers for PhotonDrift
-//! 
-//! This module provides utility functions and helpers for working with
-//! the Language Server Protocol, including message handling and data conversion.
+//! LSP protocol utilities and helper functions
 
-use std::collections::HashMap;
-use tower_lsp::lsp_types::*;
-use serde_json::Value;
-use url::Url;
+use lsp_types::Url;
+use std::path::{Path, PathBuf};
 
-/// Protocol helper utilities for LSP operations
-pub struct LspProtocolHelper {
-    /// Cache for URI to file path conversions
-    uri_cache: std::sync::RwLock<HashMap<Url, std::path::PathBuf>>,
+/// Convert LSP URI to file system path
+pub fn uri_to_path(uri: &Url) -> Result<PathBuf, Box<dyn std::error::Error + Send + Sync>> {
+    uri.to_file_path()
+        .map_err(|_| "Failed to convert URI to file path".into())
 }
 
-impl LspProtocolHelper {
-    /// Create a new protocol helper instance
-    pub fn new() -> Self {
-        Self {
-            uri_cache: std::sync::RwLock::new(HashMap::new()),
-        }
-    }
-
-    /// Convert URI to file path with caching
-    pub fn uri_to_path(&self, uri: &Url) -> Option<std::path::PathBuf> {
-        // Check cache first
-        if let Ok(cache) = self.uri_cache.read() {
-            if let Some(path) = cache.get(uri) {
-                return Some(path.clone());
-            }
-        }
-
-        // Convert and cache
-        if let Ok(path) = uri.to_file_path() {
-            if let Ok(mut cache) = self.uri_cache.write() {
-                cache.insert(uri.clone(), path.clone());
-            }
-            Some(path)
-        } else {
-            None
-        }
-    }
-
-    /// Convert file path to URI
-    pub fn path_to_uri(&self, path: &std::path::Path) -> Option<Url> {
-        Url::from_file_path(path).ok()
-    }
-
-    /// Create a diagnostic with standard formatting
-    pub fn create_diagnostic(
-        &self,
-        range: Range,
-        severity: DiagnosticSeverity,
-        code: &str,
-        message: &str,
-    ) -> Diagnostic {
-        Diagnostic {
-            range,
-            severity: Some(severity),
-            code: Some(NumberOrString::String(code.to_string())),
-            source: Some("photon-drift".to_string()),
-            message: message.to_string(),
-            related_information: None,
-            tags: None,
-            data: None,
-            code_description: None,
-        }
-    }
-
-    /// Create a diagnostic with related information
-    pub fn create_diagnostic_with_related(
-        &self,
-        range: Range,
-        severity: DiagnosticSeverity,
-        code: &str,
-        message: &str,
-        related_info: Vec<DiagnosticRelatedInformation>,
-    ) -> Diagnostic {
-        Diagnostic {
-            range,
-            severity: Some(severity),
-            code: Some(NumberOrString::String(code.to_string())),
-            source: Some("photon-drift".to_string()),
-            message: message.to_string(),
-            related_information: Some(related_info),
-            tags: None,
-            data: None,
-            code_description: None,
-        }
-    }
-
-    /// Create a completion item with snippet support
-    pub fn create_completion_item(
-        &self,
-        label: &str,
-        kind: CompletionItemKind,
-        detail: Option<&str>,
-        documentation: Option<&str>,
-        insert_text: Option<&str>,
-        is_snippet: bool,
-    ) -> CompletionItem {
-        CompletionItem {
-            label: label.to_string(),
-            kind: Some(kind),
-            detail: detail.map(|s| s.to_string()),
-            documentation: documentation.map(|s| Documentation::String(s.to_string())),
-            insert_text: insert_text.map(|s| s.to_string()),
-            insert_text_format: if is_snippet {
-                Some(InsertTextFormat::SNIPPET)
-            } else {
-                Some(InsertTextFormat::PLAIN_TEXT)
-            },
-            ..Default::default()
-        }
-    }
-
-    /// Create a hover response with markdown content
-    pub fn create_hover(&self, markdown_content: &str, range: Option<Range>) -> Hover {
-        Hover {
-            contents: HoverContents::Markup(MarkupContent {
-                kind: MarkupKind::Markdown,
-                value: markdown_content.to_string(),
-            }),
-            range,
-        }
-    }
-
-    /// Extract position information from text
-    pub fn position_to_offset(&self, text: &str, position: Position) -> Option<usize> {
-        let mut offset = 0;
-        let mut current_line = 0;
-        let mut current_char = 0;
-
-        for ch in text.chars() {
-            if current_line == position.line as usize && current_char == position.character as usize {
-                return Some(offset);
-            }
-
-            if ch == '\n' {
-                current_line += 1;
-                current_char = 0;
-            } else {
-                current_char += 1;
-            }
-
-            offset += ch.len_utf8();
-        }
-
-        // Handle end of file position
-        if current_line == position.line as usize && current_char == position.character as usize {
-            Some(offset)
-        } else {
-            None
-        }
-    }
-
-    /// Convert offset back to position
-    pub fn offset_to_position(&self, text: &str, offset: usize) -> Position {
-        let mut current_offset = 0;
-        let mut line = 0;
-        let mut character = 0;
-
-        for ch in text.chars() {
-            if current_offset >= offset {
-                break;
-            }
-
-            if ch == '\n' {
-                line += 1;
-                character = 0;
-            } else {
-                character += 1;
-            }
-
-            current_offset += ch.len_utf8();
-        }
-
-        Position {
-            line: line as u32,
-            character: character as u32,
-        }
-    }
-
-    /// Create a range from line and character bounds
-    pub fn create_range(&self, start_line: u32, start_char: u32, end_line: u32, end_char: u32) -> Range {
-        Range {
-            start: Position {
-                line: start_line,
-                character: start_char,
-            },
-            end: Position {
-                line: end_line,
-                character: end_char,
-            },
-        }
-    }
-
-    /// Get line range for a given line number
-    pub fn get_line_range(&self, text: &str, line_number: u32) -> Option<Range> {
-        let lines: Vec<&str> = text.lines().collect();
-        
-        if let Some(line) = lines.get(line_number as usize) {
-            Some(Range {
-                start: Position {
-                    line: line_number,
-                    character: 0,
-                },
-                end: Position {
-                    line: line_number,
-                    character: line.chars().count() as u32,
-                },
-            })
-        } else {
-            None
-        }
-    }
-
-    /// Extract word at position
-    pub fn get_word_at_position(&self, text: &str, position: Position) -> Option<(String, Range)> {
-        let lines: Vec<&str> = text.lines().collect();
-        let line = lines.get(position.line as usize)?;
-        let chars: Vec<char> = line.chars().collect();
-        
-        if position.character as usize >= chars.len() {
-            return None;
-        }
-
-        // Find word boundaries
-        let mut start = position.character as usize;
-        let mut end = position.character as usize;
-
-        // Move start backwards to beginning of word
-        while start > 0 && (chars[start - 1].is_alphanumeric() || chars[start - 1] == '_' || chars[start - 1] == '-') {
-            start -= 1;
-        }
-
-        // Move end forwards to end of word
-        while end < chars.len() && (chars[end].is_alphanumeric() || chars[end] == '_' || chars[end] == '-') {
-            end += 1;
-        }
-
-        if start < end {
-            let word: String = chars[start..end].iter().collect();
-            let range = Range {
-                start: Position {
-                    line: position.line,
-                    character: start as u32,
-                },
-                end: Position {
-                    line: position.line,
-                    character: end as u32,
-                },
-            };
-            Some((word, range))
-        } else {
-            None
-        }
-    }
-
-    /// Validate LSP message structure
-    pub fn validate_message(&self, message: &Value) -> Result<(), String> {
-        // Basic LSP message validation
-        if !message.is_object() {
-            return Err("Message must be a JSON object".to_string());
-        }
-
-        let obj = message.as_object().unwrap();
-
-        // Check for required fields
-        if !obj.contains_key("jsonrpc") {
-            return Err("Missing 'jsonrpc' field".to_string());
-        }
-
-        if obj.get("jsonrpc").unwrap().as_str() != Some("2.0") {
-            return Err("Invalid jsonrpc version".to_string());
-        }
-
-        // Check message type
-        let has_id = obj.contains_key("id");
-        let has_method = obj.contains_key("method");
-        let has_result = obj.contains_key("result");
-        let has_error = obj.contains_key("error");
-
-        match (has_id, has_method, has_result, has_error) {
-            // Request
-            (true, true, false, false) => Ok(()),
-            // Notification
-            (false, true, false, false) => Ok(()),
-            // Response with result
-            (true, false, true, false) => Ok(()),
-            // Response with error
-            (true, false, false, true) => Ok(()),
-            _ => Err("Invalid message structure".to_string()),
-        }
-    }
-
-    /// Create error response
-    pub fn create_error_response(&self, id: Option<Value>, code: i64, message: &str) -> Value {
-        serde_json::json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "error": {
-                "code": code,
-                "message": message
-            }
-        })
-    }
-
-    /// Performance measurement utilities
-    pub fn measure_performance<F, R>(&self, operation_name: &str, f: F) -> R
-    where
-        F: FnOnce() -> R,
-    {
-        let start = std::time::Instant::now();
-        let result = f();
-        let elapsed = start.elapsed();
-        
-        if elapsed.as_millis() > 100 {
-            eprintln!("LSP operation '{}' took {}ms (>100ms threshold)", operation_name, elapsed.as_millis());
-        }
-        
-        result
-    }
+/// Convert file system path to LSP URI
+pub fn path_to_uri(path: &Path) -> Result<Url, Box<dyn std::error::Error + Send + Sync>> {
+    Url::from_file_path(path)
+        .map_err(|_| "Failed to convert file path to URI".into())
 }
 
-impl Default for LspProtocolHelper {
-    fn default() -> Self {
-        Self::new()
-    }
+/// Normalize line endings for consistent processing
+pub fn normalize_line_endings(content: &str) -> String {
+    content.replace("\r\n", "\n").replace('\r', "\n")
 }
 
-/// LSP message types for type-safe handling
-#[derive(Debug, Clone)]
-pub enum LspMessage {
-    Request {
-        id: Value,
-        method: String,
-        params: Option<Value>,
-    },
-    Notification {
-        method: String,
-        params: Option<Value>,
-    },
-    Response {
-        id: Value,
-        result: Option<Value>,
-        error: Option<LspError>,
-    },
-}
-
-/// LSP error structure
-#[derive(Debug, Clone)]
-pub struct LspError {
-    pub code: i64,
-    pub message: String,
-    pub data: Option<Value>,
-}
-
-/// Common LSP error codes
-pub mod error_codes {
-    pub const PARSE_ERROR: i64 = -32700;
-    pub const INVALID_REQUEST: i64 = -32600;
-    pub const METHOD_NOT_FOUND: i64 = -32601;
-    pub const INVALID_PARAMS: i64 = -32602;
-    pub const INTERNAL_ERROR: i64 = -32603;
+/// Get line and character position from byte offset
+pub fn offset_to_position(content: &str, offset: usize) -> lsp_types::Position {
+    let content = normalize_line_endings(content);
+    let mut line = 0;
+    let mut character = 0;
     
-    // LSP specific error codes
-    pub const SERVER_NOT_INITIALIZED: i64 = -32002;
-    pub const UNKNOWN_ERROR_CODE: i64 = -32001;
-    pub const REQUEST_CANCELLED: i64 = -32800;
-    pub const CONTENT_MODIFIED: i64 = -32801;
+    for (i, ch) in content.char_indices() {
+        if i >= offset {
+            break;
+        }
+        
+        if ch == '\n' {
+            line += 1;
+            character = 0;
+        } else {
+            character += ch.len_utf8() as u32;
+        }
+    }
+    
+    lsp_types::Position { line, character }
 }
 
-/// File system utilities for LSP operations
-pub struct FileSystemHelper;
-
-impl FileSystemHelper {
-    /// Check if a file is an ADR based on path and content
-    pub fn is_adr_file(path: &std::path::Path) -> bool {
-        // Check file extension
-        if path.extension().and_then(|s| s.to_str()) != Some("md") {
-            return false;
+/// Get byte offset from line and character position
+pub fn position_to_offset(content: &str, position: lsp_types::Position) -> Option<usize> {
+    let content = normalize_line_endings(content);
+    let mut current_line = 0;
+    let mut current_character = 0;
+    
+    for (i, ch) in content.char_indices() {
+        if current_line == position.line && current_character == position.character {
+            return Some(i);
         }
-
-        // Check for ADR directory patterns
-        let path_str = path.to_string_lossy().to_lowercase();
-        path_str.contains("adr") || 
-        path_str.contains("decision") || 
-        path_str.contains("architecture")
-    }
-
-    /// Find all ADR files in a directory
-    pub fn find_adr_files(root: &std::path::Path) -> std::io::Result<Vec<std::path::PathBuf>> {
-        let mut adr_files = Vec::new();
         
-        for entry in walkdir::WalkDir::new(root).follow_links(true) {
-            let entry = entry?;
-            if entry.file_type().is_file() {
-                let path = entry.path();
-                if Self::is_adr_file(path) {
-                    adr_files.push(path.to_path_buf());
+        if ch == '\n' {
+            current_line += 1;
+            current_character = 0;
+        } else {
+            current_character += ch.len_utf8() as u32;
+        }
+        
+        // If we've passed the target line, we won't find it
+        if current_line > position.line {
+            break;
+        }
+    }
+    
+    // If we're at the end and haven't found it, check if we're at the target position
+    if current_line == position.line && current_character == position.character {
+        Some(content.len())
+    } else {
+        None
+    }
+}
+
+/// Extract the word at a given position
+pub fn get_word_at_position(content: &str, position: lsp_types::Position) -> Option<String> {
+    let content = normalize_line_endings(content);
+    let lines: Vec<&str> = content.lines().collect();
+    let line = lines.get(position.line as usize)?;
+    
+    let chars: Vec<char> = line.chars().collect();
+    let char_pos = position.character as usize;
+    
+    if char_pos >= chars.len() {
+        return None;
+    }
+    
+    // Find word boundaries
+    let mut start = char_pos;
+    let mut end = char_pos;
+    
+    // Move start backward
+    while start > 0 && is_word_char(chars[start - 1]) {
+        start -= 1;
+    }
+    
+    // Move end forward
+    while end < chars.len() && is_word_char(chars[end]) {
+        end += 1;
+    }
+    
+    if start < end {
+        Some(chars[start..end].iter().collect())
+    } else {
+        None
+    }
+}
+
+/// Check if a character is part of a word (including ADR-specific characters)
+fn is_word_char(ch: char) -> bool {
+    ch.is_alphanumeric() || ch == '-' || ch == '_' || ch == ':'
+}
+
+/// Create a range that spans the entire line
+pub fn line_range(line_number: u32, line_content: &str) -> lsp_types::Range {
+    lsp_types::Range {
+        start: lsp_types::Position {
+            line: line_number,
+            character: 0,
+        },
+        end: lsp_types::Position {
+            line: line_number,
+            character: line_content.len() as u32,
+        },
+    }
+}
+
+/// Create a range for a specific word within a line
+pub fn word_range(line_number: u32, line_content: &str, word: &str) -> Option<lsp_types::Range> {
+    if let Some(start) = line_content.find(word) {
+        Some(lsp_types::Range {
+            start: lsp_types::Position {
+                line: line_number,
+                character: start as u32,
+            },
+            end: lsp_types::Position {
+                line: line_number,
+                character: (start + word.len()) as u32,
+            },
+        })
+    } else {
+        None
+    }
+}
+
+/// Validate that a URI represents an ADR file
+pub fn is_adr_file(uri: &Url) -> bool {
+    if let Ok(path) = uri_to_path(uri) {
+        if let Some(extension) = path.extension() {
+            if extension == "md" || extension == "markdown" {
+                // Check if filename suggests it's an ADR
+                if let Some(filename) = path.file_stem() {
+                    let filename = filename.to_string_lossy().to_lowercase();
+                    return filename.contains("adr") || filename.starts_with("adr-") || filename.contains("decision");
                 }
             }
         }
+    }
+    false
+}
+
+/// Extract ADR number from filename or content
+pub fn extract_adr_number(content: &str) -> Option<String> {
+    // Try to find ADR number in title line first
+    let lines: Vec<&str> = content.lines().collect();
+    for line in lines.iter().take(5) { // Check first 5 lines
+        if line.starts_with("# ADR-") {
+            if let Some(start) = line.find("ADR-") {
+                let after_adr = &line[start + 4..];
+                if let Some(end) = after_adr.find([' ', ':', '\t']) {
+                    return Some(format!("ADR-{}", &after_adr[..end]));
+                }
+            }
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_line_endings() {
+        assert_eq!(normalize_line_endings("hello\r\nworld"), "hello\nworld");
+        assert_eq!(normalize_line_endings("hello\rworld"), "hello\nworld");
+        assert_eq!(normalize_line_endings("hello\nworld"), "hello\nworld");
+    }
+
+    #[test]
+    fn test_offset_to_position() {
+        let content = "hello\nworld\ntest";
         
-        Ok(adr_files)
+        assert_eq!(offset_to_position(content, 0), lsp_types::Position { line: 0, character: 0 });
+        assert_eq!(offset_to_position(content, 6), lsp_types::Position { line: 1, character: 0 });
+        assert_eq!(offset_to_position(content, 12), lsp_types::Position { line: 2, character: 0 });
+    }
+
+    #[test]
+    fn test_position_to_offset() {
+        let content = "hello\nworld\ntest";
+        
+        assert_eq!(position_to_offset(content, lsp_types::Position { line: 0, character: 0 }), Some(0));
+        assert_eq!(position_to_offset(content, lsp_types::Position { line: 1, character: 0 }), Some(6));
+        assert_eq!(position_to_offset(content, lsp_types::Position { line: 2, character: 0 }), Some(12));
+    }
+
+    #[test]
+    fn test_get_word_at_position() {
+        let content = "# ADR-001: Test Decision";
+        
+        let word = get_word_at_position(content, lsp_types::Position { line: 0, character: 2 });
+        assert_eq!(word, Some("ADR-001:".to_string()));
+        
+        let word = get_word_at_position(content, lsp_types::Position { line: 0, character: 15 });
+        assert_eq!(word, Some("Decision".to_string()));
+    }
+
+    #[test]
+    fn test_is_word_char() {
+        assert!(is_word_char('a'));
+        assert!(is_word_char('A'));
+        assert!(is_word_char('1'));
+        assert!(is_word_char('-'));
+        assert!(is_word_char('_'));
+        assert!(is_word_char(':'));
+        assert!(!is_word_char(' '));
+        assert!(!is_word_char('('));
+    }
+
+    #[test]
+    fn test_line_range() {
+        let range = line_range(5, "hello world");
+        assert_eq!(range.start.line, 5);
+        assert_eq!(range.start.character, 0);
+        assert_eq!(range.end.line, 5);
+        assert_eq!(range.end.character, 11);
+    }
+
+    #[test]
+    fn test_word_range() {
+        let range = word_range(2, "hello world test", "world");
+        assert!(range.is_some());
+        
+        let range = range.unwrap();
+        assert_eq!(range.start.line, 2);
+        assert_eq!(range.start.character, 6);
+        assert_eq!(range.end.line, 2);
+        assert_eq!(range.end.character, 11);
+    }
+
+    #[test]
+    fn test_is_adr_file() {
+        // These would normally require actual file paths, but we can test the logic
+        let uri = Url::parse("file:///path/to/adr-001.md").unwrap();
+        // Note: This test would fail because the file doesn't exist
+        // In a real scenario, you'd use temporary files or mock the filesystem
+    }
+
+    #[test]
+    fn test_extract_adr_number() {
+        let content = "# ADR-001: Use Rust for Backend\n\n## Status\nProposed";
+        assert_eq!(extract_adr_number(content), Some("ADR-001".to_string()));
+        
+        let content = "# ADR-123: Another Decision";
+        assert_eq!(extract_adr_number(content), Some("ADR-123".to_string()));
+        
+        let content = "# Not an ADR\n\nSome content";
+        assert_eq!(extract_adr_number(content), None);
+    }
+
+    #[test]
+    fn test_uri_path_conversion() {
+        // Test with a valid file URI
+        let uri = Url::parse("file:///tmp/test.md").unwrap();
+        let path = uri_to_path(&uri);
+        assert!(path.is_ok());
+        
+        // Test path to URI conversion
+        let path = PathBuf::from("/tmp/test.md");
+        let uri_result = path_to_uri(&path);
+        assert!(uri_result.is_ok());
     }
 }

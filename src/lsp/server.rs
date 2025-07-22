@@ -1,74 +1,39 @@
 //! Core LSP server implementation for PhotonDrift
-//! 
-//! Provides the main Language Server Protocol server that handles client connections,
-//! initialization, and orchestrates all LSP functionality.
 
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::RwLock;
+
+use lsp_types::{
+    CompletionOptions, CompletionParams, CompletionResponse, DidChangeTextDocumentParams,
+    DidCloseTextDocumentParams, DidOpenTextDocumentParams, Hover, HoverParams, HoverProviderCapability,
+    InitializeParams, InitializeResult, MessageType, ServerCapabilities, TextDocumentSyncCapability,
+    TextDocumentSyncKind, Url, WorkDoneProgressOptions,
+};
 use tower_lsp::jsonrpc::Result;
-use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 
-use crate::config::Config;
-use crate::drift::detector::DriftDetector;
-use super::diagnostics::DriftDiagnosticsEngine;
-use super::handlers::*;
-use super::protocol::LspProtocolHelper;
+use crate::lsp::{
+    DocumentStore, DiagnosticEngine, CompletionProvider, HoverProvider, LspConfig
+};
 
 /// PhotonDrift Language Server implementation
 pub struct PhotonDriftLspServer {
-    /// LSP client handle
     client: Client,
-    /// Server configuration
-    config: Arc<RwLock<Option<Config>>>,
-    /// Drift detection engine
-    drift_detector: Arc<RwLock<Option<DriftDetector>>>,
-    /// Diagnostics engine for real-time analysis
-    diagnostics_engine: Arc<DriftDiagnosticsEngine>,
-    /// Protocol helper utilities
-    protocol_helper: Arc<LspProtocolHelper>,
-    /// Document store for opened files
-    document_map: Arc<RwLock<HashMap<Url, String>>>,
-    /// Workspace folders
-    workspace_folders: Arc<RwLock<Vec<WorkspaceFolder>>>,
+    documents: DocumentStore,
+    config: LspConfig,
+    diagnostic_engine: DiagnosticEngine,
+    completion_provider: CompletionProvider,
+    hover_provider: HoverProvider,
 }
 
 impl PhotonDriftLspServer {
-    /// Create a new PhotonDrift LSP server instance
     pub fn new(client: Client) -> Self {
-        let config = Arc::new(RwLock::new(None));
-        let diagnostics_engine = Arc::new(DriftDiagnosticsEngine::new(config.clone()));
-        
         Self {
             client,
-            config,
-            drift_detector: Arc::new(RwLock::new(None)),
-            diagnostics_engine,
-            protocol_helper: Arc::new(LspProtocolHelper::new()),
-            document_map: Arc::new(RwLock::new(HashMap::new())),
-            workspace_folders: Arc::new(RwLock::new(Vec::new())),
-        }
-    }
-
-    /// Initialize drift detector with workspace configuration
-    async fn initialize_drift_detector(&self, workspace_root: &std::path::Path) -> crate::Result<()> {
-        let config = Config::from_workspace_root(workspace_root)?;
-        
-        // Store configuration
-        *self.config.write().await = Some(config.clone());
-        
-        // Initialize drift detector
-        let detector = DriftDetector::new(config.clone())?;
-        *self.drift_detector.write().await = Some(detector);
-        
-        Ok(())
-    }
-
-    /// Update diagnostics for a document
-    async fn update_diagnostics(&self, uri: &Url, text: &str) {
-        if let Some(diagnostics) = self.diagnostics_engine.analyze_document(uri, text).await {
-            self.client.publish_diagnostics(uri.clone(), diagnostics, None).await;
+            documents: DocumentStore::default(),
+            config: LspConfig::default(),
+            diagnostic_engine: DiagnosticEngine::new(),
+            completion_provider: CompletionProvider::new(),
+            hover_provider: HoverProvider::new(),
         }
     }
 }
@@ -76,56 +41,48 @@ impl PhotonDriftLspServer {
 #[tower_lsp::async_trait]
 impl LanguageServer for PhotonDriftLspServer {
     async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
-        // Store workspace folders
-        if let Some(workspace_folders) = params.workspace_folders {
-            *self.workspace_folders.write().await = workspace_folders;
-        }
+        // Log initialization
+        self.client
+            .log_message(MessageType::INFO, "PhotonDrift LSP server initializing")
+            .await;
 
-        // Initialize drift detector if workspace root is available
-        if let Some(root_uri) = params.root_uri {
-            if let Ok(root_path) = root_uri.to_file_path() {
-                if let Err(e) = self.initialize_drift_detector(&root_path).await {
-                    eprintln!("Failed to initialize drift detector: {}", e);
+        // Set workspace root if provided
+        if let Some(workspace_folders) = params.workspace_folders {
+            if let Some(folder) = workspace_folders.first() {
+                if let Ok(path) = folder.uri.to_file_path() {
+                    let mut config = self.config.clone();
+                    config.workspace_root = Some(path);
                 }
             }
         }
 
         Ok(InitializeResult {
+            server_info: Some(lsp_types::ServerInfo {
+                name: "PhotonDrift LSP".to_string(),
+                version: Some(env!("CARGO_PKG_VERSION").to_string()),
+            }),
             capabilities: ServerCapabilities {
                 text_document_sync: Some(TextDocumentSyncCapability::Kind(
                     TextDocumentSyncKind::FULL,
                 )),
                 completion_provider: Some(CompletionOptions {
-                    resolve_provider: Some(true),
-                    trigger_characters: Some(vec![":".to_string(), "#".to_string(), "-".to_string()]),
-                    work_done_progress_options: Default::default(),
+                    resolve_provider: Some(false),
+                    trigger_characters: Some(vec![
+                        "#".to_string(),
+                        "-".to_string(),
+                        ":".to_string(),
+                    ]),
+                    work_done_progress_options: WorkDoneProgressOptions::default(),
                     all_commit_characters: None,
                     completion_item: None,
                 }),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
-                diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
-                    identifier: Some("photon-drift".to_string()),
-                    inter_file_dependencies: true,
-                    workspace_diagnostics: false,
-                    work_done_progress_options: Default::default(),
-                })),
-                workspace: Some(WorkspaceServerCapabilities {
-                    workspace_folders: Some(WorkspaceFoldersServerCapabilities {
-                        supported: Some(true),
-                        change_notifications: Some(OneOf::Left(true)),
-                    }),
-                    file_operations: None,
-                }),
-                ..Default::default()
+                ..ServerCapabilities::default()
             },
-            server_info: Some(ServerInfo {
-                name: "photon-drift-lsp".to_string(),
-                version: Some(env!("CARGO_PKG_VERSION").to_string()),
-            }),
         })
     }
 
-    async fn initialized(&self, _: InitializedParams) {
+    async fn initialized(&self, _: lsp_types::InitializedParams) {
         self.client
             .log_message(MessageType::INFO, "PhotonDrift LSP server initialized")
             .await;
@@ -136,63 +93,167 @@ impl LanguageServer for PhotonDriftLspServer {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        let uri = params.text_document.uri;
-        let text = params.text_document.text;
-
-        // Store document content
-        self.document_map.write().await.insert(uri.clone(), text.clone());
+        let uri = params.text_document.uri.clone();
+        let content = params.text_document.text.clone();
         
-        // Update diagnostics for the opened document
-        self.update_diagnostics(&uri, &text).await;
+        // Store document
+        self.documents.write().await.insert(uri.clone(), content.clone());
+        
+        // Run diagnostics if enabled
+        if self.config.diagnostics_enabled {
+            if let Ok(diagnostics) = self.diagnostic_engine.analyze_content(&content, &uri).await {
+                self.client.publish_diagnostics(uri, diagnostics, None).await;
+            }
+        }
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        let uri = params.text_document.uri;
+        let uri = params.text_document.uri.clone();
         
         if let Some(change) = params.content_changes.into_iter().next() {
-            // Update document content
-            self.document_map.write().await.insert(uri.clone(), change.text.clone());
+            // Update document store
+            self.documents.write().await.insert(uri.clone(), change.text.clone());
             
-            // Update diagnostics for the changed document
-            self.update_diagnostics(&uri, &change.text).await;
+            // Run diagnostics if enabled
+            if self.config.diagnostics_enabled {
+                if let Ok(diagnostics) = self.diagnostic_engine.analyze_content(&change.text, &uri).await {
+                    self.client.publish_diagnostics(uri, diagnostics, None).await;
+                }
+            }
         }
     }
 
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
-        // Remove document from store
-        self.document_map.write().await.remove(&params.text_document.uri);
+        // Remove from document store
+        self.documents.write().await.remove(&params.text_document.uri);
         
-        // Clear diagnostics for the closed document
+        // Clear diagnostics
         self.client
             .publish_diagnostics(params.text_document.uri, Vec::new(), None)
             .await;
     }
 
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
-        let uri = &params.text_document_position.text_document.uri;
-        let position = params.text_document_position.position;
-
-        if let Some(text) = self.document_map.read().await.get(uri) {
-            let config = self.config.read().await;
-            if let Some(ref config) = *config {
-                return Ok(super::completion::provide_completions(text, position, config).await);
-            }
+        if !self.config.completion_enabled {
+            return Ok(None);
         }
 
-        Ok(None)
+        let uri = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
+
+        // Get document content
+        let documents = self.documents.read().await;
+        if let Some(content) = documents.get(&uri) {
+            let completions = self.completion_provider.get_completions(content, position).await;
+            Ok(Some(CompletionResponse::Array(completions)))
+        } else {
+            Ok(None)
+        }
     }
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
-        let uri = &params.text_document_position_params.text_document.uri;
-        let position = params.text_document_position_params.position;
-
-        if let Some(text) = self.document_map.read().await.get(uri) {
-            let config = self.config.read().await;
-            if let Some(ref config) = *config {
-                return Ok(super::hover::provide_hover_info(text, position, config).await);
-            }
+        if !self.config.hover_enabled {
+            return Ok(None);
         }
 
-        Ok(None)
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position;
+
+        // Get document content
+        let documents = self.documents.read().await;
+        if let Some(content) = documents.get(&uri) {
+            Ok(self.hover_provider.get_hover_info(content, position).await)
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+/// Start the LSP server
+pub async fn start_lsp_server() -> crate::Result<()> {
+    let stdin = tokio::io::stdin();
+    let stdout = tokio::io::stdout();
+
+    let (service, socket) = LspService::new(PhotonDriftLspServer::new);
+    Server::new(stdin, stdout, socket).serve(service).await;
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lsp_types::ClientCapabilities;
+    use tower_lsp::jsonrpc::Id;
+
+    // Mock client for testing
+    struct MockClient;
+
+    #[tower_lsp::async_trait]
+    impl Client for MockClient {
+        async fn log_message(&self, _typ: MessageType, _message: String) {}
+        async fn show_message(&self, _typ: MessageType, _message: String) {}
+        async fn publish_diagnostics(&self, _uri: Url, _diagnostics: Vec<lsp_types::Diagnostic>, _version: Option<i32>) {}
+    }
+
+    #[tokio::test]
+    async fn test_server_initialization() {
+        let client = MockClient;
+        let server = PhotonDriftLspServer::new(Box::new(client));
+
+        let params = InitializeParams {
+            process_id: None,
+            root_path: None,
+            root_uri: None,
+            initialization_options: None,
+            capabilities: ClientCapabilities::default(),
+            trace: None,
+            workspace_folders: None,
+            client_info: None,
+            locale: None,
+        };
+
+        let result = server.initialize(params).await.unwrap();
+        assert_eq!(result.server_info.as_ref().unwrap().name, "PhotonDrift LSP");
+        assert!(result.capabilities.text_document_sync.is_some());
+        assert!(result.capabilities.completion_provider.is_some());
+        assert!(result.capabilities.hover_provider.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_document_lifecycle() {
+        let client = MockClient;
+        let server = PhotonDriftLspServer::new(Box::new(client));
+
+        let uri = Url::parse("file:///test.md").unwrap();
+        let content = "# ADR-001: Test Decision\n\n## Status\nProposed";
+
+        // Test document open
+        let open_params = DidOpenTextDocumentParams {
+            text_document: lsp_types::TextDocumentItem {
+                uri: uri.clone(),
+                language_id: "markdown".to_string(),
+                version: 1,
+                text: content.to_string(),
+            },
+        };
+
+        server.did_open(open_params).await;
+
+        // Verify document is stored
+        let documents = server.documents.read().await;
+        assert_eq!(documents.get(&uri), Some(&content.to_string()));
+        drop(documents);
+
+        // Test document close
+        let close_params = DidCloseTextDocumentParams {
+            text_document: lsp_types::TextDocumentIdentifier { uri: uri.clone() },
+        };
+
+        server.did_close(close_params).await;
+
+        // Verify document is removed
+        let documents = server.documents.read().await;
+        assert!(!documents.contains_key(&uri));
     }
 }

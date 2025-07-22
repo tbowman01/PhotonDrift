@@ -1,321 +1,372 @@
-//! Hover information provider for ADR documents
-//! 
-//! This module provides contextual information when hovering over
-//! ADR elements, including section descriptions, references, and metadata.
+//! Hover information provider for ADR files
 
-use tower_lsp::lsp_types::*;
-use regex::Regex;
-use crate::config::Config;
+use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind, Position, Range};
 
-/// Provide hover information for ADR documents
-pub async fn provide_hover_info(
-    text: &str,
-    position: Position,
-    config: &Config,
-) -> Option<Hover> {
-    let lines: Vec<&str> = text.lines().collect();
-    let current_line = lines.get(position.line as usize)?;
-    let character = position.character as usize;
+/// Provides contextual hover information for ADR elements
+pub struct HoverProvider;
 
-    // Find the word/element under the cursor
-    let hover_context = HoverContext::analyze(current_line, character, &lines, position.line as usize);
-
-    match hover_context {
-        HoverContext::SectionHeader { section } => {
-            create_section_hover(&section)
-        }
-        HoverContext::Status { status } => {
-            create_status_hover(&status)
-        }
-        HoverContext::AdrReference { adr_num } => {
-            create_adr_reference_hover(adr_num, config)
-        }
-        HoverContext::Link { url, text: link_text } => {
-            create_link_hover(&url, &link_text)
-        }
-        HoverContext::Date { date } => {
-            create_date_hover(&date)
-        }
-        HoverContext::Keyword { keyword } => {
-            create_keyword_hover(&keyword)
-        }
-        HoverContext::None => None,
+impl HoverProvider {
+    pub fn new() -> Self {
+        Self
     }
-}
 
-/// Context analysis for hover information
-enum HoverContext {
-    SectionHeader { section: String },
-    Status { status: String },
-    AdrReference { adr_num: String },
-    Link { url: String, text: String },
-    Date { date: String },
-    Keyword { keyword: String },
-    None,
-}
+    /// Get hover information for the given position in the document
+    pub async fn get_hover_info(&self, content: &str, position: Position) -> Option<Hover> {
+        let lines: Vec<&str> = content.lines().collect();
+        let current_line = lines.get(position.line as usize)?;
 
-impl HoverContext {
-    fn analyze(line: &str, character: usize, lines: &[&str], line_num: usize) -> Self {
-        // Get word boundaries around cursor position
-        let (start, end) = find_word_boundaries(line, character);
-        let word = &line[start..end];
+        // Determine what the user is hovering over
+        if let Some(word) = self.get_word_at_position(current_line, position.character) {
+            // Check for ADR-specific elements
+            if word.starts_with("ADR-") {
+                return self.get_adr_reference_hover(&word);
+            }
 
-        // Check for section headers
-        if line.trim().starts_with("#") {
-            if let Some(section) = extract_section_name(line) {
-                return Self::SectionHeader { section };
+            // Check for status values
+            if self.is_status_value(&word) {
+                return self.get_status_hover(&word);
+            }
+
+            // Check for section headers
+            if current_line.starts_with("## ") && current_line.contains(&word) {
+                return self.get_section_hover(&word);
+            }
+
+            // Check for common ADR terminology
+            if let Some(hover) = self.get_terminology_hover(&word) {
+                return Some(hover);
             }
         }
 
-        // Check for status keywords
-        if is_in_status_section(lines, line_num) {
-            let status_keywords = vec!["Proposed", "Accepted", "Rejected", "Superseded", "Deprecated"];
-            for status in status_keywords {
-                if word.contains(status) {
-                    return Self::Status { status: status.to_string() };
-                }
-            }
+        // Check for entire line context
+        if current_line.starts_with("# ADR-") {
+            return self.get_title_hover(current_line);
         }
 
-        // Check for ADR references
-        let adr_ref_regex = Regex::new(r"ADR-?(\d+)").unwrap();
-        if let Some(cap) = adr_ref_regex.captures(word) {
-            let adr_num = cap.get(1).unwrap().as_str().to_string();
-            return Self::AdrReference { adr_num };
+        None
+    }
+
+    fn get_word_at_position(&self, line: &str, character: u32) -> Option<String> {
+        let chars: Vec<char> = line.chars().collect();
+        let pos = character as usize;
+
+        if pos >= chars.len() {
+            return None;
         }
 
-        // Check for markdown links
-        let link_regex = Regex::new(r"\[([^\]]+)\]\(([^)]+)\)").unwrap();
-        if let Some(cap) = link_regex.captures(line) {
-            let link_start = cap.get(0).unwrap().start();
-            let link_end = cap.get(0).unwrap().end();
-            
-            if character >= link_start && character <= link_end {
-                let link_text = cap.get(1).unwrap().as_str().to_string();
-                let url = cap.get(2).unwrap().as_str().to_string();
-                return Self::Link { url, text: link_text };
-            }
+        // Find word boundaries
+        let mut start = pos;
+        let mut end = pos;
+
+        // Move start backward to find word start
+        while start > 0 && (chars[start - 1].is_alphanumeric() || chars[start - 1] == '-' || chars[start - 1] == '_') {
+            start -= 1;
         }
 
-        // Check for dates
-        let date_regex = Regex::new(r"\d{4}-\d{2}-\d{2}").unwrap();
-        if let Some(cap) = date_regex.find(word) {
-            return Self::Date { date: cap.as_str().to_string() };
+        // Move end forward to find word end
+        while end < chars.len() && (chars[end].is_alphanumeric() || chars[end] == '-' || chars[end] == '_') {
+            end += 1;
         }
 
-        // Check for ADR-specific keywords
-        let keywords = vec![
-            "Context", "Decision", "Consequences", "Alternatives", 
-            "Status", "Supersedes", "Superseded", "Related"
-        ];
-        
-        for keyword in keywords {
-            if word.contains(keyword) {
-                return Self::Keyword { keyword: keyword.to_string() };
-            }
-        }
-
-        Self::None
-    }
-}
-
-/// Find word boundaries around a character position
-fn find_word_boundaries(line: &str, character: usize) -> (usize, usize) {
-    let chars: Vec<char> = line.chars().collect();
-    
-    if character >= chars.len() {
-        return (line.len(), line.len());
-    }
-
-    // Find start of word
-    let mut start = character;
-    while start > 0 {
-        if chars[start - 1].is_whitespace() || "()[]{}\"'".contains(chars[start - 1]) {
-            break;
-        }
-        start -= 1;
-    }
-
-    // Find end of word
-    let mut end = character;
-    while end < chars.len() {
-        if chars[end].is_whitespace() || "()[]{}\"'".contains(chars[end]) {
-            break;
-        }
-        end += 1;
-    }
-
-    // Convert back to byte positions
-    let start_byte = chars[..start].iter().map(|c| c.len_utf8()).sum();
-    let end_byte = chars[..end].iter().map(|c| c.len_utf8()).sum();
-
-    (start_byte, end_byte)
-}
-
-/// Extract section name from header line
-fn extract_section_name(line: &str) -> Option<String> {
-    let trimmed = line.trim();
-    if let Some(name) = trimmed.strip_prefix("### ") {
-        return Some(name.to_string());
-    }
-    if let Some(name) = trimmed.strip_prefix("## ") {
-        return Some(name.to_string());
-    }
-    if let Some(name) = trimmed.strip_prefix("# ") {
-        return Some(name.to_string());
-    }
-    None
-}
-
-/// Check if current position is in a status section
-fn is_in_status_section(lines: &[&str], current_line: usize) -> bool {
-    for i in (0..=current_line).rev() {
-        if let Some(line) = lines.get(i) {
-            if line.starts_with("##") || line.starts_with("#") {
-                return line.to_lowercase().contains("status");
-            }
-        }
-    }
-    false
-}
-
-/// Create hover information for section headers
-fn create_section_hover(section: &str) -> Option<Hover> {
-    let documentation = match section.to_lowercase().as_str() {
-        "status" => "**Status Section**\n\nDefines the current state of this ADR. Common values:\n- **Proposed**: Under consideration\n- **Accepted**: Approved and active\n- **Rejected**: Considered but not adopted\n- **Superseded**: Replaced by another ADR\n- **Deprecated**: No longer recommended",
-        
-        "context" => "**Context Section**\n\nDescribes the situation that motivates this decision. Should include:\n- Current architecture state\n- Problems or challenges\n- Constraints and requirements\n- Stakeholder concerns",
-        
-        "decision" => "**Decision Section**\n\nStates the architecture decision that addresses the context. Should be:\n- Clear and unambiguous\n- Actionable\n- Focused on architecture rather than implementation",
-        
-        "consequences" => "**Consequences Section**\n\nDescribes the results of applying this decision:\n- **Positive**: Benefits and improvements\n- **Negative**: Costs and risks\n- **Neutral**: Other impacts",
-        
-        "alternatives" => "**Alternatives Section**\n\nDocuments other options that were considered:\n- Alternative solutions\n- Why they were not chosen\n- Trade-offs comparison",
-        
-        "related" => "**Related Section**\n\nReferences to related decisions:\n- Links to other ADRs\n- External documentation\n- Standards or guidelines",
-        
-        _ => return None,
-    };
-
-    Some(Hover {
-        contents: HoverContents::Markup(MarkupContent {
-            kind: MarkupKind::Markdown,
-            value: documentation.to_string(),
-        }),
-        range: None,
-    })
-}
-
-/// Create hover information for status values
-fn create_status_hover(status: &str) -> Option<Hover> {
-    let documentation = match status.to_lowercase().as_str() {
-        "proposed" => "**Proposed Status**\n\nThis ADR is under review and has not yet been decided. It may be accepted, rejected, or require modifications.",
-        
-        "accepted" => "**Accepted Status**\n\nThis ADR has been approved and should be implemented. The decision is currently active and in effect.",
-        
-        "rejected" => "**Rejected Status**\n\nThis ADR was considered but ultimately not adopted. The reasoning should be documented for future reference.",
-        
-        "superseded" => "**Superseded Status**\n\nThis ADR has been replaced by a newer decision. Check for references to the superseding ADR.",
-        
-        "deprecated" => "**Deprecated Status**\n\nThis ADR is no longer recommended but may still be in use. Plan migration to newer alternatives.",
-        
-        _ => return None,
-    };
-
-    Some(Hover {
-        contents: HoverContents::Markup(MarkupContent {
-            kind: MarkupKind::Markdown,
-            value: documentation.to_string(),
-        }),
-        range: None,
-    })
-}
-
-/// Create hover information for ADR references
-fn create_adr_reference_hover(adr_num: String, config: &Config) -> Option<Hover> {
-    // In a real implementation, you would look up the actual ADR file
-    let documentation = format!(
-        "**ADR Reference**\n\nReference to ADR-{}\n\n*Click to navigate to the referenced ADR document.*",
-        adr_num
-    );
-
-    Some(Hover {
-        contents: HoverContents::Markup(MarkupContent {
-            kind: MarkupKind::Markdown,
-            value: documentation,
-        }),
-        range: None,
-    })
-}
-
-/// Create hover information for links
-fn create_link_hover(url: &str, link_text: &str) -> Option<Hover> {
-    let documentation = if url.starts_with("http") {
-        format!("**External Link**\n\n[{}]({})\n\n*Click to open in browser*", link_text, url)
-    } else {
-        format!("**Internal Link**\n\n{}\n\n*Path: {}*", link_text, url)
-    };
-
-    Some(Hover {
-        contents: HoverContents::Markup(MarkupContent {
-            kind: MarkupKind::Markdown,
-            value: documentation,
-        }),
-        range: None,
-    })
-}
-
-/// Create hover information for dates
-fn create_date_hover(date: &str) -> Option<Hover> {
-    // Parse the date and provide additional information
-    if let Ok(parsed_date) = chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d") {
-        let now = chrono::Utc::now().naive_utc().date();
-        let days_diff = (now - parsed_date).num_days();
-        
-        let relative_time = if days_diff == 0 {
-            "Today".to_string()
-        } else if days_diff == 1 {
-            "Yesterday".to_string()
-        } else if days_diff > 0 {
-            format!("{} days ago", days_diff)
+        if start < end {
+            Some(chars[start..end].iter().collect())
         } else {
-            format!("In {} days", -days_diff)
-        };
+            None
+        }
+    }
 
-        let documentation = format!(
-            "**Date Information**\n\n{}\n\n*{}*\n\n*Day of week: {}*",
-            date,
-            relative_time,
-            parsed_date.format("%A")
-        );
+    fn get_adr_reference_hover(&self, adr_ref: &str) -> Option<Hover> {
+        Some(Hover {
+            contents: HoverContents::Markup(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value: format!(
+                    r#"**Architecture Decision Record Reference**
+
+`{}` - Reference to another ADR in this collection.
+
+ADR references help maintain traceability between related architectural decisions. Consider including a brief summary of the referenced decision for context.
+
+**Best Practices:**
+- Always check that referenced ADRs exist
+- Include the decision title for clarity
+- Update references when ADRs are superseded
+"#,
+                    adr_ref
+                ),
+            }),
+            range: None,
+        })
+    }
+
+    fn is_status_value(&self, word: &str) -> bool {
+        matches!(word.to_lowercase().as_str(), "proposed" | "accepted" | "deprecated" | "superseded" | "rejected")
+    }
+
+    fn get_status_hover(&self, status: &str) -> Option<Hover> {
+        let (description, guidance) = match status.to_lowercase().as_str() {
+            "proposed" => (
+                "This ADR is under consideration and not yet implemented.",
+                "Use this status while the decision is being discussed and refined."
+            ),
+            "accepted" => (
+                "This ADR has been approved and is actively being implemented or is in effect.",
+                "This is the target status for most ADRs. It indicates the decision is final and should be followed."
+            ),
+            "deprecated" => (
+                "This ADR is no longer in effect but is kept for historical reference.",
+                "Use this when the decision is no longer relevant but you want to preserve the reasoning."
+            ),
+            "superseded" => (
+                "This ADR has been replaced by a newer decision.",
+                "Always reference the superseding ADR. This creates a clear decision trail."
+            ),
+            "rejected" => (
+                "This ADR was considered but ultimately not adopted.",
+                "Useful for documenting why certain approaches were not taken."
+            ),
+            _ => return None,
+        };
 
         Some(Hover {
             contents: HoverContents::Markup(MarkupContent {
                 kind: MarkupKind::Markdown,
-                value: documentation,
+                value: format!(
+                    r#"**ADR Status: {}**
+
+{}
+
+**Guidance:** {}
+"#,
+                    status.to_uppercase(),
+                    description,
+                    guidance
+                ),
             }),
             range: None,
         })
-    } else {
-        None
+    }
+
+    fn get_section_hover(&self, section: &str) -> Option<Hover> {
+        let info = match section.to_lowercase().as_str() {
+            "status" => (
+                "Status Section",
+                "Indicates the current state of this architectural decision.",
+                "Should be one of: Proposed, Accepted, Deprecated, Superseded, or Rejected."
+            ),
+            "context" => (
+                "Context Section", 
+                "Describes the issue or situation that motivates this architectural decision.",
+                "Explain the problem, constraints, and requirements that led to this decision."
+            ),
+            "decision" => (
+                "Decision Section",
+                "States the architectural decision that has been made.",
+                "Be clear and specific about what is being decided. This is the core of the ADR."
+            ),
+            "consequences" => (
+                "Consequences Section",
+                "Describes the results of applying this decision.",
+                "Include both positive and negative outcomes, trade-offs, and any risks introduced."
+            ),
+            "alternatives" => (
+                "Alternatives Section",
+                "Lists other options that were considered.",
+                "Briefly describe alternatives and why they were not chosen."
+            ),
+            "related" => (
+                "Related Section",
+                "References to related ADRs, documents, or external resources.",
+                "Help readers understand the broader context and decision dependencies."
+            ),
+            _ => return None,
+        };
+
+        Some(Hover {
+            contents: HoverContents::Markup(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value: format!(
+                    r#"**{}**
+
+{}
+
+**Best Practice:** {}
+"#,
+                    info.0, info.1, info.2
+                ),
+            }),
+            range: None,
+        })
+    }
+
+    fn get_terminology_hover(&self, term: &str) -> Option<Hover> {
+        let definition = match term.to_lowercase().as_str() {
+            "adr" => "Architecture Decision Record - A document that captures an important architectural decision made along with its context and consequences.",
+            "architectural" => "Relating to the fundamental structures of a system and the principles guiding their design and evolution.",
+            "decision" => "A choice made from available alternatives, typically involving trade-offs and having significant impact.",
+            "consequences" => "The results or effects that follow from a decision, including both intended and unintended outcomes.",
+            "trade-off" => "A balance achieved between two desirable but incompatible features; a compromise.",
+            "constraint" => "A limitation or restriction that affects the design or implementation of a system.",
+            "requirement" => "A condition or capability needed by a stakeholder to solve a problem or achieve an objective.",
+            _ => return None,
+        };
+
+        Some(Hover {
+            contents: HoverContents::Markup(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value: format!("**{}**\n\n{}", term, definition),
+            }),
+            range: None,
+        })
+    }
+
+    fn get_title_hover(&self, title_line: &str) -> Option<Hover> {
+        Some(Hover {
+            contents: HoverContents::Markup(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value: r#"**ADR Title Format**
+
+The title should follow the pattern: `# ADR-XXX: Brief description`
+
+**Components:**
+- **ADR-XXX**: Sequential number (001, 002, etc.)
+- **Brief description**: Concise summary of the decision
+
+**Tips:**
+- Use consistent numbering across your ADR collection
+- Keep titles brief but descriptive
+- Use action-oriented language when possible
+"#.to_string(),
+            }),
+            range: Some(Range {
+                start: lsp_types::Position { line: 0, character: 0 },
+                end: lsp_types::Position { line: 0, character: title_line.len() as u32 },
+            }),
+        })
     }
 }
 
-/// Create hover information for ADR keywords
-fn create_keyword_hover(keyword: &str) -> Option<Hover> {
-    let documentation = match keyword.to_lowercase().as_str() {
-        "supersedes" => "**Supersedes**\n\nIndicates that this ADR replaces or overrides a previous decision. The superseded ADR should be marked with 'Superseded' status.",
-        
-        "superseded" => "**Superseded**\n\nIndicates that this ADR has been replaced by a newer decision. This ADR should not be used for new implementations.",
-        
+/// Create hover information for any ADR element
+pub fn create_hover_info(content: &str, element_type: &str) -> Option<Hover> {
+    let info = match element_type {
+        "adr_best_practices" => r#"**ADR Best Practices**
+
+1. **Keep it brief** - ADRs should be concise and focused
+2. **Be specific** - Clearly state what is being decided
+3. **Include context** - Explain why this decision is needed
+4. **Document alternatives** - Show what options were considered
+5. **Update status** - Keep the status current as decisions evolve
+6. **Link related ADRs** - Build a coherent decision history
+
+**Common Anti-patterns:**
+- Too much technical detail
+- Missing context or rationale
+- Outdated status information
+- No consideration of alternatives
+"#,
+        "adr_lifecycle" => r#"**ADR Lifecycle**
+
+1. **Proposed** - Initial draft, under discussion
+2. **Accepted** - Approved and implemented
+3. **Superseded** - Replaced by newer decision
+4. **Deprecated** - No longer relevant
+5. **Rejected** - Considered but not adopted
+
+**Transitions:**
+- Proposed → Accepted (normal flow)
+- Accepted → Superseded (evolved decision)
+- Accepted → Deprecated (no longer needed)
+- Proposed → Rejected (decided against)
+"#,
         _ => return None,
     };
 
     Some(Hover {
         contents: HoverContents::Markup(MarkupContent {
             kind: MarkupKind::Markdown,
-            value: documentation.to_string(),
+            value: info.to_string(),
         }),
         range: None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_status_hover() {
+        let provider = HoverProvider::new();
+        let content = "## Status\nAccepted";
+        let position = Position { line: 1, character: 2 }; // Position in "Accepted"
+        
+        let hover = provider.get_hover_info(content, position).await;
+        assert!(hover.is_some());
+        
+        if let Some(h) = hover {
+            if let HoverContents::Markup(markup) = h.contents {
+                assert!(markup.value.contains("ACCEPTED"));
+                assert!(markup.value.contains("approved"));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_adr_reference_hover() {
+        let provider = HoverProvider::new();
+        let content = "Related to ADR-001";
+        let position = Position { line: 0, character: 12 }; // Position in "ADR-001"
+        
+        let hover = provider.get_hover_info(content, position).await;
+        assert!(hover.is_some());
+        
+        if let Some(h) = hover {
+            if let HoverContents::Markup(markup) = h.contents {
+                assert!(markup.value.contains("Architecture Decision Record Reference"));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_section_hover() {
+        let provider = HoverProvider::new();
+        let content = "## Context";
+        let position = Position { line: 0, character: 5 }; // Position in "Context"
+        
+        let hover = provider.get_hover_info(content, position).await;
+        assert!(hover.is_some());
+        
+        if let Some(h) = hover {
+            if let HoverContents::Markup(markup) = h.contents {
+                assert!(markup.value.contains("Context Section"));
+                assert!(markup.value.contains("motivates"));
+            }
+        }
+    }
+
+    #[test]
+    fn test_word_extraction() {
+        let provider = HoverProvider::new();
+        
+        // Test normal word
+        let word = provider.get_word_at_position("Hello world", 2);
+        assert_eq!(word, Some("Hello".to_string()));
+        
+        // Test ADR reference
+        let word = provider.get_word_at_position("See ADR-001 for details", 7);
+        assert_eq!(word, Some("ADR-001".to_string()));
+        
+        // Test at word boundary
+        let word = provider.get_word_at_position("test-word", 4);
+        assert_eq!(word, Some("test-word".to_string()));
+    }
+
+    #[test]
+    fn test_status_recognition() {
+        let provider = HoverProvider::new();
+        
+        assert!(provider.is_status_value("Proposed"));
+        assert!(provider.is_status_value("accepted"));
+        assert!(provider.is_status_value("DEPRECATED"));
+        assert!(!provider.is_status_value("Unknown"));
+    }
 }

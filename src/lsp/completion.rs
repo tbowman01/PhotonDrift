@@ -1,339 +1,243 @@
 //! ADR template completion provider for LSP
-//! 
-//! This module provides intelligent completion suggestions for ADR documents,
-//! including templates, section headers, and common patterns.
 
-use tower_lsp::lsp_types::*;
-use crate::config::Config;
+use lsp_types::{CompletionItem, CompletionItemKind, InsertTextFormat, Position};
 
-/// Provide completion suggestions for ADR documents
-pub async fn provide_completions(
-    text: &str,
-    position: Position,
-    config: &Config,
-) -> Option<CompletionResponse> {
-    let lines: Vec<&str> = text.lines().collect();
-    let current_line = lines.get(position.line as usize)?;
-    let line_prefix = &current_line[..position.character as usize.min(current_line.len())];
+/// Provides intelligent completion for ADR templates and content
+pub struct CompletionProvider {
+    templates: Vec<CompletionItem>,
+}
 
-    let mut completion_items = Vec::new();
-
-    // Determine completion context
-    let context = CompletionContext::analyze(line_prefix, &lines, position.line as usize);
-
-    match context {
-        CompletionContext::SectionHeader => {
-            completion_items.extend(create_section_completions());
-        }
-        CompletionContext::Status => {
-            completion_items.extend(create_status_completions());
-        }
-        CompletionContext::Template => {
-            completion_items.extend(create_template_completions(config));
-        }
-        CompletionContext::Reference => {
-            completion_items.extend(create_reference_completions(config));
-        }
-        CompletionContext::List => {
-            completion_items.extend(create_list_completions());
-        }
-        CompletionContext::General => {
-            completion_items.extend(create_general_completions());
+impl CompletionProvider {
+    pub fn new() -> Self {
+        Self {
+            templates: ADR_TEMPLATE_COMPLETIONS.to_vec(),
         }
     }
 
-    if completion_items.is_empty() {
-        return None;
+    /// Get completions based on current position and context
+    pub async fn get_completions(&self, content: &str, position: Position) -> Vec<CompletionItem> {
+        let mut completions = Vec::new();
+
+        // Get the current line
+        let lines: Vec<&str> = content.lines().collect();
+        let current_line = lines.get(position.line as usize).unwrap_or(&"");
+
+        // Determine context and provide appropriate completions
+        if current_line.starts_with("# ") {
+            // Title completion
+            completions.extend(self.get_title_completions());
+        } else if current_line.starts_with("## ") {
+            // Section header completions
+            completions.extend(self.get_section_completions());
+        } else if current_line.to_lowercase().contains("status") {
+            // Status value completions
+            completions.extend(self.get_status_completions());
+        } else if position.character == 0 || current_line.trim().is_empty() {
+            // General template completions at line start
+            completions.extend(self.templates.clone());
+        }
+
+        // Add ADR number suggestions if we're in a title
+        if current_line.starts_with("# ADR-") {
+            completions.extend(self.get_adr_number_suggestions());
+        }
+
+        completions
     }
 
-    Some(CompletionResponse::Array(completion_items))
-}
-
-/// Completion context analysis
-enum CompletionContext {
-    SectionHeader,
-    Status,
-    Template,
-    Reference,
-    List,
-    General,
-}
-
-impl CompletionContext {
-    fn analyze(line_prefix: &str, lines: &[&str], current_line: usize) -> Self {
-        // Check if we're typing a section header
-        if line_prefix.trim().starts_with("#") {
-            return Self::SectionHeader;
-        }
-
-        // Check if we're in a status section
-        if let Some(section) = find_current_section(lines, current_line) {
-            if section.to_lowercase().contains("status") {
-                return Self::Status;
-            }
-        }
-
-        // Check if we're starting a new document (for template completion)
-        if current_line < 3 && lines.iter().take(current_line + 1).all(|line| line.trim().is_empty() || line.starts_with('#')) {
-            return Self::Template;
-        }
-
-        // Check if we're typing a reference
-        if line_prefix.contains("ADR") || line_prefix.contains("@") {
-            return Self::Reference;
-        }
-
-        // Check if we're in a list context
-        if line_prefix.trim().starts_with("-") || line_prefix.trim().starts_with("*") {
-            return Self::List;
-        }
-
-        Self::General
-    }
-}
-
-/// Find the current section based on cursor position
-fn find_current_section(lines: &[&str], current_line: usize) -> Option<&str> {
-    for i in (0..=current_line).rev() {
-        if let Some(line) = lines.get(i) {
-            if line.starts_with("# ") {
-                return Some(line.trim_start_matches("# "));
-            } else if line.starts_with("## ") {
-                return Some(line.trim_start_matches("## "));
-            }
-        }
-    }
-    None
-}
-
-/// Create section header completions
-fn create_section_completions() -> Vec<CompletionItem> {
-    let sections = vec![
-        ("Status", "Status of this ADR"),
-        ("Context", "Context and problem statement"),
-        ("Decision", "The architecture decision"),
-        ("Consequences", "Consequences of this decision"),
-        ("Alternatives", "Alternative solutions considered"),
-        ("Related", "Related decisions and references"),
-    ];
-
-    sections
-        .into_iter()
-        .map(|(title, detail)| CompletionItem {
-            label: format!("## {}", title),
-            kind: Some(CompletionItemKind::SNIPPET),
-            detail: Some(detail.to_string()),
-            documentation: Some(Documentation::String(format!(
-                "Insert '{}' section header for ADR",
-                title
-            ))),
-            insert_text: Some(format!("## {}\n\n${{1:Content for {} section}}\n", title, title.to_lowercase())),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
-            ..Default::default()
-        })
-        .collect()
-}
-
-/// Create status completions
-fn create_status_completions() -> Vec<CompletionItem> {
-    let statuses = vec![
-        ("Proposed", "This ADR is proposed and under review"),
-        ("Accepted", "This ADR has been accepted and is active"),
-        ("Rejected", "This ADR was considered but rejected"),
-        ("Superseded", "This ADR has been replaced by another decision"),
-        ("Deprecated", "This ADR is no longer recommended"),
-    ];
-
-    statuses
-        .into_iter()
-        .map(|(status, description)| CompletionItem {
-            label: status.to_string(),
-            kind: Some(CompletionItemKind::VALUE),
-            detail: Some(description.to_string()),
-            documentation: Some(Documentation::String(format!(
-                "Set ADR status to '{}'",
-                status
-            ))),
-            insert_text: Some(status.to_string()),
-            ..Default::default()
-        })
-        .collect()
-}
-
-/// Create template completions for new ADRs
-fn create_template_completions(config: &Config) -> Vec<CompletionItem> {
-    let mut completions = vec![
-        CompletionItem {
-            label: "ADR Template (Basic)".to_string(),
-            kind: Some(CompletionItemKind::SNIPPET),
-            detail: Some("Basic ADR template".to_string()),
-            documentation: Some(Documentation::String(
-                "Insert a basic ADR template with standard sections".to_string(),
-            )),
-            insert_text: Some(create_basic_template()),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
-            sort_text: Some("00001".to_string()),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "ADR Template (Extended)".to_string(),
-            kind: Some(CompletionItemKind::SNIPPET),
-            detail: Some("Extended ADR template with additional sections".to_string()),
-            documentation: Some(Documentation::String(
-                "Insert an extended ADR template with comprehensive sections".to_string(),
-            )),
-            insert_text: Some(create_extended_template()),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
-            sort_text: Some("00002".to_string()),
-            ..Default::default()
-        },
-    ];
-
-    // Add custom templates from config if available
-    if let Some(custom_templates) = &config.templates {
-        for (i, template) in custom_templates.iter().enumerate() {
-            completions.push(CompletionItem {
-                label: format!("Custom Template: {}", template.name),
+    fn get_title_completions(&self) -> Vec<CompletionItem> {
+        vec![
+            CompletionItem {
+                label: "ADR Title Template".to_string(),
                 kind: Some(CompletionItemKind::SNIPPET),
-                detail: Some(template.description.clone()),
-                insert_text: Some(template.content.clone()),
+                detail: Some("Standard ADR title format".to_string()),
+                documentation: Some(lsp_types::Documentation::String(
+                    "Creates a properly formatted ADR title with sequential numbering".to_string(),
+                )),
+                insert_text: Some("# ADR-${1:001}: ${2:Title of the decision}".to_string()),
                 insert_text_format: Some(InsertTextFormat::SNIPPET),
-                sort_text: Some(format!("00{:03}", i + 10)),
                 ..Default::default()
-            });
-        }
+            },
+        ]
     }
 
-    completions
+    fn get_section_completions(&self) -> Vec<CompletionItem> {
+        let sections = [
+            ("Status", "Current status of this ADR"),
+            ("Context", "The issue motivating this decision"),
+            ("Decision", "The change that we're proposing or have agreed to implement"),
+            ("Consequences", "What becomes easier or more difficult to do and any risks introduced"),
+            ("Alternatives", "Other options considered"),
+            ("Related", "Related decisions and references"),
+        ];
+
+        sections
+            .iter()
+            .map(|(section, description)| CompletionItem {
+                label: format!("## {}", section),
+                kind: Some(CompletionItemKind::SNIPPET),
+                detail: Some(description.to_string()),
+                documentation: Some(lsp_types::Documentation::String(format!(
+                    "Standard ADR section: {}",
+                    description
+                ))),
+                insert_text: Some(format!("## {}\n\n${{1:Content goes here}}", section)),
+                insert_text_format: Some(InsertTextFormat::SNIPPET),
+                ..Default::default()
+            })
+            .collect()
+    }
+
+    fn get_status_completions(&self) -> Vec<CompletionItem> {
+        let statuses = [
+            ("Proposed", "This ADR is proposed and under consideration"),
+            ("Accepted", "This ADR has been accepted and is active"),
+            ("Deprecated", "This ADR is no longer in effect but kept for historical reference"),
+            ("Superseded", "This ADR has been replaced by a newer decision"),
+            ("Rejected", "This ADR was considered but rejected"),
+        ];
+
+        statuses
+            .iter()
+            .map(|(status, description)| CompletionItem {
+                label: status.to_string(),
+                kind: Some(CompletionItemKind::VALUE),
+                detail: Some(description.to_string()),
+                documentation: Some(lsp_types::Documentation::String(description.to_string())),
+                insert_text: Some(status.to_string()),
+                ..Default::default()
+            })
+            .collect()
+    }
+
+    fn get_adr_number_suggestions(&self) -> Vec<CompletionItem> {
+        // This would ideally scan existing ADRs to suggest the next number
+        // For now, provide some common patterns
+        vec![
+            CompletionItem {
+                label: "001".to_string(),
+                kind: Some(CompletionItemKind::VALUE),
+                detail: Some("ADR numbering suggestion".to_string()),
+                insert_text: Some("001".to_string()),
+                ..Default::default()
+            },
+        ]
+    }
 }
 
-/// Create reference completions
-fn create_reference_completions(config: &Config) -> Vec<CompletionItem> {
-    let mut completions = vec![
-        CompletionItem {
-            label: "ADR Reference".to_string(),
-            kind: Some(CompletionItemKind::REFERENCE),
-            detail: Some("Reference to another ADR".to_string()),
-            insert_text: Some("[ADR-${1:number}](${2:path/to/adr})".to_string()),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "Supersedes Reference".to_string(),
-            kind: Some(CompletionItemKind::REFERENCE),
-            detail: Some("Mark this ADR as superseding another".to_string()),
-            insert_text: Some("Supersedes [ADR-${1:number}](${2:path/to/adr})".to_string()),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "Superseded By Reference".to_string(),
-            kind: Some(CompletionItemKind::REFERENCE),
-            detail: Some("Mark this ADR as superseded by another".to_string()),
-            insert_text: Some("Superseded by [ADR-${1:number}](${2:path/to/adr})".to_string()),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
-            ..Default::default()
-        },
-    ];
+/// Pre-defined ADR template completions
+pub const ADR_TEMPLATE_COMPLETIONS: &[CompletionItem] = &[
+    CompletionItem {
+        label: "Full ADR Template".to_string(),
+        kind: Some(CompletionItemKind::SNIPPET),
+        detail: Some("Complete ADR template with all sections".to_string()),
+        documentation: Some(lsp_types::Documentation::String(
+            "Inserts a complete ADR template with all standard sections".to_string(),
+        )),
+        insert_text: Some(
+            r#"# ADR-${1:001}: ${2:Title of the decision}
 
-    completions
-}
+## Status
 
-/// Create list item completions
-fn create_list_completions() -> Vec<CompletionItem> {
-    vec![
-        CompletionItem {
-            label: "Pro/Con Item".to_string(),
-            kind: Some(CompletionItemKind::SNIPPET),
-            detail: Some("Pros and cons list item".to_string()),
-            insert_text: Some("- **${1:Pro/Con}**: ${2:Description}".to_string()),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "Alternative Option".to_string(),
-            kind: Some(CompletionItemKind::SNIPPET),
-            detail: Some("Alternative solution item".to_string()),
-            insert_text: Some("- **Option ${1:number}**: ${2:Description}\n  - Pros: ${3:advantages}\n  - Cons: ${4:disadvantages}".to_string()),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
-            ..Default::default()
-        },
-    ]
-}
+${3:Proposed}
 
-/// Create general completions
-fn create_general_completions() -> Vec<CompletionItem> {
-    vec![
-        CompletionItem {
-            label: "Date Placeholder".to_string(),
-            kind: Some(CompletionItemKind::VALUE),
-            detail: Some("Insert current date".to_string()),
-            insert_text: Some(chrono::Utc::now().format("%Y-%m-%d").to_string()),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "Decision Rationale".to_string(),
-            kind: Some(CompletionItemKind::SNIPPET),
-            detail: Some("Template for decision rationale".to_string()),
-            insert_text: Some("We decided to ${1:decision} because:\n\n- ${2:reason 1}\n- ${3:reason 2}\n- ${4:reason 3}".to_string()),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
-            ..Default::default()
-        },
-    ]
-}
+## Context
 
-/// Create basic ADR template
-fn create_basic_template() -> String {
-    format!(
-        "# ADR-${{1:number}}: ${{2:Title}}\n\n\
-         ## Status\n\n\
-         ${{3:Proposed}}\n\n\
-         ## Context\n\n\
-         ${{4:Context and problem statement}}\n\n\
-         ## Decision\n\n\
-         ${{5:Architecture decision}}\n\n\
-         ## Consequences\n\n\
-         ${{6:Consequences of this decision}}\n\n\
-         ---\n\
-         Date: {}\n\
-         Author: ${{7:Author name}}\n",
-        chrono::Utc::now().format("%Y-%m-%d")
-    )
-}
+${4:What is the issue that we're seeing that is motivating this decision or change?}
 
-/// Create extended ADR template
-fn create_extended_template() -> String {
-    format!(
-        "# ADR-${{1:number}}: ${{2:Title}}\n\n\
-         ## Status\n\n\
-         ${{3:Proposed}}\n\n\
-         ## Context\n\n\
-         ${{4:Context and problem statement}}\n\n\
-         ## Decision\n\n\
-         ${{5:Architecture decision}}\n\n\
-         ## Alternatives\n\n\
-         ${{6:Alternative solutions considered}}\n\n\
-         ## Consequences\n\n\
-         ### Positive\n\n\
-         ${{7:Positive consequences}}\n\n\
-         ### Negative\n\n\
-         ${{8:Negative consequences}}\n\n\
-         ### Neutral\n\n\
-         ${{9:Neutral consequences}}\n\n\
-         ## Related\n\n\
-         ${{10:Related decisions and references}}\n\n\
-         ---\n\
-         Date: {}\n\
-         Author: ${{11:Author name}}\n\
-         Reviewers: ${{12:Reviewer names}}\n",
-        chrono::Utc::now().format("%Y-%m-%d")
-    )
-}
+## Decision
 
-/// Template definition from configuration
-#[derive(Debug, Clone)]
-pub struct Template {
-    pub name: String,
-    pub description: String,
-    pub content: String,
+${5:What is the change that we're proposing or have agreed to implement?}
+
+## Consequences
+
+${6:What becomes easier or more difficult to do and any risks introduced by this decision?}
+
+## Related
+
+${7:List related ADRs, documents, or decisions}
+"#
+            .to_string(),
+        ),
+        insert_text_format: Some(InsertTextFormat::SNIPPET),
+        ..CompletionItem::default()
+    },
+    CompletionItem {
+        label: "Simple ADR Template".to_string(),
+        kind: Some(CompletionItemKind::SNIPPET),
+        detail: Some("Minimal ADR template with core sections".to_string()),
+        documentation: Some(lsp_types::Documentation::String(
+            "Inserts a minimal ADR template with essential sections only".to_string(),
+        )),
+        insert_text: Some(
+            r#"# ADR-${1:001}: ${2:Title}
+
+## Status
+${3:Proposed}
+
+## Decision
+${4:What we decided to do}
+
+## Consequences
+${5:What this means going forward}
+"#
+            .to_string(),
+        ),
+        insert_text_format: Some(InsertTextFormat::SNIPPET),
+        ..CompletionItem::default()
+    },
+];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_section_completions() {
+        let provider = CompletionProvider::new();
+        let content = "# ADR-001: Test\n\n## ";
+        let position = Position { line: 2, character: 3 };
+        
+        let completions = provider.get_completions(content, position).await;
+        
+        assert!(!completions.is_empty());
+        assert!(completions.iter().any(|c| c.label.contains("Status")));
+        assert!(completions.iter().any(|c| c.label.contains("Context")));
+        assert!(completions.iter().any(|c| c.label.contains("Decision")));
+    }
+
+    #[tokio::test]
+    async fn test_status_completions() {
+        let provider = CompletionProvider::new();
+        let content = "# ADR-001: Test\n\n## Status\n";
+        let position = Position { line: 3, character: 0 };
+        
+        let completions = provider.get_completions(content, position).await;
+        
+        assert!(completions.iter().any(|c| c.label == "Proposed"));
+        assert!(completions.iter().any(|c| c.label == "Accepted"));
+        assert!(completions.iter().any(|c| c.label == "Deprecated"));
+    }
+
+    #[tokio::test]
+    async fn test_template_completions() {
+        let provider = CompletionProvider::new();
+        let content = "";
+        let position = Position { line: 0, character: 0 };
+        
+        let completions = provider.get_completions(content, position).await;
+        
+        assert!(completions.iter().any(|c| c.label.contains("Full ADR Template")));
+        assert!(completions.iter().any(|c| c.label.contains("Simple ADR Template")));
+    }
+
+    #[test]
+    fn test_predefined_templates() {
+        assert_eq!(ADR_TEMPLATE_COMPLETIONS.len(), 2);
+        
+        let full_template = &ADR_TEMPLATE_COMPLETIONS[0];
+        assert_eq!(full_template.label, "Full ADR Template");
+        assert!(matches!(full_template.kind, Some(CompletionItemKind::SNIPPET)));
+        assert!(full_template.insert_text.as_ref().unwrap().contains("# ADR-"));
+    }
 }

@@ -1,250 +1,357 @@
-//! LSP request and notification handlers for PhotonDrift
-//! 
-//! This module contains specialized handlers for different LSP requests
-//! and notifications, providing focused functionality for each operation.
+//! Additional LSP handlers and utilities
 
-use tower_lsp::lsp_types::*;
-use crate::config::Config;
+use lsp_types::{
+    CodeActionParams, CodeActionResponse, DocumentFormattingParams, DocumentSymbolParams,
+    DocumentSymbolResponse, TextEdit, WorkspaceEdit,
+};
+use tower_lsp::jsonrpc::Result;
+use std::collections::HashMap;
 
-/// Handle LSP initialization parameters and setup
-pub struct InitializationHandler;
+use crate::lsp::protocol::{line_range, extract_adr_number};
 
-impl InitializationHandler {
-    /// Process initialization parameters and prepare server capabilities
-    pub fn process_initialization(params: &InitializeParams) -> ServerCapabilities {
-        let mut capabilities = ServerCapabilities::default();
+/// Additional handlers for extended LSP functionality
+pub struct LspHandlers;
+
+impl LspHandlers {
+    /// Provide code actions for common ADR issues
+    pub async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
+        let uri = params.text_document.uri;
+        let range = params.range;
         
-        // Configure text document synchronization
-        capabilities.text_document_sync = Some(TextDocumentSyncCapability::Kind(
-            TextDocumentSyncKind::FULL,
-        ));
-
-        // Enable completion with ADR-specific triggers
-        capabilities.completion_provider = Some(CompletionOptions {
-            resolve_provider: Some(true),
-            trigger_characters: Some(vec![
-                ":".to_string(),  // For ADR field completion
-                "#".to_string(),  // For section headers
-                "-".to_string(),  // For list items
-                "@".to_string(),  // For references
-            ]),
-            work_done_progress_options: Default::default(),
-            all_commit_characters: None,
-            completion_item: None,
-        });
-
-        // Enable hover for contextual information
-        capabilities.hover_provider = Some(HoverProviderCapability::Simple(true));
-
-        // Enable diagnostics for drift detection
-        capabilities.diagnostic_provider = Some(DiagnosticServerCapabilities::Options(
-            DiagnosticOptions {
-                identifier: Some("photon-drift".to_string()),
-                inter_file_dependencies: true,
-                workspace_diagnostics: true,
-                work_done_progress_options: Default::default(),
-            }
-        ));
-
-        // Configure workspace capabilities
-        capabilities.workspace = Some(WorkspaceServerCapabilities {
-            workspace_folders: Some(WorkspaceFoldersServerCapabilities {
-                supported: Some(true),
-                change_notifications: Some(OneOf::Left(true)),
+        // For now, return some example code actions
+        // In a full implementation, this would analyze the specific context
+        let actions = vec![
+            lsp_types::CodeActionOrCommand::CodeAction(lsp_types::CodeAction {
+                title: "Add missing Status section".to_string(),
+                kind: Some(lsp_types::CodeActionKind::QUICKFIX),
+                diagnostics: Some(params.context.diagnostics),
+                edit: Some(WorkspaceEdit {
+                    changes: Some({
+                        let mut changes = HashMap::new();
+                        changes.insert(uri.clone(), vec![
+                            TextEdit {
+                                range: lsp_types::Range {
+                                    start: lsp_types::Position { line: 2, character: 0 },
+                                    end: lsp_types::Position { line: 2, character: 0 },
+                                },
+                                new_text: "\n## Status\nProposed\n".to_string(),
+                            }
+                        ]);
+                        changes
+                    }),
+                    document_changes: None,
+                    change_annotations: None,
+                }),
+                command: None,
+                data: None,
+                is_preferred: Some(true),
+                disabled: None,
             }),
-            file_operations: Some(WorkspaceFileOperationsServerCapabilities {
-                did_create: Some(FileOperationRegistrationOptions {
-                    filters: vec![FileOperationFilter {
-                        scheme: Some("file".to_string()),
-                        pattern: FileOperationPattern {
-                            glob: "**/*.md".to_string(),
-                            matches: Some(FileOperationPatternKind::File),
-                            options: None,
-                        },
-                    }],
-                }),
-                will_create: None,
-                did_rename: Some(FileOperationRegistrationOptions {
-                    filters: vec![FileOperationFilter {
-                        scheme: Some("file".to_string()),
-                        pattern: FileOperationPattern {
-                            glob: "**/*.md".to_string(),
-                            matches: Some(FileOperationPatternKind::File),
-                            options: None,
-                        },
-                    }],
-                }),
-                will_rename: None,
-                did_delete: Some(FileOperationRegistrationOptions {
-                    filters: vec![FileOperationFilter {
-                        scheme: Some("file".to_string()),
-                        pattern: FileOperationPattern {
-                            glob: "**/*.md".to_string(),
-                            matches: Some(FileOperationPatternKind::File),
-                            options: None,
-                        },
-                    }],
-                }),
-                will_delete: None,
-            }),
-        });
+        ];
 
-        capabilities
+        Ok(Some(actions))
     }
 
-    /// Extract workspace information from initialization parameters
-    pub fn extract_workspace_info(params: &InitializeParams) -> Option<WorkspaceInfo> {
-        if let Some(root_uri) = &params.root_uri {
-            if let Ok(root_path) = root_uri.to_file_path() {
-                return Some(WorkspaceInfo {
-                    root_path,
-                    workspace_folders: params.workspace_folders.clone().unwrap_or_default(),
-                });
+    /// Provide document symbols for navigation
+    pub async fn document_symbol(&self, params: DocumentSymbolParams) -> Result<Option<DocumentSymbolResponse>> {
+        // This would analyze the document structure and return symbols
+        // For ADRs, this could include sections, references, etc.
+        
+        let symbols = vec![
+            lsp_types::DocumentSymbol {
+                name: "Title".to_string(),
+                detail: Some("ADR Title".to_string()),
+                kind: lsp_types::SymbolKind::STRING,
+                range: lsp_types::Range {
+                    start: lsp_types::Position { line: 0, character: 0 },
+                    end: lsp_types::Position { line: 0, character: 50 },
+                },
+                selection_range: lsp_types::Range {
+                    start: lsp_types::Position { line: 0, character: 0 },
+                    end: lsp_types::Position { line: 0, character: 50 },
+                },
+                children: None,
+                tags: None,
+                deprecated: None,
+            },
+        ];
+
+        Ok(Some(DocumentSymbolResponse::Nested(symbols)))
+    }
+
+    /// Format ADR document
+    pub async fn formatting(&self, params: DocumentFormattingParams) -> Result<Option<Vec<TextEdit>>> {
+        // This would implement ADR-specific formatting rules
+        // For now, return empty - formatting could include:
+        // - Consistent section ordering
+        // - Proper spacing between sections
+        // - Status value normalization
+        
+        Ok(Some(Vec::new()))
+    }
+
+    /// Validate ADR structure and provide suggestions
+    pub fn validate_adr_structure(&self, content: &str) -> Vec<String> {
+        let mut issues = Vec::new();
+        
+        // Check for required sections
+        let required_sections = ["status", "context", "decision"];
+        for section in required_sections {
+            if !content.to_lowercase().contains(&format!("## {}", section)) {
+                issues.push(format!("Missing required section: {}", section));
             }
         }
-        None
-    }
-}
-
-/// Workspace information extracted from initialization
-pub struct WorkspaceInfo {
-    pub root_path: std::path::PathBuf,
-    pub workspace_folders: Vec<WorkspaceFolder>,
-}
-
-/// Handle document lifecycle events
-pub struct DocumentHandler;
-
-impl DocumentHandler {
-    /// Process document open event
-    pub fn handle_did_open(params: &DidOpenTextDocumentParams) -> DocumentEvent {
-        DocumentEvent::Opened {
-            uri: params.text_document.uri.clone(),
-            text: params.text_document.text.clone(),
-            language_id: params.text_document.language_id.clone(),
-            version: params.text_document.version,
+        
+        // Check for title format
+        if !content.lines().any(|line| line.starts_with("# ADR-")) {
+            issues.push("Title should follow format: # ADR-XXX: Description".to_string());
         }
-    }
-
-    /// Process document change event
-    pub fn handle_did_change(params: &DidChangeTextDocumentParams) -> Option<DocumentEvent> {
-        if let Some(change) = params.content_changes.first() {
-            return Some(DocumentEvent::Changed {
-                uri: params.text_document.uri.clone(),
-                version: params.text_document.version,
-                text: change.text.clone(),
-            });
+        
+        // Check for empty sections
+        let lines: Vec<&str> = content.lines().collect();
+        for (i, line) in lines.iter().enumerate() {
+            if line.starts_with("## ") {
+                // Check if the section has content
+                let mut has_content = false;
+                for next_line in lines.iter().skip(i + 1) {
+                    if next_line.starts_with("## ") {
+                        break;
+                    }
+                    if !next_line.trim().is_empty() {
+                        has_content = true;
+                        break;
+                    }
+                }
+                
+                if !has_content {
+                    issues.push(format!("Empty section: {}", line.trim()));
+                }
+            }
         }
-        None
+        
+        issues
     }
 
-    /// Process document close event
-    pub fn handle_did_close(params: &DidCloseTextDocumentParams) -> DocumentEvent {
-        DocumentEvent::Closed {
-            uri: params.text_document.uri.clone(),
+    /// Suggest related ADRs based on content analysis
+    pub fn suggest_related_adrs(&self, content: &str, _available_adrs: &[String]) -> Vec<String> {
+        let mut suggestions = Vec::new();
+        
+        // This is a simplified implementation
+        // In practice, this could use ML or keyword analysis
+        
+        let keywords = self.extract_keywords(content);
+        
+        // For now, just return some placeholder suggestions based on keywords
+        if keywords.iter().any(|k| k.contains("database")) {
+            suggestions.push("ADR-002: Database Selection".to_string());
         }
-    }
-}
-
-/// Document lifecycle events
-#[derive(Debug, Clone)]
-pub enum DocumentEvent {
-    Opened {
-        uri: Url,
-        text: String,
-        language_id: String,
-        version: i32,
-    },
-    Changed {
-        uri: Url,
-        version: i32,
-        text: String,
-    },
-    Closed {
-        uri: Url,
-    },
-}
-
-/// Handle workspace events and operations
-pub struct WorkspaceHandler;
-
-impl WorkspaceHandler {
-    /// Process workspace folder changes
-    pub fn handle_workspace_folders_change(
-        params: &DidChangeWorkspaceFoldersParams,
-    ) -> WorkspaceFoldersChange {
-        WorkspaceFoldersChange {
-            added: params.event.added.clone(),
-            removed: params.event.removed.clone(),
+        
+        if keywords.iter().any(|k| k.contains("security")) {
+            suggestions.push("ADR-003: Security Framework".to_string());
         }
+        
+        suggestions
+    }
+    
+    fn extract_keywords(&self, content: &str) -> Vec<String> {
+        // Simple keyword extraction
+        let words: Vec<String> = content
+            .split_whitespace()
+            .map(|w| w.to_lowercase())
+            .filter(|w| w.len() > 3) // Filter short words
+            .collect();
+            
+        // Remove duplicates and return
+        let mut keywords: Vec<String> = words.into_iter().collect();
+        keywords.sort();
+        keywords.dedup();
+        keywords
     }
 
-    /// Process file creation events
-    pub fn handle_file_create(params: &CreateFilesParams) -> Vec<CreatedFile> {
-        params.files.iter().map(|file| CreatedFile {
-            uri: file.uri.clone(),
-        }).collect()
-    }
+    /// Generate ADR template based on context
+    pub fn generate_template(&self, adr_type: &str) -> String {
+        match adr_type {
+            "technical" => {
+                r#"# ADR-XXX: [Technical Decision Title]
 
-    /// Process file deletion events  
-    pub fn handle_file_delete(params: &DeleteFilesParams) -> Vec<DeletedFile> {
-        params.files.iter().map(|file| DeletedFile {
-            uri: file.uri.clone(),
-        }).collect()
-    }
+## Status
+Proposed
 
-    /// Process file rename events
-    pub fn handle_file_rename(params: &RenameFilesParams) -> Vec<RenamedFile> {
-        params.files.iter().map(|file| RenamedFile {
-            old_uri: file.old_uri.clone(),
-            new_uri: file.new_uri.clone(),
-        }).collect()
+## Context
+What technical challenge or requirement led to this decision?
+
+## Decision
+What technical solution have we chosen?
+
+## Consequences
+### Positive
+- What benefits does this bring?
+
+### Negative
+- What are the downsides or limitations?
+
+### Risks
+- What could go wrong?
+
+## Alternatives Considered
+- Alternative 1: Brief description and why it was rejected
+- Alternative 2: Brief description and why it was rejected
+
+## Implementation Notes
+- Key implementation details
+- Dependencies required
+- Timeline considerations
+
+## Related Decisions
+- ADR-XXX: Related decision
+"#
+            },
+            "process" => {
+                r#"# ADR-XXX: [Process Decision Title]
+
+## Status
+Proposed
+
+## Context
+What process issue or need drove this decision?
+
+## Decision
+What process change are we implementing?
+
+## Consequences
+How will this affect our workflow and team?
+
+## Implementation
+- Steps to implement this process
+- Training required
+- Tools needed
+
+## Success Metrics
+How will we measure if this process improvement is working?
+
+## Review Schedule
+When will we review this process decision?
+"#
+            },
+            _ => {
+                r#"# ADR-XXX: [Decision Title]
+
+## Status
+Proposed
+
+## Context
+What is the issue that we're seeing that is motivating this decision or change?
+
+## Decision
+What is the change that we're proposing or have agreed to implement?
+
+## Consequences
+What becomes easier or more difficult to do and any risks introduced by this decision?
+"#
+            }
+        }.to_string()
     }
 }
 
-/// Workspace folder change event
-#[derive(Debug, Clone)]
-pub struct WorkspaceFoldersChange {
-    pub added: Vec<WorkspaceFolder>,
-    pub removed: Vec<WorkspaceFolder>,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-/// File operation events
-#[derive(Debug, Clone)]
-pub struct CreatedFile {
-    pub uri: Url,
-}
-
-#[derive(Debug, Clone)]
-pub struct DeletedFile {
-    pub uri: Url,
-}
-
-#[derive(Debug, Clone)]
-pub struct RenamedFile {
-    pub old_uri: Url,
-    pub new_uri: Url,
-}
-
-/// Error handling utilities for LSP handlers
-pub struct ErrorHandler;
-
-impl ErrorHandler {
-    /// Convert internal errors to LSP error responses
-    pub fn handle_error(error: crate::AdrscanError) -> tower_lsp::jsonrpc::Error {
-        tower_lsp::jsonrpc::Error {
-            code: tower_lsp::jsonrpc::ErrorCode::InternalError,
-            message: error.to_string().into(),
-            data: None,
-        }
+    #[test]
+    fn test_validate_adr_structure() {
+        let handlers = LspHandlers;
+        
+        // Test missing sections
+        let content = "# ADR-001: Test\n\nSome content without proper sections";
+        let issues = handlers.validate_adr_structure(content);
+        
+        assert!(!issues.is_empty());
+        assert!(issues.iter().any(|i| i.contains("status")));
+        assert!(issues.iter().any(|i| i.contains("context")));
+        assert!(issues.iter().any(|i| i.contains("decision")));
     }
 
-    /// Create a generic LSP error
-    pub fn generic_error(message: &str) -> tower_lsp::jsonrpc::Error {
-        tower_lsp::jsonrpc::Error {
-            code: tower_lsp::jsonrpc::ErrorCode::InternalError,
-            message: message.into(),
-            data: None,
-        }
+    #[test]
+    fn test_validate_proper_adr() {
+        let handlers = LspHandlers;
+        
+        let content = r#"# ADR-001: Use Rust for Backend
+
+## Status
+Accepted
+
+## Context
+We need a performant backend language.
+
+## Decision
+We will use Rust for our backend services.
+
+## Consequences
+Better performance but steeper learning curve.
+"#;
+        
+        let issues = handlers.validate_adr_structure(content);
+        // Should have minimal issues for a proper ADR
+        assert!(issues.len() <= 1); // May have minor suggestions
+    }
+
+    #[test]
+    fn test_empty_section_detection() {
+        let handlers = LspHandlers;
+        
+        let content = r#"# ADR-001: Test
+
+## Status
+
+## Context
+Some context here
+"#;
+        
+        let issues = handlers.validate_adr_structure(content);
+        assert!(issues.iter().any(|i| i.contains("Empty section: ## Status")));
+    }
+
+    #[test]
+    fn test_keyword_extraction() {
+        let handlers = LspHandlers;
+        
+        let content = "We need to choose a database system for our application";
+        let keywords = handlers.extract_keywords(content);
+        
+        assert!(keywords.contains(&"database".to_string()));
+        assert!(keywords.contains(&"system".to_string()));
+        assert!(keywords.contains(&"application".to_string()));
+        assert!(!keywords.contains(&"we".to_string())); // Should filter short words
+    }
+
+    #[test]
+    fn test_template_generation() {
+        let handlers = LspHandlers;
+        
+        let technical_template = handlers.generate_template("technical");
+        assert!(technical_template.contains("## Implementation Notes"));
+        assert!(technical_template.contains("### Positive"));
+        
+        let process_template = handlers.generate_template("process");
+        assert!(process_template.contains("## Success Metrics"));
+        assert!(process_template.contains("## Review Schedule"));
+        
+        let default_template = handlers.generate_template("unknown");
+        assert!(default_template.contains("## Status"));
+        assert!(default_template.contains("## Context"));
+    }
+
+    #[test]
+    fn test_related_adr_suggestions() {
+        let handlers = LspHandlers;
+        
+        let content = "We need to implement database security measures for our application";
+        let available_adrs = vec!["ADR-001: Use PostgreSQL".to_string()];
+        
+        let suggestions = handlers.suggest_related_adrs(content, &available_adrs);
+        
+        // Should suggest both database and security related ADRs
+        assert!(suggestions.iter().any(|s| s.contains("Database")));
+        assert!(suggestions.iter().any(|s| s.contains("Security")));
     }
 }
