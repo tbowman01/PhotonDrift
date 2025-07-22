@@ -1,0 +1,104 @@
+name: Matrix Build Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      services:
+        description: 'Services to build (comma-separated or "all")'
+        required: false
+        default: 'all'
+        type: string
+      environments:
+        description: 'Target environments (comma-separated or "all")'  
+        required: false
+        default: 'dev'
+        type: string
+
+env:
+  ALL_SERVICES: 'cli,dashboard-backend,dashboard-frontend'
+  ALL_ENVIRONMENTS: 'dev,staging,prod'
+
+jobs:
+  prepare:
+    name: Prepare Build Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.matrix.outputs.services }}
+      environments: ${{ steps.matrix.outputs.environments }}
+    
+    steps:
+      - name: Generate matrix
+        id: matrix
+        run: |
+          # Parse services
+          if [[ "${{ inputs.services }}" == "all" ]]; then
+            SERVICES='["cli", "dashboard-backend", "dashboard-frontend"]'
+          else
+            SERVICES=$(echo "${{ inputs.services }}" | jq -R -c 'split(",") | map(select(length > 0))')
+          fi
+          
+          # Parse environments
+          if [[ "${{ inputs.environments }}" == "all" ]]; then
+            ENVIRONMENTS='["dev", "staging", "prod"]'
+          else
+            ENVIRONMENTS=$(echo "${{ inputs.environments }}" | jq -R -c 'split(",") | map(select(length > 0))')
+          fi
+          
+          echo "services=$SERVICES" >> $GITHUB_OUTPUT
+          echo "environments=$ENVIRONMENTS" >> $GITHUB_OUTPUT
+          
+          # Summary
+          echo "### Build Matrix Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Services:** $SERVICES" >> $GITHUB_STEP_SUMMARY
+          echo "**Environments:** $ENVIRONMENTS" >> $GITHUB_STEP_SUMMARY
+
+  build:
+    name: Build ${{ matrix.service }} - ${{ matrix.environment }}
+    needs: prepare
+    uses: ./.github/workflows/build-configs.yml
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.prepare.outputs.services) }}
+        environment: ${{ fromJson(needs.prepare.outputs.environments) }}
+        exclude:
+          # Skip prod builds for dashboard components until ready
+          - service: dashboard-backend
+            environment: prod
+          - service: dashboard-frontend
+            environment: prod
+      fail-fast: false
+      max-parallel: 4
+    with:
+      service: ${{ matrix.service }}
+      environment: ${{ matrix.environment }}
+      platforms: ${{ matrix.environment == 'dev' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+    secrets: inherit
+
+  summary:
+    name: Build Summary
+    needs: build
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Generate final summary
+        run: |
+          echo "### 📊 Matrix Build Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Count results
+          TOTAL=${{ strategy.job-total }}
+          SUCCESS=$(echo '${{ toJson(needs.build.result) }}' | jq -r 'select(. == "success") | length')
+          FAILED=$(echo '${{ toJson(needs.build.result) }}' | jq -r 'select(. == "failure") | length')
+          
+          echo "**Total Builds:** $TOTAL" >> $GITHUB_STEP_SUMMARY
+          echo "**Successful:** $SUCCESS ✅" >> $GITHUB_STEP_SUMMARY
+          echo "**Failed:** $FAILED ❌" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ $FAILED -gt 0 ]]; then
+            echo "⚠️ Some builds failed. Check individual job logs for details." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ All builds completed successfully!" >> $GITHUB_STEP_SUMMARY
+          fi
