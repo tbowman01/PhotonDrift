@@ -1,0 +1,298 @@
+# Smart Path-based Change Detection
+# This workflow detects changes in different service components and outputs flags for conditional execution
+
+name: Path Change Detection
+
+on:
+  push:
+    branches: [main, develop, 'feature/*', 'fix/*', 'hotfix/*']
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  detect-changes:
+    name: Detect Path Changes
+    runs-on: ubuntu-latest
+    outputs:
+      cli: ${{ steps.changes.outputs.cli }}
+      dashboard-backend: ${{ steps.changes.outputs.dashboard-backend }}
+      dashboard-frontend: ${{ steps.changes.outputs.dashboard-frontend }}
+      wasm: ${{ steps.changes.outputs.wasm }}
+      docs: ${{ steps.changes.outputs.docs }}
+      ci: ${{ steps.changes.outputs.ci }}
+      any-code: ${{ steps.changes.outputs.any-code }}
+      
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Analyze changed paths
+      uses: dorny/paths-filter@v3
+      id: changes
+      with:
+        filters: |
+          # CLI service paths
+          cli:
+            - 'src/**'
+            - 'Cargo.toml'
+            - 'Cargo.lock'
+            - 'Dockerfile'
+            - 'deny.toml'
+            - 'tests/**'
+            - '.adrscan*.yml'
+          
+          # Dashboard backend paths (future-ready)
+          dashboard-backend:
+            - 'dashboard/backend/**'
+            - 'dashboard/backend/Dockerfile'
+            - 'dashboard/backend/Cargo.toml'
+            - 'dashboard/backend/Cargo.lock'
+            - 'dashboard/shared/**'
+          
+          # Dashboard frontend paths (future-ready)
+          dashboard-frontend:
+            - 'dashboard/frontend/**'
+            - 'dashboard/frontend/Dockerfile'
+            - 'dashboard/frontend/package.json'
+            - 'dashboard/frontend/package-lock.json'
+            - 'dashboard/frontend/yarn.lock'
+            - 'dashboard/shared/**'
+          
+          # WASM module paths
+          wasm:
+            - 'wasm/**'
+            - 'src/wasm.rs'
+            - 'src/wasm_simple.rs'
+            - 'Cargo.toml'
+          
+          # Documentation changes
+          docs:
+            - 'docs/**'
+            - '*.md'
+            - 'README*'
+            - 'CHANGELOG*'
+          
+          # CI/CD changes
+          ci:
+            - '.github/**'
+            - 'scripts/**'
+            - '.gitignore'
+            - 'renovate.json'
+          
+          # Any code changes (for broad conditional checks)
+          any-code:
+            - 'src/**'
+            - 'dashboard/**'
+            - 'wasm/**'
+            - 'tests/**'
+            - 'Cargo.toml'
+            - 'package.json'
+
+    - name: Display change detection results
+      run: |
+        echo "🔍 Path Change Detection Results:"
+        echo "├── CLI Changes: ${{ steps.changes.outputs.cli }}"
+        echo "├── Dashboard Backend: ${{ steps.changes.outputs.dashboard-backend }}"
+        echo "├── Dashboard Frontend: ${{ steps.changes.outputs.dashboard-frontend }}"
+        echo "├── WASM Changes: ${{ steps.changes.outputs.wasm }}"
+        echo "├── Documentation: ${{ steps.changes.outputs.docs }}"
+        echo "├── CI/CD Changes: ${{ steps.changes.outputs.ci }}"
+        echo "└── Any Code Changes: ${{ steps.changes.outputs.any-code }}"
+
+  # CLI service jobs (conditional execution)
+  cli-test:
+    name: CLI Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.cli == 'true' || needs.detect-changes.outputs.ci == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+        components: rustfmt, clippy
+    
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Run CLI tests
+      run: |
+        echo "🚀 Running CLI tests (changes detected in CLI paths)"
+        cargo test --verbose
+        cargo clippy --all-targets --all-features
+        cargo fmt --all -- --check
+
+  # Dashboard backend jobs (future-ready, currently skipped)
+  dashboard-backend-test:
+    name: Dashboard Backend Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.dashboard-backend == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Rust (Backend)
+      if: hashFiles('dashboard/backend/Cargo.toml') != ''
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+    
+    - name: Test Dashboard Backend
+      run: |
+        if [ -f "dashboard/backend/Cargo.toml" ]; then
+          echo "🔧 Running dashboard backend tests"
+          cd dashboard/backend
+          cargo test --verbose
+        else
+          echo "⚠️  Dashboard backend not implemented yet - skipping tests"
+        fi
+
+  # Dashboard frontend jobs (future-ready, currently skipped) 
+  dashboard-frontend-test:
+    name: Dashboard Frontend Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.dashboard-frontend == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js (Frontend)
+      if: hashFiles('dashboard/frontend/package.json') != ''
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: 'dashboard/frontend/package-lock.json'
+    
+    - name: Test Dashboard Frontend
+      run: |
+        if [ -f "dashboard/frontend/package.json" ]; then
+          echo "⚛️  Running dashboard frontend tests"
+          cd dashboard/frontend
+          npm ci
+          npm run test
+          npm run build
+        else
+          echo "⚠️  Dashboard frontend not implemented yet - skipping tests"
+        fi
+
+  # WASM module jobs
+  wasm-test:
+    name: WASM Module Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.wasm == 'true' || needs.detect-changes.outputs.cli == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+    
+    - name: Install wasm-pack
+      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+    
+    - name: Test WASM module
+      run: |
+        echo "🕸️  Running WASM module tests"
+        cd wasm
+        npm test
+
+  # Docker build jobs (conditional based on service changes)
+  docker-builds:
+    name: Docker Builds
+    needs: detect-changes
+    if: needs.detect-changes.outputs.any-code == 'true' || needs.detect-changes.outputs.ci == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - service: cli
+            condition: ${{ needs.detect-changes.outputs.cli }}
+            dockerfile: ./Dockerfile
+            context: .
+          # Future dashboard services (commented out until implemented)
+          # - service: dashboard-backend
+          #   condition: ${{ needs.detect-changes.outputs.dashboard-backend }}
+          #   dockerfile: ./dashboard/backend/Dockerfile
+          #   context: ./dashboard/backend
+          # - service: dashboard-frontend
+          #   condition: ${{ needs.detect-changes.outputs.dashboard-frontend }}
+          #   dockerfile: ./dashboard/frontend/Dockerfile
+          #   context: ./dashboard/frontend
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      if: matrix.condition == 'true'
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build Docker image
+      if: matrix.condition == 'true'
+      run: |
+        echo "🐳 Building Docker image for ${{ matrix.service }}"
+        if [ -f "${{ matrix.dockerfile }}" ]; then
+          docker build -t photondrift-${{ matrix.service }}:latest -f ${{ matrix.dockerfile }} ${{ matrix.context }}
+          echo "✅ Successfully built ${{ matrix.service }} image"
+        else
+          echo "⚠️  Dockerfile not found for ${{ matrix.service }} - skipping build"
+        fi
+
+  # Documentation deployment (conditional)
+  docs-deploy:
+    name: Deploy Documentation
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docs == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Deploy Documentation
+      run: |
+        echo "📚 Deploying documentation updates"
+        # Future: Add documentation deployment logic here
+        echo "Documentation deployment placeholder"
+
+  # Summary job
+  build-summary:
+    name: Build Summary
+    needs: [detect-changes, cli-test, dashboard-backend-test, dashboard-frontend-test, wasm-test, docker-builds]
+    if: always()
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Generate Build Summary
+      run: |
+        echo "# 🚀 Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 🔍 Change Detection Results:" >> $GITHUB_STEP_SUMMARY
+        echo "- **CLI**: ${{ needs.detect-changes.outputs.cli }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Dashboard Backend**: ${{ needs.detect-changes.outputs.dashboard-backend }}" >> $GITHUB_STEP_SUMMARY  
+        echo "- **Dashboard Frontend**: ${{ needs.detect-changes.outputs.dashboard-frontend }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **WASM**: ${{ needs.detect-changes.outputs.wasm }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Documentation**: ${{ needs.detect-changes.outputs.docs }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **CI/CD**: ${{ needs.detect-changes.outputs.ci }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 🏗️ Jobs Executed:" >> $GITHUB_STEP_SUMMARY
+        echo "- **CLI Tests**: ${{ needs.cli-test.result || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Backend Tests**: ${{ needs.dashboard-backend-test.result || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Frontend Tests**: ${{ needs.dashboard-frontend-test.result || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **WASM Tests**: ${{ needs.wasm-test.result || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Docker Builds**: ${{ needs.docker-builds.result || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
