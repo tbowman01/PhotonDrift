@@ -1,0 +1,127 @@
+# Reusable workflow for different build scenarios
+name: Reusable Build Configuration
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        description: 'Service to build (cli, dashboard-backend, dashboard-frontend)'
+        required: true
+        type: string
+      environment:
+        description: 'Target environment (dev, staging, prod)'
+        required: true
+        type: string
+      platforms:
+        description: 'Build platforms'
+        required: false
+        type: string
+        default: 'linux/amd64,linux/arm64'
+    outputs:
+      image-tag:
+        description: 'Built image tag'
+        value: ${{ jobs.build.outputs.image-tag }}
+      digest:
+        description: 'Image digest'
+        value: ${{ jobs.build.outputs.digest }}
+
+jobs:
+  build:
+    name: Build ${{ inputs.service }} for ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+    
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      digest: ${{ steps.build.outputs.digest }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure build
+        id: config
+        run: |
+          # Service-specific configuration
+          case "${{ inputs.service }}" in
+            cli)
+              echo "DOCKERFILE=./Dockerfile" >> $GITHUB_ENV
+              echo "CONTEXT=." >> $GITHUB_ENV
+              echo "IMAGE_NAME=photondrift-cli" >> $GITHUB_ENV
+              ;;
+            dashboard-backend)
+              echo "DOCKERFILE=./dashboard/backend/Dockerfile" >> $GITHUB_ENV
+              echo "CONTEXT=./dashboard/backend" >> $GITHUB_ENV
+              echo "IMAGE_NAME=photondrift-dashboard-backend" >> $GITHUB_ENV
+              ;;
+            dashboard-frontend)
+              echo "DOCKERFILE=./dashboard/frontend/Dockerfile" >> $GITHUB_ENV
+              echo "CONTEXT=./dashboard/frontend" >> $GITHUB_ENV
+              echo "IMAGE_NAME=photondrift-dashboard-frontend" >> $GITHUB_ENV
+              ;;
+          esac
+          
+          # Environment-specific configuration
+          case "${{ inputs.environment }}" in
+            dev)
+              echo "PUSH=false" >> $GITHUB_ENV
+              echo "PLATFORMS=linux/amd64" >> $GITHUB_ENV
+              echo "CACHE_MODE=min" >> $GITHUB_ENV
+              ;;
+            staging)
+              echo "PUSH=true" >> $GITHUB_ENV
+              echo "PLATFORMS=${{ inputs.platforms }}" >> $GITHUB_ENV
+              echo "CACHE_MODE=max" >> $GITHUB_ENV
+              ;;
+            prod)
+              echo "PUSH=true" >> $GITHUB_ENV
+              echo "PLATFORMS=${{ inputs.platforms }}" >> $GITHUB_ENV
+              echo "CACHE_MODE=max" >> $GITHUB_ENV
+              echo "SCAN_REQUIRED=true" >> $GITHUB_ENV
+              ;;
+          esac
+      
+      - name: Login to registry
+        if: env.PUSH == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Generate metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ inputs.environment }}
+            type=raw,value=${{ inputs.environment }}-{{sha}}
+            type=raw,value=${{ inputs.environment }}-{{date 'YYYYMMDD'}}
+            type=semver,pattern={{version}},enable=${{ inputs.environment == 'prod' }}
+            type=raw,value=latest,enable=${{ inputs.environment == 'prod' }}
+      
+      - name: Build with reusable action
+        uses: ./.github/actions/docker-build
+        with:
+          context: ${{ env.CONTEXT }}
+          dockerfile: ${{ env.DOCKERFILE }}
+          image-name: ${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+          platforms: ${{ env.PLATFORMS }}
+          push: ${{ env.PUSH }}
+          build-args: |
+            ENVIRONMENT=${{ inputs.environment }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            GIT_REVISION=${{ github.sha }}
+          scan-severity: ${{ inputs.environment == 'prod' && 'CRITICAL,HIGH,MEDIUM' || 'CRITICAL,HIGH' }}
+      
+      - name: Deploy notification
+        if: env.PUSH == 'true'
+        run: |
+          echo "### 🚀 Deployment Ready" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Service:** ${{ inputs.service }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** ${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY

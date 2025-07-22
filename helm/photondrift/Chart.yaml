@@ -1,0 +1,30 @@
+apiVersion: v2
+name: photondrift
+description: A Helm chart for PhotonDrift AI-powered ADR management
+type: application
+version: 0.2.0
+appVersion: "0.2.0-alpha.20250721"
+
+keywords:
+  - adr
+  - architecture
+  - documentation
+  - ai
+  - ml
+  - drift-detection
+
+home: https://github.com/tbowman01/PhotonDrift
+sources:
+  - https://github.com/tbowman01/PhotonDrift
+
+maintainers:
+  - name: tbowman01
+    email: tbowman01@users.noreply.github.com
+
+annotations:
+  artifacthub.io/license: MIT
+  artifacthub.io/links: |
+    - name: Documentation
+      url: https://github.com/tbowman01/PhotonDrift/blob/main/README.md
+    - name: Container Registry
+      url: https://ghcr.io/tbowman01/photondrift
