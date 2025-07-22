@@ -7,8 +7,18 @@ pub mod commands;
 pub mod config;
 pub mod drift;
 pub mod error;
+#[cfg(feature = "lsp")]
+pub mod lsp;
 pub mod ml;
 pub mod parser;
+
+// Plugin system (only available with plugins feature)
+#[cfg(feature = "plugins")]
+pub mod plugins;
+
+// Real-time analysis module (only available with realtime feature)
+#[cfg(feature = "realtime")]
+pub mod realtime;
 
 // WebAssembly module (only compiled for wasm32 target)
 #[cfg(all(target_arch = "wasm32", feature = "wasm"))]

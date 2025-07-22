@@ -1,0 +1,124 @@
+{
+    "ADR MADR Template": {
+        "prefix": "adr-madr",
+        "body": [
+            "---",
+            "title: $1",
+            "status: proposed",
+            "date: $CURRENT_YEAR-$CURRENT_MONTH-$CURRENT_DATE",
+            "---",
+            "",
+            "# ADR-${2:0001}: $1",
+            "",
+            "## Status",
+            "",
+            "${3|Proposed,Accepted,Rejected,Superseded,Deprecated|}",
+            "",
+            "## Context",
+            "",
+            "$4",
+            "",
+            "## Decision Drivers",
+            "",
+            "* $5",
+            "",
+            "## Considered Options",
+            "",
+            "* $6",
+            "",
+            "## Decision",
+            "",
+            "$7",
+            "",
+            "## Consequences",
+            "",
+            "### Positive",
+            "",
+            "* $8",
+            "",
+            "### Negative",
+            "",
+            "* $9",
+            "",
+            "## Links",
+            "",
+            "$10"
+        ],
+        "description": "Create a new MADR (Markdown Architecture Decision Record)"
+    },
+    "ADR Basic Template": {
+        "prefix": "adr-basic",
+        "body": [
+            "# ADR-${1:0001}: ${2:Title}",
+            "",
+            "## Status",
+            "",
+            "${3|Proposed,Accepted,Rejected,Superseded,Deprecated|}",
+            "",
+            "## Context",
+            "",
+            "$4",
+            "",
+            "## Decision",
+            "",
+            "$5",
+            "",
+            "## Consequences",
+            "",
+            "$6"
+        ],
+        "description": "Create a basic ADR template"
+    },
+    "ADR Status": {
+        "prefix": "status",
+        "body": [
+            "## Status",
+            "",
+            "${1|Proposed,Accepted,Rejected,Superseded,Deprecated|}"
+        ],
+        "description": "Add ADR status section"
+    },
+    "ADR Context": {
+        "prefix": "context",
+        "body": [
+            "## Context",
+            "",
+            "$1"
+        ],
+        "description": "Add ADR context section"
+    },
+    "ADR Decision": {
+        "prefix": "decision",
+        "body": [
+            "## Decision",
+            "",
+            "$1"
+        ],
+        "description": "Add ADR decision section"
+    },
+    "ADR Consequences": {
+        "prefix": "consequences",
+        "body": [
+            "## Consequences",
+            "",
+            "### Positive",
+            "",
+            "* $1",
+            "",
+            "### Negative",
+            "",
+            "* $2"
+        ],
+        "description": "Add ADR consequences section"
+    },
+    "ADR Reference": {
+        "prefix": "adr-ref",
+        "body": "ADR-${1:0001}",
+        "description": "Reference another ADR"
+    },
+    "ADR Supersedes": {
+        "prefix": "supersedes",
+        "body": "Supersedes ADR-${1:0001}",
+        "description": "Mark ADR as superseding another"
+    }
+}

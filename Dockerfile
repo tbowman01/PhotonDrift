@@ -43,7 +43,7 @@ RUN strip target/release/adrscan
 RUN ./target/release/adrscan --version
 
 # Runtime stage - Use Alpine for minimal attack surface and musl compatibility
-FROM alpine:3.18 AS runtime
+FROM alpine:3.22 AS runtime
 
 # Install CA certificates and create non-root user
 RUN apk add --no-cache ca-certificates && \
