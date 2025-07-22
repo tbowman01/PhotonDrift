@@ -1,0 +1,193 @@
+name: VS Code Extension CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths: 
+      - 'extensions/vscode/**'
+      - '.github/workflows/vscode-extension.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'extensions/vscode/**'
+      - '.github/workflows/vscode-extension.yml'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish to VS Code Marketplace'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [16.x, 18.x]
+        
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: extensions/vscode/package-lock.json
+        
+    - name: Install dependencies
+      working-directory: extensions/vscode
+      run: npm ci
+      
+    - name: Lint code
+      working-directory: extensions/vscode
+      run: npm run lint
+      
+    - name: Compile TypeScript
+      working-directory: extensions/vscode
+      run: npm run compile
+      
+    - name: Run tests
+      working-directory: extensions/vscode
+      run: |
+        xvfb-run -a npm test
+      if: runner.os == 'Linux'
+      
+    - name: Run tests (non-Linux)
+      working-directory: extensions/vscode
+      run: npm test
+      if: runner.os != 'Linux'
+
+  package:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+        cache-dependency-path: extensions/vscode/package-lock.json
+        
+    - name: Install dependencies
+      working-directory: extensions/vscode
+      run: npm ci
+      
+    - name: Install VSCE
+      run: npm install -g vsce
+      
+    - name: Package extension
+      working-directory: extensions/vscode
+      run: vsce package --no-yarn
+      
+    - name: Upload VSIX artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: photondrift-adr-extension
+        path: extensions/vscode/*.vsix
+        retention-days: 30
+
+  publish:
+    needs: [test, package]
+    runs-on: ubuntu-latest
+    if: |
+      (github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[publish]')) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
+    environment: marketplace
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+        cache-dependency-path: extensions/vscode/package-lock.json
+        
+    - name: Install dependencies
+      working-directory: extensions/vscode
+      run: npm ci
+      
+    - name: Install VSCE
+      run: npm install -g vsce
+      
+    - name: Publish to VS Code Marketplace
+      working-directory: extensions/vscode
+      run: vsce publish --no-yarn
+      env:
+        VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        
+    - name: Create GitHub Release
+      if: success()
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: vscode-v${{ github.run_number }}
+        release_name: VS Code Extension v${{ github.run_number }}
+        body: |
+          🚀 **VS Code Extension Release**
+          
+          **Changes in this release:**
+          ${{ github.event.head_commit.message }}
+          
+          **Installation:**
+          - From VS Code Marketplace: Search for "PhotonDrift ADR Manager"
+          - Direct link: https://marketplace.visualstudio.com/items?itemName=photondrift-team.photondrift-adr
+          
+          **What's New:**
+          - Enhanced AI-powered drift detection
+          - Improved Language Server Protocol integration
+          - Better performance and stability
+          - Updated documentation and examples
+          
+          **Requirements:**
+          - VS Code 1.74.0 or higher
+          - PhotonDrift CLI installed and accessible in PATH
+        draft: false
+        prerelease: false
+
+  security-scan:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Run security audit
+      working-directory: extensions/vscode
+      run: |
+        npm audit --audit-level moderate
+        
+    - name: Check for sensitive files
+      run: |
+        # Check for accidentally committed secrets or sensitive files
+        if find extensions/vscode -name "*.env" -o -name "*.key" -o -name "*.pem" | grep -q .; then
+          echo "❌ Sensitive files detected!"
+          exit 1
+        else
+          echo "✅ No sensitive files found"
+        fi
+
+  quality-gate:
+    runs-on: ubuntu-latest
+    needs: [test, security-scan]
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Quality Gate
+      run: |
+        echo "✅ All quality checks passed!"
+        echo "- Tests: Passed"
+        echo "- Security: Passed"
+        echo "- Linting: Passed"

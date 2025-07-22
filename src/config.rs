@@ -25,6 +25,10 @@ pub struct Config {
 
     /// Drift detection configuration
     pub drift: DriftConfig,
+
+    /// LSP-specific templates for completion
+    #[cfg(feature = "lsp")]
+    pub templates: Option<Vec<LspTemplate>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,6 +62,18 @@ pub struct DetectionPattern {
 
     /// Category for grouping (database, framework, cloud, etc.)
     pub category: String,
+}
+
+/// LSP Template definition for completion
+#[cfg(feature = "lsp")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LspTemplate {
+    /// Template name
+    pub name: String,
+    /// Template description
+    pub description: String,
+    /// Template content with snippet placeholders
+    pub content: String,
 }
 
 /// Configuration overrides that can be applied from command line or environment variables
@@ -124,6 +140,8 @@ impl Default for Config {
                     },
                 ],
             },
+            #[cfg(feature = "lsp")]
+            templates: None,
         }
     }
 }
@@ -160,6 +178,22 @@ impl Config {
         config.validate()?;
 
         Ok(config)
+    }
+
+    /// Load configuration from workspace root directory
+    pub fn from_workspace_root(workspace_root: &std::path::Path) -> Result<Self> {
+        // Look for config file in workspace root
+        let config_files = [".adrscan.yml", ".adrscan.yaml", ".adrscan.toml"];
+        
+        for filename in &config_files {
+            let config_path = workspace_root.join(filename);
+            if config_path.exists() {
+                return Self::load_from_file(&config_path);
+            }
+        }
+        
+        // No config file found, return default config
+        Ok(Self::default())
     }
 
     /// Load base configuration from file or defaults
