@@ -1,0 +1,92 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "Architecture Decision Record",
+    "scopeName": "text.html.markdown.adr",
+    "fileTypes": ["md"],
+    "patterns": [
+        {
+            "include": "text.html.markdown"
+        },
+        {
+            "include": "#adr-frontmatter"
+        },
+        {
+            "include": "#adr-title"
+        },
+        {
+            "include": "#adr-sections"
+        },
+        {
+            "include": "#adr-status"
+        },
+        {
+            "include": "#adr-references"
+        }
+    ],
+    "repository": {
+        "adr-frontmatter": {
+            "name": "meta.embedded.block.frontmatter.adr",
+            "begin": "\\A(---)",
+            "beginCaptures": {
+                "1": {
+                    "name": "punctuation.definition.tag.begin.yaml.adr"
+                }
+            },
+            "end": "(---)",
+            "endCaptures": {
+                "1": {
+                    "name": "punctuation.definition.tag.end.yaml.adr"
+                }
+            },
+            "patterns": [
+                {
+                    "name": "keyword.other.frontmatter.adr",
+                    "match": "^\\s*(title|status|date|tags):"
+                },
+                {
+                    "name": "string.quoted.double.yaml.adr",
+                    "match": "\"[^\"]*\""
+                },
+                {
+                    "name": "constant.other.date.adr",
+                    "match": "\\d{4}-\\d{2}-\\d{2}"
+                }
+            ]
+        },
+        "adr-title": {
+            "name": "markup.heading.adr-title.markdown",
+            "match": "^(#)\\s+(ADR-\\d+):\\s*(.+)$",
+            "captures": {
+                "1": {
+                    "name": "punctuation.definition.heading.markdown"
+                },
+                "2": {
+                    "name": "entity.name.tag.adr-number.adr"
+                },
+                "3": {
+                    "name": "entity.name.section.markdown.adr"
+                }
+            }
+        },
+        "adr-sections": {
+            "name": "markup.heading.adr-section.markdown",
+            "match": "^(##)\\s+(Status|Context|Decision|Consequences|Decision Drivers|Considered Options|Links|Alternatives|Pros and Cons|More Information)\\s*$",
+            "captures": {
+                "1": {
+                    "name": "punctuation.definition.heading.markdown"
+                },
+                "2": {
+                    "name": "entity.name.section.adr-section.adr"
+                }
+            }
+        },
+        "adr-status": {
+            "name": "constant.other.adr-status.adr",
+            "match": "\\b(Proposed|Accepted|Rejected|Superseded|Deprecated)\\b"
+        },
+        "adr-references": {
+            "name": "markup.underline.link.adr-reference.adr",
+            "match": "\\bADR-\\d+\\b"
+        }
+    }
+}
