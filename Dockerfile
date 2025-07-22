@@ -22,8 +22,10 @@ WORKDIR /usr/src/adrscan
 # Copy dependency manifests first for better layer caching
 COPY Cargo.toml ./
 
-# Create dummy main.rs to build dependencies
-RUN mkdir src && echo "fn main() {}" > src/main.rs
+# Create dummy src files to build dependencies
+RUN mkdir src && \
+    echo "fn main() {}" > src/main.rs && \
+    echo "" > src/lib.rs
 
 # Build dependencies only (this layer will be cached)
 RUN cargo build --release
