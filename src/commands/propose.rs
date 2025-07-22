@@ -1736,7 +1736,6 @@ Detected in: {{DETECTED_FILE}}
         assert!(created_path
             .to_string_lossy()
             .contains("0002-test-technology"));
-
     }
 
     #[tokio::test]
