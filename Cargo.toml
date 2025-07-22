@@ -46,7 +46,7 @@ tokio = { version = "1.0", features = ["full"], optional = true }
 
 # Language Server Protocol dependencies (conditional on lsp feature)
 tower-lsp = { version = "0.20", optional = true }
-lsp-types = { version = "0.95", optional = true }
+lsp-types = { version = "0.97", optional = true }
 tokio-util = { version = "0.7", optional = true, features = ["codec"] }
 
 # Real-time file watching and WebSocket support
