@@ -1,20 +1,19 @@
 # Multi-stage Docker build for ADRScan
 # Security-hardened container following best practices
 
-# Build stage - Use official Rust image for building
-FROM rust:1.75-slim-bullseye AS builder
+# Build stage - Use Alpine-based Rust image for better multi-platform support
+FROM rust:1.75-alpine AS builder
 
-# Install security updates and required build dependencies
-RUN apt-get update && apt-get upgrade -y && \
-    apt-get install -y \
-    pkg-config \
-    libssl-dev \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+# Install build dependencies
+RUN apk add --no-cache \
+        musl-dev \
+        pkgconfig \
+        openssl-dev \
+        openssl-libs-static
 
 # Create non-root user for building
-RUN groupadd -r builder && useradd -r -g builder builder
+RUN addgroup -g 1001 -S builder && \
+    adduser -u 1001 -S builder -G builder
 
 # Set working directory
 WORKDIR /usr/src/adrscan
@@ -43,11 +42,13 @@ RUN strip target/release/adrscan
 # Verify binary works
 RUN ./target/release/adrscan --version
 
-# Runtime stage - Use distroless for minimal attack surface
-FROM gcr.io/distroless/cc-debian11:nonroot AS runtime
+# Runtime stage - Use Alpine for minimal attack surface and musl compatibility
+FROM alpine:3.18 AS runtime
 
-# Copy CA certificates for HTTPS requests
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+# Install CA certificates and create non-root user
+RUN apk add --no-cache ca-certificates && \
+    addgroup -g 65532 -S nonroot && \
+    adduser -u 65532 -S nonroot -G nonroot
 
 # Copy the binary from builder stage
 COPY --from=builder /usr/src/adrscan/target/release/adrscan /usr/local/bin/adrscan
