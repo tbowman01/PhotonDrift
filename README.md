@@ -3,7 +3,7 @@
 > Next-generation Architecture Decision Record (ADR) management with ML-enhanced drift detection for intelligent development governance.
 
 [![CI](https://github.com/tbowman01/PhotonDrift/actions/workflows/ci.yml/badge.svg)](https://github.com/tbowman01/PhotonDrift/actions/workflows/ci.yml)
-[![Docker](https://github.com/tbowman01/PhotonDrift/actions/workflows/docker.yml/badge.svg)](https://github.com/tbowman01/PhotonDrift/actions/workflows/docker.yml)
+[![Container Build](https://github.com/tbowman01/PhotonDrift/actions/workflows/container-build.yml/badge.svg)](https://github.com/tbowman01/PhotonDrift/actions/workflows/container-build.yml)
 [![Security Audit](https://github.com/tbowman01/PhotonDrift/actions/workflows/security-audit.yml/badge.svg)](https://github.com/tbowman01/PhotonDrift/actions/workflows/security-audit.yml)
 [![Version](https://img.shields.io/badge/version-0.2.0--alpha.20250721-blue)](https://github.com/tbowman01/PhotonDrift/releases)
 [![Tests](https://img.shields.io/badge/tests-178%2F182%20passing-green)](https://github.com/tbowman01/PhotonDrift/actions)
@@ -46,36 +46,117 @@ PhotonDrift is an AI-powered Rust CLI tool that revolutionizes Architecture Deci
 - **Production-ready**: Health checks, proper metadata labels
 - **Easy deployment**: Available on GitHub Container Registry
 
-## 🐳 Docker Usage
+## 🐳 Container Usage
 
-### Quick Start with Docker
+### Quick Start with Containers
 
 ```bash
 # Pull the latest image
 docker pull ghcr.io/tbowman01/photondrift:latest
 
-# Run ADRScan on your project
-docker run --rm -v "$(pwd)":/app ghcr.io/tbowman01/photondrift:latest analyze /app
+# Run ADR analysis on your project
+docker run --rm -v "$(pwd)":/workspace \
+  ghcr.io/tbowman01/photondrift:latest \
+  diff --adr-dir /workspace/docs/adr
 
-# Interactive shell
-docker run -it --rm -v "$(pwd)":/app ghcr.io/tbowman01/photondrift:latest
+# Interactive container shell
+docker run -it --rm -v "$(pwd)":/workspace \
+  ghcr.io/tbowman01/photondrift:latest bash
 ```
 
-### Available Tags
+### Multi-Service Deployment
 
-- `latest` - Latest stable release
-- `main` - Latest from main branch
-- `develop` - Latest development version
-- `v0.2.0-alpha.20250721` - Specific version tags
+```bash
+# Using Docker Compose for multi-service setup
+version: '3.8'
+services:
+  photondrift-analyzer:
+    image: ghcr.io/tbowman01/photondrift:latest
+    volumes:
+      - ./docs/adr:/workspace/adr:ro
+      - ./src:/workspace/src:ro
+    command: diff --adr-dir /workspace/adr --directory /workspace/src
+    environment:
+      - RUST_LOG=info
+      - ADR_CONFIG=/workspace/adr/config.yml
+
+  photondrift-monitor:
+    image: ghcr.io/tbowman01/photondrift:latest
+    volumes:
+      - ./:/workspace:ro
+    command: inventory --adr-dir /workspace/docs/adr --watch
+    restart: unless-stopped
+```
+
+### Available Container Tags
+
+- `latest` - Latest stable release (recommended for production)
+- `main` - Latest from main branch (stable development)
+- `develop` - Latest development features (testing only)
+- `v0.2.0-alpha.20250721` - Specific version tags (reproducible builds)
+- `main-<sha>` - Commit-specific builds (debugging)
+
+### Registry Information
+
+**Primary Registry**: `ghcr.io/tbowman01/photondrift`
+- **Security**: Images scanned with Trivy, SBOM/Provenance included
+- **Platforms**: `linux/amd64`, `linux/arm64` (multi-arch support)
+- **Base**: Distroless (security-hardened, minimal attack surface)
+- **User**: Non-root (`65532:65532` for security compliance)
+
+### Environment Variables
+
+```bash
+# Configuration
+RUST_LOG=debug              # Logging level (debug, info, warn, error)
+ADR_CONFIG=/workspace/config.yml  # Custom config file location
+ADR_DIR=/workspace/adr      # Default ADR directory
+
+# ML Features
+ML_ENABLED=true             # Enable machine learning features
+ML_MODEL=Ensemble           # ML model type (IsolationForest, Ensemble)
+ML_CONFIDENCE=0.7           # Confidence threshold (0.0-1.0)
+
+# Security
+TRUST_DNS=1                 # Trust container DNS resolution
+NO_PROXY=localhost,127.0.0.1  # Proxy bypass patterns
+```
+
+### Volume Mounting Examples
+
+```bash
+# Read-only project analysis
+docker run --rm \
+  -v "$(pwd)":/workspace:ro \
+  ghcr.io/tbowman01/photondrift:latest \
+  inventory --adr-dir /workspace/docs/adr
+
+# Read-write for generating ADRs
+docker run --rm \
+  -v "$(pwd)/docs/adr":/workspace/adr \
+  -v "$(pwd)/src":/workspace/src:ro \
+  ghcr.io/tbowman01/photondrift:latest \
+  propose --adr-dir /workspace/adr --directory /workspace/src
+
+# Configuration file mounting
+docker run --rm \
+  -v "$(pwd)":/workspace:ro \
+  -v "$(pwd)/photondrift-config.yml":/config.yml:ro \
+  ghcr.io/tbowman01/photondrift:latest \
+  diff --config /config.yml
+```
 
 ### Build Locally
 
 ```bash
-# Build the image
-docker build -t photondrift .
+# Clone and build
+git clone https://github.com/tbowman01/PhotonDrift.git
+cd PhotonDrift
+docker build -t photondrift:local .
 
-# Run with your project
-docker run --rm -v "$(pwd)":/workspace photondrift diff --adr-dir /workspace/docs/adr
+# Multi-platform build
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t photondrift:multi-arch .
 
 # See comprehensive build guide
 # docs/DOCKER_BUILD_GUIDE.md
