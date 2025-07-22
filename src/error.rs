@@ -37,4 +37,22 @@ pub enum AdrscanError {
 
     #[error("Serialization error: {0}")]
     SerializationError(String),
+
+    #[error("Real-time analysis error: {0}")]
+    RealtimeError(String),
+
+    #[error("ML processing error: {0}")]
+    MLError(String),
+
+    #[error("Cache error: {0}")]
+    CacheError(String),
+
+    #[error("WebSocket error: {0}")]
+    WebSocketError(String),
+
+    #[error("Event bus error: {0}")]
+    EventBusError(String),
+
+    #[error("File watcher error: {0}")]
+    FileWatcherError(String),
 }

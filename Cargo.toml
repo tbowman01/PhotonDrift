@@ -44,6 +44,17 @@ regex = "1.10"
 # Async runtime for drift detection (not compatible with WASM)
 tokio = { version = "1.0", features = ["full"], optional = true }
 
+# Real-time file system watching and analysis
+notify = { version = "6.1", optional = true }
+tokio-tungstenite = { version = "0.21", optional = true }
+dashmap = { version = "5.5", optional = true }
+crossbeam = { version = "0.8", optional = true }
+futures-util = { version = "0.3", optional = true }
+
+# LSP server dependencies
+tower-lsp = { version = "0.20", optional = true }
+lsp-types = { version = "0.95", optional = true }
+
 # Cryptographic hashing for file content
 sha2 = "0.10"
 
@@ -52,6 +63,13 @@ smartcore = { version = "0.3", optional = true }
 ndarray = { version = "0.15", optional = true }
 rand = { version = "0.8", optional = true }
 nalgebra = { version = "0.32", optional = true }
+
+# Plugin system dependencies
+libloading = { version = "0.8", optional = true }
+wasmtime = { version = "23.0", optional = true }
+reqwest = { version = "0.12", features = ["json"], optional = true }
+dirs = "5.0"
+tempfile = "3.8"
 
 # WebAssembly bindings (only for WASM target)
 wasm-bindgen = { version = "0.2", optional = true }
@@ -63,6 +81,10 @@ console_error_panic_hook = { version = "0.1", optional = true }
 default = ["tokio"]
 wasm = ["wasm-bindgen", "js-sys", "web-sys", "console_error_panic_hook"]
 ml = ["smartcore", "ndarray", "rand", "nalgebra"]
+plugins = ["libloading", "wasmtime", "reqwest"]
+realtime = ["tokio", "notify", "tokio-tungstenite", "dashmap", "crossbeam", "futures-util"]
+websocket-client = ["tokio-tungstenite", "futures-util"]
+lsp = ["tokio", "tower-lsp", "lsp-types"]
 [dev-dependencies]
 tempfile = "3.8"
 assert_cmd = "2.0"
@@ -76,6 +98,11 @@ crate-type = ["cdylib", "rlib"]
 [[bin]]
 name = "adrscan"
 path = "src/main.rs"
+
+[[bin]]
+name = "adrscan-lsp"
+path = "src/bin/lsp.rs"
+required-features = ["lsp"]
 
 [profile.release]
 lto = true
