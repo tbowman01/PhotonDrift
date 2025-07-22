@@ -98,6 +98,18 @@ adrscan diff
 adrscan propose --dry-run
 ```
 
+### Step 4: IDE Integration (Optional - 30 seconds)
+
+```bash
+# Start the Language Server for IDE support
+adrscan-lsp
+
+# Or configure your IDE to use the LSP server:
+# VS Code: Install the PhotonDrift extension (coming soon)
+# Neovim: Add to your LSP config
+# IntelliJ: Use the PhotonDrift plugin (coming soon)
+```
+
 ### Step 4: Add to CI/CD (1 minute)
 
 Create `.github/workflows/architecture.yml`:

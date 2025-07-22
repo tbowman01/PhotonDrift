@@ -7,12 +7,13 @@
 1. [Quick Start](#quick-start)
 2. [Installation](#installation)
 3. [Core Commands](#core-commands)
-4. [Configuration](#configuration)
-5. [ADR Management](#adr-management)
-6. [Drift Detection](#drift-detection)
-7. [GitHub Integration](#github-integration)
-8. [Best Practices](#best-practices)
-9. [Troubleshooting](#troubleshooting)
+4. [IDE Integration](#ide-integration)
+5. [Configuration](#configuration)
+6. [ADR Management](#adr-management)
+7. [Drift Detection](#drift-detection)
+8. [GitHub Integration](#github-integration)
+9. [Best Practices](#best-practices)
+10. [Troubleshooting](#troubleshooting)
 
 ## Quick Start
 
@@ -80,6 +81,10 @@ git clone https://github.com/tbowman01/PhotonDrift.git
 cd PhotonDrift
 cargo build --release
 # Binary will be in target/release/adrscan
+
+# Build LSP server for IDE integration
+cargo build --release --features lsp --bin adrscan-lsp
+# LSP server will be in target/release/adrscan-lsp
 ```
 
 ### GitHub Action
@@ -239,6 +244,53 @@ adrscan index --template ./templates/index.md
 # Specify output location  
 adrscan index --output ./docs/DECISIONS.md
 ```
+
+## IDE Integration
+
+ADRScan provides a Language Server Protocol (LSP) implementation for real-time ADR management and drift detection in your favorite IDE.
+
+### Starting the LSP Server
+
+```bash
+# Start the LSP server for IDE integration
+adrscan-lsp
+
+# The server will listen on stdin/stdout for LSP communication
+# Your IDE will automatically connect to it
+```
+
+### Features
+
+- **Real-time Diagnostics**: Instant detection of ADR structural issues and drift patterns (<100ms)
+- **Smart Completion**: Context-aware suggestions for ADR templates, sections, and status values
+- **Rich Hover Information**: Detailed explanations for ADR elements, references, and status values
+- **Document Lifecycle**: Full support for opening, editing, and closing ADR documents
+
+### IDE Setup
+
+#### VS Code
+Add to your `settings.json`:
+```json
+{
+  "photondrift-lsp.enable": true,
+  "photondrift-lsp.serverPath": "/path/to/adrscan-lsp"
+}
+```
+
+#### Neovim
+Add to your LSP configuration:
+```lua
+require'lspconfig'.photondrift.setup{
+  cmd = { "/path/to/adrscan-lsp" },
+  filetypes = { "markdown" },
+  root_dir = require'lspconfig/util'.find_git_ancestor
+}
+```
+
+#### IntelliJ/JetBrains IDEs
+Install the PhotonDrift plugin (coming soon) or configure generic LSP support.
+
+For detailed IDE setup instructions, see [LSP Integration Guide](lsp-integration.md).
 
 ## Configuration
 

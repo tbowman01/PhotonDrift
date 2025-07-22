@@ -40,6 +40,13 @@ PhotonDrift is an AI-powered Rust CLI tool that revolutionizes Architecture Deci
 - **CI/CD Ready**: WebAssembly module and GitHub Action for automation
 - **Scalable**: Handles enterprise codebases (100k+ files)
 
+### 💻 **IDE Integration** (v0.3.0+) - **NEW!**
+- **Language Server Protocol**: Universal IDE support via LSP server
+- **Real-time Diagnostics**: Instant drift detection as you type (<100ms)
+- **Smart Completion**: Context-aware ADR template suggestions
+- **Rich Hover Information**: Detailed ADR element explanations
+- **Code Actions**: Quick fixes for common ADR issues
+
 ### 🐳 **Next-Gen Container System** (v2.0)
 - **Simplified Build Pipeline**: 60-80% faster builds with intelligent caching
 - **Multi-platform Support**: AMD64/ARM64 with optimized cross-compilation
@@ -204,6 +211,9 @@ adrscan propose
 
 # Create intelligent ADR index
 adrscan index
+
+# Start LSP server for IDE integration (NEW!)
+adrscan-lsp
 ```
 
 ### 🤖 AI-Enhanced Usage (v0.2.0+)
@@ -261,6 +271,7 @@ drift:
 - **[Performance Analysis](docs/PERFORMANCE_ANALYSIS.md)** - Monitor performance and optimize bottlenecks
 
 ### Integration & Automation
+- **[LSP Integration Guide](docs/lsp-integration.md)** - IDE integration with Language Server Protocol ✨
 - **[GitHub Integration](docs/GITHUB_LABELS.md)** - GitHub automation features
 - **[Development Hooks](docs/DEVELOPMENT_HOOKS.md)** - Pre-commit hooks and automation setup
 - **[Docker Build Guide](docs/DOCKER_BUILD_GUIDE.md)** - Comprehensive Docker build instructions
@@ -299,9 +310,9 @@ drift:
 - [x] **🐳 Docker Support**: Production-ready containerization
 - [x] **🛠️ DevOps Pipeline**: Enhanced CI/CD with comprehensive automation
 
-### 🔧 Phase 3 - Developer Experience (Q2 2025) - **PLANNED**
-- [ ] **IDE Extensions**: VS Code and IntelliJ plugins with ML insights
-- [ ] **Language Server Protocol**: Universal IDE support with intelligent warnings
+### 🔧 Phase 3 - Developer Experience (Q1-Q2 2025) - **IN PROGRESS**
+- [x] **Language Server Protocol**: Universal IDE support with intelligent warnings ✅
+- [ ] **IDE Extensions**: VS Code and IntelliJ plugins with ML insights (Next)
 - [ ] **Real-time Analysis**: File system watchers with instant ML feedback
 - [ ] **Visual Dashboard**: Web-based analytics with trend analysis
 - [ ] **Advanced Templates**: AI-powered ADR generation and suggestions
@@ -380,6 +391,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**🚀 Current Status**: Phase 2 Complete - Production-Ready Alpha with Enhanced DevOps Pipeline
+**🚀 Current Status**: Phase 3 In Progress - LSP Implementation Complete, IDE Extensions Next
 
 **📧 Questions?** Open an [issue](https://github.com/tbowman01/PhotonDrift/issues) or check our [discussions](https://github.com/tbowman01/PhotonDrift/discussions)

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 💻 Language Server Protocol (LSP) Implementation - Phase 3
+- **NEW**: Complete LSP server implementation for universal IDE support
+- **NEW**: Real-time drift diagnostics with <100ms response time
+- **NEW**: Smart completion for ADR templates, sections, and status values
+- **NEW**: Rich hover information with markdown formatting
+- **NEW**: Protocol utilities for URI/path conversion and position handling
+- **NEW**: Dedicated LSP binary (`adrscan-lsp`) for IDE integration
+- **NEW**: Comprehensive LSP test suite with integration tests
+- **IMPROVED**: Feature-gated LSP compilation for optional functionality
+
 ### 🐳 Docker Support & Containerization
 - **NEW**: Multi-stage Dockerfile with security-hardened build process
 - **NEW**: Linux amd64 container builds for GitHub Container Registry

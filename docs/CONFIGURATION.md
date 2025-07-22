@@ -77,6 +77,35 @@ drift:
       category: "cloud"
 ```
 
+### LSP Configuration
+
+```yaml
+lsp:
+  # Enable/disable LSP server features
+  enabled: true
+  
+  # Maximum number of diagnostics to report per document
+  max_diagnostics: 100
+  
+  # Enable/disable specific LSP features
+  features:
+    diagnostics: true
+    completion: true
+    hover: true
+    document_symbols: true
+  
+  # LSP server behavior settings
+  server:
+    # Workspace root directory (auto-detected if not specified)
+    # workspace_root: /path/to/workspace
+    
+    # Response timeout in milliseconds
+    response_timeout: 5000
+    
+    # Enable debug logging for LSP operations
+    debug_logging: false
+```
+
 ## Environment Variables
 
 All configuration options can be overridden using environment variables:
@@ -102,6 +131,15 @@ All configuration options can be overridden using environment variables:
 | Variable | Description | Values |
 |----------|-------------|--------|
 | `ADRSCAN_DRIFT_ENABLED` | Enable drift detection | `true`, `false`, `1`, `0`, `yes`, `no`, `on`, `off` |
+
+### LSP Environment Variables
+
+| Variable | Description | Values |
+|----------|-------------|--------|
+| `ADRSCAN_LSP_ENABLED` | Enable LSP features | `true`, `false`, `1`, `0`, `yes`, `no`, `on`, `off` |
+| `ADRSCAN_LSP_MAX_DIAGNOSTICS` | Maximum diagnostics per document | `50`, `100`, `200` |
+| `ADRSCAN_LSP_RESPONSE_TIMEOUT` | Response timeout (milliseconds) | `5000`, `10000` |
+| `ADRSCAN_LSP_DEBUG_LOGGING` | Enable LSP debug logging | `true`, `false` |
 
 ## Command-Line Overrides
 
