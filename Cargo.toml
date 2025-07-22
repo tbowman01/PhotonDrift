@@ -46,25 +46,16 @@ tokio = { version = "1.0", features = ["full"], optional = true }
 
 # Language Server Protocol dependencies (conditional on lsp feature)
 tower-lsp = { version = "0.20", optional = true }
-lsp-types = { version = "0.94", optional = true }
+lsp-types = { version = "0.95", optional = true }
 tokio-util = { version = "0.7", optional = true, features = ["codec"] }
 
 # Real-time file watching and WebSocket support
 notify = { version = "6.1", optional = true }
-tokio-tungstenite = { version = "0.20", optional = true }
-dashmap = { version = "5.5", optional = true }
-crossbeam-channel = { version = "0.5", optional = true }
-
-# Real-time file system watching and analysis
-notify = { version = "6.1", optional = true }
 tokio-tungstenite = { version = "0.21", optional = true }
 dashmap = { version = "5.5", optional = true }
+crossbeam-channel = { version = "0.5", optional = true }
 crossbeam = { version = "0.8", optional = true }
 futures-util = { version = "0.3", optional = true }
-
-# LSP server dependencies
-tower-lsp = { version = "0.20", optional = true }
-lsp-types = { version = "0.95", optional = true }
 
 # Cryptographic hashing for file content
 sha2 = "0.10"
@@ -93,11 +84,9 @@ default = ["tokio"]
 wasm = ["wasm-bindgen", "js-sys", "web-sys", "console_error_panic_hook"]
 ml = ["smartcore", "ndarray", "rand", "nalgebra"]
 lsp = ["tokio", "tower-lsp", "lsp-types", "tokio-util"]
-realtime = ["tokio", "notify", "tokio-tungstenite", "dashmap", "crossbeam-channel"]
+realtime = ["tokio", "notify", "tokio-tungstenite", "dashmap", "crossbeam-channel", "crossbeam", "futures-util"]
 plugins = ["libloading", "wasmtime", "reqwest"]
-realtime = ["tokio", "notify", "tokio-tungstenite", "dashmap", "crossbeam", "futures-util"]
 websocket-client = ["tokio-tungstenite", "futures-util"]
-lsp = ["tokio", "tower-lsp", "lsp-types"]
 [dev-dependencies]
 tempfile = "3.8"
 assert_cmd = "2.0"
@@ -111,11 +100,6 @@ crate-type = ["cdylib", "rlib"]
 [[bin]]
 name = "adrscan"
 path = "src/main.rs"
-
-[[bin]]
-name = "adrscan-lsp"
-path = "src/bin/lsp.rs"
-required-features = ["lsp"]
 
 [[bin]]
 name = "adrscan-lsp"

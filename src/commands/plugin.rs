@@ -1,6 +1,7 @@
 //! Plugin management commands
 
-use crate::{Result, AdrscanError};
+use crate::error::AdrscanError;
+type Result<T> = std::result::Result<T, AdrscanError>;
 use clap::{Args, Subcommand};
 use serde_json;
 use std::path::PathBuf;
