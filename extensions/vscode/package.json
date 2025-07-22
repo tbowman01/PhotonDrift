@@ -1,10 +1,9 @@
 {
   "name": "photondrift-adr",
   "displayName": "PhotonDrift ADR Manager",
-  "description": "Architecture Decision Record management with AI-powered drift detection",
-  "version": "0.1.0",
-  "publisher": "photondrift",
-  "icon": "icon.png",
+  "description": "Architecture Decision Record management with AI-powered drift detection and ML-based analysis",
+  "version": "1.0.0",
+  "publisher": "photondrift-team",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -12,7 +11,8 @@
     "Other",
     "Linters",
     "Formatters",
-    "Snippets"
+    "Snippets",
+    "Language Packs"
   ],
   "keywords": [
     "architecture",
@@ -21,7 +21,12 @@
     "adr",
     "drift",
     "ai",
-    "ml"
+    "ml",
+    "documentation",
+    "markdown",
+    "analysis",
+    "enterprise",
+    "governance"
   ],
   "activationEvents": [
     "onLanguage:markdown",
@@ -37,8 +42,13 @@
     "languages": [
       {
         "id": "adr",
-        "aliases": ["Architecture Decision Record", "ADR"],
-        "extensions": [".md"],
+        "aliases": [
+          "Architecture Decision Record",
+          "ADR"
+        ],
+        "extensions": [
+          ".md"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -56,7 +66,7 @@
         "path": "./themes/adr-dark-theme.json"
       },
       {
-        "label": "PhotonDrift ADR Light", 
+        "label": "PhotonDrift ADR Light",
         "uiTheme": "vs",
         "path": "./themes/adr-light-theme.json"
       }
@@ -179,7 +189,11 @@
         },
         "photondrift.adr.template": {
           "type": "string",
-          "enum": ["madr", "basic", "custom"],
+          "enum": [
+            "madr",
+            "basic",
+            "custom"
+          ],
           "default": "madr",
           "description": "Default ADR template format"
         },
@@ -200,7 +214,13 @@
         },
         "photondrift.ml.model": {
           "type": "string",
-          "enum": ["IsolationForest", "OneClassSVM", "LOF", "Statistical", "Ensemble"],
+          "enum": [
+            "IsolationForest",
+            "OneClassSVM",
+            "LOF",
+            "Statistical",
+            "Ensemble"
+          ],
           "default": "Ensemble",
           "description": "ML model for drift detection"
         },
@@ -211,7 +231,11 @@
         },
         "photondrift.ui.theme": {
           "type": "string",
-          "enum": ["dark", "light", "auto"],
+          "enum": [
+            "dark",
+            "light",
+            "auto"
+          ],
           "default": "auto",
           "description": "UI theme for PhotonDrift views"
         },
@@ -255,18 +279,19 @@
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js",
-    "package": "vsce package",
-    "publish": "vsce publish"
+    "package": "npx @vscode/vsce package --no-yarn",
+    "publish": "npx @vscode/vsce publish --no-yarn",
+    "deploy": "npx @vscode/vsce package --no-yarn && npx @vscode/vsce publish --no-yarn"
   },
   "devDependencies": {
-    "@types/vscode": "^1.74.0",
     "@types/node": "16.x",
+    "@types/vscode": "^1.74.0",
     "@typescript-eslint/eslint-plugin": "^5.45.0",
     "@typescript-eslint/parser": "^5.45.0",
-    "eslint": "^8.28.0",
-    "typescript": "^4.9.4",
     "@vscode/test-electron": "^2.2.0",
-    "vsce": "^2.15.0"
+    "@vscode/vsce": "^3.6.0",
+    "eslint": "^8.28.0",
+    "typescript": "^4.9.4"
   },
   "dependencies": {
     "vscode-languageclient": "^8.0.2"
@@ -279,5 +304,26 @@
     "url": "https://github.com/tbowman01/PhotonDrift/issues"
   },
   "homepage": "https://github.com/tbowman01/PhotonDrift#readme",
-  "license": "MIT"
+  "license": "MIT",
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
+  "preview": false,
+  "qna": "https://github.com/tbowman01/PhotonDrift/discussions",
+  "sponsor": {
+    "url": "https://github.com/sponsors/tbowman01"
+  },
+  "badges": [
+    {
+      "url": "https://img.shields.io/github/stars/tbowman01/PhotonDrift.svg?style=social&label=Stars",
+      "href": "https://github.com/tbowman01/PhotonDrift",
+      "description": "GitHub Stars"
+    },
+    {
+      "url": "https://img.shields.io/github/license/tbowman01/PhotonDrift.svg",
+      "href": "https://github.com/tbowman01/PhotonDrift/blob/main/LICENSE",
+      "description": "License"
+    }
+  ]
 }

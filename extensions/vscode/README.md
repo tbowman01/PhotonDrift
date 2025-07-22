@@ -2,7 +2,9 @@
 
 > AI-powered Architecture Decision Record management with intelligent drift detection for VS Code
 
-[![Visual Studio Marketplace](https://img.shields.io/badge/VS%20Code-Extension-blue)](https://marketplace.visualstudio.com/)
+[![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/photondrift-team.photondrift-adr.svg)](https://marketplace.visualstudio.com/items?itemName=photondrift-team.photondrift-adr)
+[![Visual Studio Marketplace Downloads](https://img.shields.io/visual-studio-marketplace/d/photondrift-team.photondrift-adr.svg)](https://marketplace.visualstudio.com/items?itemName=photondrift-team.photondrift-adr)
+[![Visual Studio Marketplace Rating](https://img.shields.io/visual-studio-marketplace/r/photondrift-team.photondrift-adr.svg)](https://marketplace.visualstudio.com/items?itemName=photondrift-team.photondrift-adr)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## Overview
