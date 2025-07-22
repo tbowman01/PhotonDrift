@@ -3,7 +3,7 @@ name: Container Build and Publish
 on:
   workflow_dispatch:
   push:
-    branches: [ main, develop, testing/dogfood1 ]
+    branches: [ main, develop]
     paths:
       - 'src/**'
       - 'Cargo.toml'
@@ -20,7 +20,6 @@ on:
       - '.dockerignore'
   release:
     types: [ published ]
-  workflow_dispatch:
     inputs:
       push_to_registry:
         description: 'Push to container registry'
