@@ -1,0 +1,18 @@
+{{- if and .Values.cli.enabled .Values.cli.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "photondrift.fullname" . }}-workspace
+  labels:
+    {{- include "photondrift.labels" . | nindent 4 }}
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - {{ .Values.cli.persistence.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.cli.persistence.size }}
+  {{- if .Values.cli.persistence.storageClass }}
+  storageClassName: {{ .Values.cli.persistence.storageClass }}
+  {{- end }}
+{{- end }}

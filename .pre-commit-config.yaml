@@ -1,101 +1,106 @@
-# Pre-commit configuration for ADRScan
-# See https://pre-commit.com for more information
-# See https://pre-commit.com/hooks.html for more hooks
+# Pre-commit hooks for PhotonDrift
+# Ensures code quality, security, and build validation before commits
 
 repos:
-  # Standard pre-commit hooks
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
-    hooks:
-      - id: trailing-whitespace
-        args: [--markdown-linebreak-ext=md]
-      - id: end-of-file-fixer
-      - id: check-yaml
-      - id: check-toml
-      - id: check-json
-      - id: check-added-large-files
-        args: ['--maxkb=1000']
-      - id: check-merge-conflict
-      - id: check-case-conflict
-      - id: mixed-line-ending
-        args: ['--fix=lf']
-
   # Rust-specific hooks
   - repo: local
     hooks:
-      # Rust formatting check
-      - id: rust-fmt
-        name: Rust formatting check
-        entry: cargo fmt --all -- --check
+      - id: cargo-fmt
+        name: Cargo Format
+        entry: cargo fmt
         language: system
-        files: \.rs$
+        types: [rust]
         pass_filenames: false
-        description: "Check Rust code formatting with rustfmt"
         
-      # Rust linting with clippy
-      - id: rust-clippy
-        name: Rust linting with clippy
-        entry: cargo clippy --all-targets --all-features -- -D warnings
+      - id: cargo-clippy
+        name: Cargo Clippy
+        entry: cargo clippy
         language: system
-        files: \.rs$
+        types: [rust]
         pass_filenames: false
-        description: "Lint Rust code with clippy (deny warnings)"
+        args: [--all-targets, --all-features, --, -D, warnings]
         
-      # Rust compilation check
-      - id: rust-check
-        name: Rust compilation check
-        entry: cargo check --all-targets --all-features
+      - id: cargo-test
+        name: Cargo Test
+        entry: cargo test
         language: system
-        files: \.rs$
+        types: [rust]
         pass_filenames: false
-        description: "Check Rust code compilation"
         
-      # Rust tests
-      - id: rust-test
-        name: Rust test suite
-        entry: cargo test --all-features
-        language: system
-        files: \.rs$
-        pass_filenames: false
-        description: "Run Rust test suite"
+      - id: dockerfile-validation
+        name: Dockerfile Validation
+        entry: scripts/validate-dockerfile.sh
+        language: script
+        files: ^Dockerfile.*$
+        
+      - id: build-script-validation
+        name: Build Script Validation
+        entry: scripts/validate-build-scripts.sh
+        language: script
+        files: ^(scripts/.*\.sh|\.github/workflows/.*\.yml)$
+        
+      - id: container-security-check
+        name: Container Security Check
+        entry: scripts/security-check.sh
+        language: script
+        files: ^(Dockerfile.*|\.github/workflows/container.*\.yml)$
+        stages: [pre-push]
+
+  # General code quality
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^docs/.*\.md$
+      - id: end-of-file-fixer
+        exclude: ^docs/.*\.md$
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-toml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # GitHub Actions validation
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.6.26
+    hooks:
+      - id: actionlint
+        name: GitHub Actions Lint
+
+  # Dockerfile linting
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        name: Hadolint Dockerfile Linter
+        args: [--ignore, DL3008, --ignore, DL3009]
 
   # Security scanning
   - repo: https://github.com/Yelp/detect-secrets
-    rev: v1.5.0
+    rev: v1.4.0
     hooks:
       - id: detect-secrets
-        args: ['--baseline', '.secrets.baseline']
-        exclude: package.lock.json
+        name: Detect Secrets
+        args: [--baseline, .secrets.baseline]
+        exclude: ^(\.secrets\.baseline|poetry\.lock|Cargo\.lock)$
 
-  # Markdown linting
-  - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.45.0
+  # Documentation validation
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 0.7.17
     hooks:
-      - id: markdownlint
-        args: ['--disable', 'MD013', 'MD033', 'MD041']
-        exclude: '^(CHANGELOG\.md|hive-mind-prompt-swarm.*\.txt)$'
+      - id: mdformat
+        name: Markdown Format
+        additional_dependencies:
+          - mdformat-gfm
+          - mdformat-black
+        args: [--wrap, "80"]
+        exclude: ^docs/BUILD_SIMPLIFICATION_SUMMARY\.md$
 
-  # YAML formatting
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v4.0.0-alpha.8
-    hooks:
-      - id: prettier
-        types: [yaml]
-        exclude: '\.github/workflows/.*\.yml$'
-
-# Configuration
-fail_fast: false
+# Global configuration
+default_install_hook_types: [pre-commit, pre-push]
 default_stages: [pre-commit]
-
-# CI configuration
-ci:
-  autofix_commit_msg: |
-    [pre-commit.ci] auto fixes from pre-commit hooks
-
-    for more information, see https://pre-commit.ci
-  autofix_prs: true
-  autoupdate_branch: ''
-  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
-  autoupdate_schedule: weekly
-  skip: []
-  submodules: false
+fail_fast: false

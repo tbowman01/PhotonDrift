@@ -1,0 +1,200 @@
+# PhotonDrift Kubernetes deployment example
+# This deploys PhotonDrift as a scheduled job for ADR scanning
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: photondrift
+  labels:
+    name: photondrift
+    app.kubernetes.io/name: photondrift
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: photondrift
+  namespace: photondrift
+  labels:
+    app.kubernetes.io/name: photondrift
+    app.kubernetes.io/component: serviceaccount
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: photondrift-workspace
+  namespace: photondrift
+  labels:
+    app.kubernetes.io/name: photondrift
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: photondrift-config
+  namespace: photondrift
+  labels:
+    app.kubernetes.io/name: photondrift
+    app.kubernetes.io/component: config
+data:
+  adr-dir: "/workspace/adr"
+  output-dir: "/workspace/output"
+  log-level: "info"
+  enable-ml: "true"
+  drift-detection: "true"
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: photondrift-scanner
+  namespace: photondrift
+  labels:
+    app.kubernetes.io/name: photondrift
+    app.kubernetes.io/component: scanner
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: photondrift
+            app.kubernetes.io/component: scanner
+        spec:
+          serviceAccountName: photondrift
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            fsGroup: 65532
+          containers:
+          - name: photondrift
+            image: ghcr.io/tbowman01/photondrift:latest
+            imagePullPolicy: IfNotPresent
+            command:
+              - /usr/local/bin/adrscan
+            args:
+              - inventory
+              - --adr-dir
+              - "$(ADR_DIR)"
+              - --output-dir
+              - "$(OUTPUT_DIR)"
+              - --log-level
+              - "$(LOG_LEVEL)"
+              - --enable-ml
+              - --drift-detection
+            env:
+            - name: ADR_DIR
+              valueFrom:
+                configMapKeyRef:
+                  name: photondrift-config
+                  key: adr-dir
+            - name: OUTPUT_DIR
+              valueFrom:
+                configMapKeyRef:
+                  name: photondrift-config
+                  key: output-dir
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: photondrift-config
+                  key: log-level
+            - name: RUST_LOG
+              value: "$(LOG_LEVEL)"
+            resources:
+              limits:
+                cpu: 500m
+                memory: 512Mi
+              requests:
+                cpu: 100m
+                memory: 128Mi
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+              readOnlyRootFilesystem: true
+            volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: tmp
+              mountPath: /tmp
+          volumes:
+          - name: workspace
+            persistentVolumeClaim:
+              claimName: photondrift-workspace
+          - name: tmp
+            emptyDir: {}
+
+---
+# Optional: Job for one-time ADR analysis
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: photondrift-analysis
+  namespace: photondrift
+  labels:
+    app.kubernetes.io/name: photondrift
+    app.kubernetes.io/component: analysis
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: photondrift
+        app.kubernetes.io/component: analysis
+    spec:
+      serviceAccountName: photondrift
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      containers:
+      - name: photondrift
+        image: ghcr.io/tbowman01/photondrift:latest
+        imagePullPolicy: IfNotPresent
+        command:
+          - /usr/local/bin/adrscan
+        args:
+          - diff
+          - --adr-dir
+          - /workspace/adr
+          - --directory
+          - /workspace/src
+          - --output
+          - /workspace/output/drift-analysis.json
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 200m
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: workspace
+        persistentVolumeClaim:
+          claimName: photondrift-workspace
+      - name: tmp
+        emptyDir: {}

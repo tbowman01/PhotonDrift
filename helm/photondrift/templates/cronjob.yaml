@@ -1,0 +1,82 @@
+{{- if .Values.cli.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "photondrift.fullname" . }}-cli
+  labels:
+    {{- include "photondrift.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cli
+spec:
+  schedule: {{ .Values.cli.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "photondrift.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: cli
+        spec:
+          {{- with .Values.global.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          serviceAccountName: {{ include "photondrift.serviceAccountName" . }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          restartPolicy: OnFailure
+          containers:
+          - name: photondrift-cli
+            securityContext:
+              {{- toYaml .Values.cli.securityContext | nindent 14 }}
+            image: "{{ .Values.global.imageRegistry }}/{{ .Values.cli.image.repository }}:{{ .Values.cli.image.tag }}"
+            imagePullPolicy: {{ .Values.cli.image.pullPolicy }}
+            command:
+              - /usr/local/bin/adrscan
+            args:
+              - inventory
+              - --adr-dir
+              - {{ .Values.cli.config.adrDir }}
+              - --output-dir
+              - {{ .Values.cli.config.outputDir }}
+              - --log-level
+              - {{ .Values.cli.config.logLevel }}
+              {{- if .Values.cli.config.features.ml }}
+              - --enable-ml
+              {{- end }}
+              {{- if .Values.cli.config.features.drift_detection }}
+              - --drift-detection
+              {{- end }}
+            resources:
+              {{- toYaml .Values.cli.resources | nindent 14 }}
+            volumeMounts:
+            - name: workspace
+              mountPath: {{ .Values.cli.persistence.mountPath }}
+            - name: tmp
+              mountPath: /tmp
+            env:
+            - name: RUST_LOG
+              value: {{ .Values.cli.config.logLevel }}
+          volumes:
+          {{- if .Values.cli.persistence.enabled }}
+          - name: workspace
+            persistentVolumeClaim:
+              claimName: {{ include "photondrift.fullname" . }}-workspace
+          {{- else }}
+          - name: workspace
+            emptyDir: {}
+          {{- end }}
+          - name: tmp
+            emptyDir: {}
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

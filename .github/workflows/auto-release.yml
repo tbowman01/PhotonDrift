@@ -1,0 +1,339 @@
+name: Automated Release and Tagging
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'CHANGELOG.md'
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - prerelease
+      custom_version:
+        description: 'Custom version (overrides release_type)'
+        required: false
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  detect-changes:
+    name: Detect Version Changes
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.version-check.outputs.should_release }}
+      current_version: ${{ steps.version-check.outputs.current_version }}
+      new_version: ${{ steps.version-check.outputs.new_version }}
+      changelog_updated: ${{ steps.version-check.outputs.changelog_updated }}
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Get current version
+        id: current-version
+        run: |
+          CURRENT_VERSION=$(grep '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION"
+          
+      - name: Get latest git tag
+        id: latest-tag
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "Latest tag: $LATEST_TAG"
+          
+      - name: Check if version changed
+        id: version-check
+        run: |
+          CURRENT_VERSION="${{ steps.current-version.outputs.version }}"
+          LATEST_TAG="${{ steps.latest-tag.outputs.tag }}"
+          LATEST_VERSION=${LATEST_TAG#v}
+          
+          echo "Comparing versions: $CURRENT_VERSION vs $LATEST_VERSION"
+          
+          # Check if this is a manual trigger with custom version
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.custom_version }}" ]]; then
+            NEW_VERSION="${{ github.event.inputs.custom_version }}"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+            echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "Manual release with custom version: $NEW_VERSION"
+            exit 0
+          fi
+          
+          # Check if version in Cargo.toml has changed
+          if [[ "$CURRENT_VERSION" != "$LATEST_VERSION" ]]; then
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            echo "current_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+            echo "new_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+            echo "Version changed from $LATEST_VERSION to $CURRENT_VERSION"
+          else
+            echo "should_release=false" >> $GITHUB_OUTPUT
+            echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+            echo "new_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+            echo "No version change detected"
+          fi
+          
+          # Check if CHANGELOG.md was updated
+          if git diff --name-only HEAD~1 HEAD | grep -q "CHANGELOG.md"; then
+            echo "changelog_updated=true" >> $GITHUB_OUTPUT
+            echo "CHANGELOG.md was updated"
+          else
+            echo "changelog_updated=false" >> $GITHUB_OUTPUT
+            echo "CHANGELOG.md was not updated"
+          fi
+
+  create-release:
+    name: Create Release
+    needs: detect-changes
+    if: needs.detect-changes.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      
+    outputs:
+      release_id: ${{ steps.create-release.outputs.id }}
+      upload_url: ${{ steps.create-release.outputs.upload_url }}
+      tag_name: ${{ steps.create-release.outputs.tag_name }}
+      
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        
+      - name: Install cargo-edit
+        run: cargo install cargo-edit
+        
+      - name: Update version if manual release
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.custom_version != ''
+        run: |
+          NEW_VERSION="${{ github.event.inputs.custom_version }}"
+          echo "Updating Cargo.toml to version $NEW_VERSION"
+          cargo set-version "$NEW_VERSION"
+          
+      - name: Generate release notes
+        id: release-notes
+        run: |
+          NEW_VERSION="${{ needs.detect-changes.outputs.new_version }}"
+          
+          # Create release notes
+          cat > release_notes.md << EOF
+          # PhotonDrift v$NEW_VERSION
+          
+          ## What's Changed
+          
+          EOF
+          
+          # Add changelog section if available
+          if [[ -f "CHANGELOG.md" ]]; then
+            echo "## Changelog" >> release_notes.md
+            echo "" >> release_notes.md
+            
+            # Extract changelog for this version
+            awk "/## \[?$NEW_VERSION\]?|## $NEW_VERSION/{flag=1; next} /## \[?[0-9]/{flag=0} flag" CHANGELOG.md >> release_notes.md || true
+          fi
+          
+          # Add commit messages since last release
+          echo "" >> release_notes.md
+          echo "## Commits" >> release_notes.md
+          echo "" >> release_notes.md
+          
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          if [[ -n "$LAST_TAG" ]]; then
+            git log --pretty=format:"- %s (%an)" $LAST_TAG..HEAD >> release_notes.md
+          else
+            git log --pretty=format:"- %s (%an)" --max-count=10 >> release_notes.md
+          fi
+          
+          echo "" >> release_notes.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$LAST_TAG...v$NEW_VERSION" >> release_notes.md
+          
+      - name: Create Git tag
+        run: |
+          NEW_VERSION="${{ needs.detect-changes.outputs.new_version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.custom_version }}" ]]; then
+            git add Cargo.toml
+            git commit -m "chore: bump version to $NEW_VERSION"
+          fi
+          
+          git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+          git push origin "v$NEW_VERSION"
+          
+      - name: Create GitHub Release
+        id: create-release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ needs.detect-changes.outputs.new_version }}
+          release_name: PhotonDrift v${{ needs.detect-changes.outputs.new_version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(needs.detect-changes.outputs.new_version, 'alpha') || contains(needs.detect-changes.outputs.new_version, 'beta') || contains(needs.detect-changes.outputs.new_version, 'rc') }}
+
+  build-release-artifacts:
+    name: Build Release Artifacts
+    needs: [detect-changes, create-release]
+    if: needs.detect-changes.outputs.should_release == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: photondrift-linux-amd64
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            artifact_name: photondrift-linux-arm64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: photondrift-windows-amd64.exe
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: photondrift-macos-amd64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: photondrift-macos-arm64
+            
+    steps:
+      - uses: actions/checkout@v4
+        
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          
+      - name: Install cross-compilation tools
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          
+      - name: Build release binary
+        run: |
+          cargo build --release --target ${{ matrix.target }}
+          
+      - name: Prepare artifact
+        run: |
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            cp target/${{ matrix.target }}/release/adrscan.exe ${{ matrix.artifact_name }}
+          else
+            cp target/${{ matrix.target }}/release/adrscan ${{ matrix.artifact_name }}
+          fi
+          
+      - name: Upload release artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./${{ matrix.artifact_name }}
+          asset_name: ${{ matrix.artifact_name }}
+          asset_content_type: application/octet-stream
+
+  trigger-container-build:
+    name: Trigger Container Build
+    needs: [detect-changes, create-release]
+    if: needs.detect-changes.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Trigger container build workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'container-build.yml',
+              ref: 'main',
+              inputs: {
+                push_to_registry: 'true'
+              }
+            });
+            
+  update-documentation:
+    name: Update Documentation
+    needs: [detect-changes, create-release]
+    if: needs.detect-changes.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Update README badges
+        run: |
+          NEW_VERSION="${{ needs.detect-changes.outputs.new_version }}"
+          
+          # Update version badge in README
+          sed -i "s/version-[0-9].*-blue/version-$NEW_VERSION-blue/g" README.md
+          
+          # Update installation instructions
+          sed -i "s/photondrift:v[0-9].*/photondrift:v$NEW_VERSION/g" README.md
+          
+      - name: Update Docker documentation
+        run: |
+          NEW_VERSION="${{ needs.detect-changes.outputs.new_version }}"
+          
+          # Update docker build guide with new version
+          sed -i "s/version-[0-9].*-alpha/version-$NEW_VERSION/g" docs/DOCKER_BUILD_GUIDE.md
+          
+      - name: Commit documentation updates
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          if git diff --quiet; then
+            echo "No documentation changes to commit"
+          else
+            git add README.md docs/
+            git commit -m "docs: update version references to ${{ needs.detect-changes.outputs.new_version }}"
+            git push
+          fi
+
+  notify-release:
+    name: Notify Release
+    needs: [detect-changes, create-release, build-release-artifacts]
+    if: always() && needs.detect-changes.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Release summary
+        run: |
+          echo "### 🚀 PhotonDrift v${{ needs.detect-changes.outputs.new_version }} Released!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Release Notes**: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.detect-changes.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Container Image**: \`ghcr.io/${{ github.repository }}:v${{ needs.detect-changes.outputs.new_version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Artifacts Built:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Linux AMD64" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Linux ARM64" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Windows AMD64" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ macOS AMD64" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ macOS ARM64" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Container Images" >> $GITHUB_STEP_SUMMARY

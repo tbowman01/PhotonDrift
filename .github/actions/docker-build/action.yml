@@ -1,0 +1,131 @@
+name: 'Docker Build Action'
+description: 'Reusable Docker build action with caching and security scanning'
+author: 'PhotonDrift'
+
+inputs:
+  context:
+    description: 'Build context path'
+    required: false
+    default: '.'
+  dockerfile:
+    description: 'Path to Dockerfile'
+    required: false
+    default: './Dockerfile'
+  image-name:
+    description: 'Image name (without registry)'
+    required: true
+  registry:
+    description: 'Container registry'
+    required: false
+    default: 'ghcr.io'
+  platforms:
+    description: 'Target platforms'
+    required: false
+    default: 'linux/amd64'
+  push:
+    description: 'Push image to registry'
+    required: false
+    default: 'false'
+  build-args:
+    description: 'Build arguments (multiline)'
+    required: false
+    default: ''
+  scan-severity:
+    description: 'Security scan severity levels'
+    required: false
+    default: 'CRITICAL,HIGH'
+  cache-key:
+    description: 'Cache key prefix'
+    required: false
+    default: 'docker-build'
+
+outputs:
+  image-tag:
+    description: 'Full image tag'
+    value: ${{ steps.build.outputs.imageid }}
+  digest:
+    description: 'Image digest'
+    value: ${{ steps.build.outputs.digest }}
+  metadata:
+    description: 'Image metadata JSON'
+    value: ${{ steps.build.outputs.metadata }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Normalize image name
+      shell: bash
+      run: |
+        # Ensure lowercase image name
+        IMAGE_LOWER=$(echo "${{ inputs.image-name }}" | tr '[:upper:]' '[:lower:]')
+        echo "IMAGE_NAME_LOWER=$IMAGE_LOWER" >> $GITHUB_ENV
+        echo "FULL_IMAGE=${{ inputs.registry }}/$IMAGE_LOWER" >> $GITHUB_ENV
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        platforms: ${{ inputs.platforms }}
+
+    - name: Generate cache keys
+      shell: bash
+      run: |
+        # Smart cache key generation
+        CACHE_KEY="${{ inputs.cache-key }}-${{ hashFiles(inputs.dockerfile) }}"
+        echo "CACHE_FROM=type=gha,scope=$CACHE_KEY" >> $GITHUB_ENV
+        echo "CACHE_TO=type=gha,mode=max,scope=$CACHE_KEY" >> $GITHUB_ENV
+        
+        # Add registry cache if pushing
+        if [[ "${{ inputs.push }}" == "true" ]]; then
+          echo "REGISTRY_CACHE=${{ env.FULL_IMAGE }}:buildcache" >> $GITHUB_ENV
+        fi
+
+    - name: Build Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: ${{ inputs.context }}
+        file: ${{ inputs.dockerfile }}
+        platforms: ${{ inputs.platforms }}
+        push: ${{ inputs.push }}
+        load: ${{ inputs.push == 'false' && contains(inputs.platforms, ',') == false }}
+        tags: ${{ env.FULL_IMAGE }}:latest
+        build-args: ${{ inputs.build-args }}
+        cache-from: |
+          ${{ env.CACHE_FROM }}
+          ${{ env.REGISTRY_CACHE && format('type=registry,ref={0}', env.REGISTRY_CACHE) || '' }}
+        cache-to: |
+          ${{ env.CACHE_TO }}
+          ${{ inputs.push == 'true' && env.REGISTRY_CACHE && format('type=registry,ref={0},mode=max', env.REGISTRY_CACHE) || '' }}
+
+    - name: Run security scan
+      if: always() && steps.build.outcome == 'success'
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.FULL_IMAGE }}:latest
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        severity: ${{ inputs.scan-severity }}
+        exit-code: '0'
+
+    - name: Upload scan results
+      if: always() && steps.build.outcome == 'success'
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: 'trivy-results.sarif'
+        category: 'container-scan-${{ inputs.image-name }}'
+
+    - name: Generate build summary
+      if: always()
+      shell: bash
+      run: |
+        echo "### Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Image:** ${{ env.FULL_IMAGE }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Platforms:** ${{ inputs.platforms }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Push:** ${{ inputs.push }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Build Status:** ${{ steps.build.outcome }}" >> $GITHUB_STEP_SUMMARY
+        
+        if [[ -f trivy-results.sarif ]]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Security Scan:** Completed" >> $GITHUB_STEP_SUMMARY
+        fi
