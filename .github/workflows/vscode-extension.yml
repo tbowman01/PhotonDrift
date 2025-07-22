@@ -72,7 +72,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18.x'
+        node-version: '22.x'
         cache: 'npm'
         cache-dependency-path: extensions/vscode/package-lock.json
         
@@ -109,7 +109,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18.x'
+        node-version: '22.x'
         cache: 'npm'
         cache-dependency-path: extensions/vscode/package-lock.json
         
