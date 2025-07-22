@@ -5,6 +5,18 @@ All notable changes to the PhotonDrift ADR Manager extension will be documented 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2024-07-22
+
+### Updated
+- **Node.js Compatibility**: Extended support to Node.js 20.x, 22.x, and 24.x for better future compatibility
+- **CI/CD Pipeline**: Updated GitHub Actions workflow to test against latest Node.js LTS versions
+- **Build Tools**: Updated to @vscode/vsce for secure extension packaging and publishing
+- **Dependencies**: Updated @types/node to 20.x for improved TypeScript definitions
+
+### Performance
+- **Faster Builds**: Optimized for newer Node.js versions with improved performance
+- **Better Caching**: Enhanced npm cache strategy in CI/CD pipeline
+
 ## [1.0.0] - 2024-07-22
 
 ### Added
