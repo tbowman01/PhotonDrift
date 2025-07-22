@@ -1,7 +1,7 @@
 # Optimized multi-stage Dockerfile with improved caching
 # Build arguments for flexibility
 ARG RUST_VERSION=1.75
-ARG ALPINE_VERSION=3.18
+ARG ALPINE_VERSION=3.22
 
 # ==== Dependencies Stage ====
 # Cache dependencies separately for faster rebuilds
