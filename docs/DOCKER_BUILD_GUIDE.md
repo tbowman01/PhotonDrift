@@ -196,7 +196,7 @@ docker build -t photondrift:local . 2>&1 | tee build.log
 
 ### GitHub Actions
 
-The repository includes automated Docker builds. See `.github/workflows/docker.yml` for the CI configuration.
+The repository includes automated Docker builds. See `.github/workflows/container-build.yml` for the CI configuration.
 
 ### Manual CI Build
 
