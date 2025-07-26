@@ -49,7 +49,7 @@ RUN apk add --no-cache ca-certificates && \
     adduser -D -u 65532 nonroot
 
 # Copy binary from builder
-COPY --from=builder /build/target/release/adrscan /usr/local/bin/adrscan
+COPY --from=builder /target/release/adrscan /usr/local/bin/adrscan
 
 # Switch to non-root user
 USER 65532:65532
