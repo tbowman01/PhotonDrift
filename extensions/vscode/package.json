@@ -290,7 +290,7 @@
     "@typescript-eslint/parser": "^5.45.0",
     "@vscode/test-electron": "^2.2.0",
     "@vscode/vsce": "^3.6.0",
-    "eslint": "^8.28.0",
+    "eslint": "^9.0.0",
     "typescript": "^4.9.4"
   },
   "dependencies": {
