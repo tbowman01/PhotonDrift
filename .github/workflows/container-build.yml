@@ -129,21 +129,43 @@ jobs:
           provenance: ${{ env.SHOULD_PUSH }}
           sbom: ${{ env.SHOULD_PUSH }}
 
-      # Simplified test step - only runs on PRs
+      # Enhanced test step with adrscan binary verification
       - name: Test container
         if: github.event_name == 'pull_request'
         run: |
           set -e
           IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ env.BUILD_TYPE }}-${{ env.GIT_SHA }}"
           
-          # Quick smoke tests
+          # Test 1: Verify adrscan binary exists in the container
+          echo "🔍 Testing if adrscan binary exists..."
+          docker run --rm "$IMAGE" sh -c "test -f /usr/local/bin/adrscan && echo '✅ adrscan binary exists'" || {
+            echo "❌ adrscan binary not found in container"
+            exit 1
+          }
+          
+          # Test 2: Verify adrscan --help returns help menu
+          echo "🔍 Testing adrscan --help functionality..."
+          HELP_OUTPUT=$(docker run --rm "$IMAGE" --help)
+          if echo "$HELP_OUTPUT" | grep -q "Architecture Decision Record (ADR) management and drift detection"; then
+            echo "✅ adrscan --help returns expected help menu"
+          else
+            echo "❌ adrscan --help does not return expected help menu"
+            echo "Actual output: $HELP_OUTPUT"
+            exit 1
+          fi
+          
+          # Additional smoke tests
+          echo "🔍 Testing adrscan --version..."
           docker run --rm "$IMAGE" --version
-          docker run --rm "$IMAGE" --help
           
           # Verify non-root execution
-          [[ $(docker run --rm "$IMAGE" id -u) != "0" ]] || exit 1
+          echo "🔍 Testing non-root execution..."
+          [[ $(docker run --rm "$IMAGE" id -u) != "0" ]] || {
+            echo "❌ Container is running as root user"
+            exit 1
+          }
           
-          echo "✅ Container tests passed"
+          echo "✅ All container tests passed"
 
       # Security scan - runs on all builds
       - name: Security scan
