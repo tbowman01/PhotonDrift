@@ -1,0 +1,232 @@
+name: PR Manager - Automated Description Enhancement
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to enhance'
+        required: true
+        type: number
+      force_update:
+        description: 'Force update even if description exists'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  analyze-pr:
+    name: Analyze PR Changes
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    outputs:
+      pr-number: ${{ steps.pr-info.outputs.pr-number }}
+      pr-title: ${{ steps.pr-info.outputs.pr-title }}
+      pr-author: ${{ steps.pr-info.outputs.pr-author }}
+      commit-count: ${{ steps.analysis.outputs.commit-count }}
+      files-changed: ${{ steps.analysis.outputs.files-changed }}
+      has-breaking-changes: ${{ steps.analysis.outputs.has-breaking-changes }}
+      change-type: ${{ steps.analysis.outputs.change-type }}
+      complexity-score: ${{ steps.analysis.outputs.complexity-score }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get PR information
+        id: pr-info
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            PR_NUMBER="${{ github.event.inputs.pr_number }}"
+          else
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+          fi
+          
+          echo "pr-number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          
+          # Get PR details
+          PR_INFO=$(gh pr view $PR_NUMBER --json title,author,headRefName,baseRefName,body)
+          echo "pr-title=$(echo "$PR_INFO" | jq -r '.title')" >> $GITHUB_OUTPUT
+          echo "pr-author=$(echo "$PR_INFO" | jq -r '.author.login')" >> $GITHUB_OUTPUT
+          echo "head-ref=$(echo "$PR_INFO" | jq -r '.headRefName')" >> $GITHUB_OUTPUT
+          echo "base-ref=$(echo "$PR_INFO" | jq -r '.baseRefName')" >> $GITHUB_OUTPUT
+          
+          # Check if description needs enhancement
+          BODY_LENGTH=$(echo "$PR_INFO" | jq -r '.body' | wc -c)
+          echo "body-length=$BODY_LENGTH" >> $GITHUB_OUTPUT
+          
+          # Determine if enhancement is needed
+          if [[ $BODY_LENGTH -lt 500 || "${{ github.event.inputs.force_update }}" == "true" ]]; then
+            echo "needs-enhancement=true" >> $GITHUB_OUTPUT
+          else
+            echo "needs-enhancement=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Analyze PR changes
+        id: analysis
+        run: |
+          PR_NUMBER="${{ steps.pr-info.outputs.pr-number }}"
+          
+          # Get commits and files
+          COMMITS=$(gh pr view $PR_NUMBER --json commits | jq -r '.commits | length')
+          FILES=$(gh pr diff $PR_NUMBER --name-only | wc -l)
+          
+          echo "commit-count=$COMMITS" >> $GITHUB_OUTPUT
+          echo "files-changed=$FILES" >> $GITHUB_OUTPUT
+          
+          # Analyze commit messages for breaking changes
+          BREAKING_CHANGES="false"
+          if gh pr view $PR_NUMBER --json commits | jq -r '.commits[].messageHeadline' | grep -i "BREAKING\|breaking change\|!:"; then
+            BREAKING_CHANGES="true"
+          fi
+          echo "has-breaking-changes=$BREAKING_CHANGES" >> $GITHUB_OUTPUT
+          
+          # Determine change type based on patterns
+          CHANGE_TYPE="other"
+          DIFF_CONTENT=$(gh pr diff $PR_NUMBER)
+          
+          if echo "$DIFF_CONTENT" | grep -q "feat:\|feature:\|add:"; then
+            CHANGE_TYPE="feature"
+          elif echo "$DIFF_CONTENT" | grep -q "fix:\|bugfix:\|bug:"; then
+            CHANGE_TYPE="bugfix"
+          elif echo "$DIFF_CONTENT" | grep -q "docs:\|documentation:"; then
+            CHANGE_TYPE="documentation"
+          elif echo "$DIFF_CONTENT" | grep -q "test:\|tests:"; then
+            CHANGE_TYPE="testing"
+          elif echo "$DIFF_CONTENT" | grep -q "refactor:\|refactoring:"; then
+            CHANGE_TYPE="refactor"
+          elif echo "$DIFF_CONTENT" | grep -q "perf:\|performance:"; then
+            CHANGE_TYPE="performance"
+          elif echo "$DIFF_CONTENT" | grep -q "ci:\|cd:\|workflow:"; then
+            CHANGE_TYPE="ci-cd"
+          fi
+          
+          echo "change-type=$CHANGE_TYPE" >> $GITHUB_OUTPUT
+          
+          # Calculate complexity score
+          COMPLEXITY=0
+          [[ $FILES -gt 50 ]] && COMPLEXITY=$((COMPLEXITY + 3))
+          [[ $FILES -gt 20 ]] && COMPLEXITY=$((COMPLEXITY + 2))
+          [[ $FILES -gt 10 ]] && COMPLEXITY=$((COMPLEXITY + 1))
+          [[ $COMMITS -gt 10 ]] && COMPLEXITY=$((COMPLEXITY + 2))
+          [[ $COMMITS -gt 5 ]] && COMPLEXITY=$((COMPLEXITY + 1))
+          [[ "$BREAKING_CHANGES" == "true" ]] && COMPLEXITY=$((COMPLEXITY + 3))
+          
+          echo "complexity-score=$COMPLEXITY" >> $GITHUB_OUTPUT
+
+  enhance-pr-description:
+    name: Generate Enhanced PR Description
+    runs-on: ubuntu-latest
+    needs: analyze-pr
+    if: needs.analyze-pr.outputs.needs-enhancement == 'true' || github.event.inputs.force_update == 'true'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate enhanced description
+        id: generate-description
+        run: |
+          PR_NUMBER="${{ needs.analyze-pr.outputs.pr-number }}"
+          
+          # Get detailed PR information
+          PR_COMMITS=$(gh pr view $PR_NUMBER --json commits | jq -r '.commits[] | "\(.messageHeadline) - \(.oid[0:7])"')
+          PR_FILES=$(gh pr diff $PR_NUMBER --name-only | head -20)
+          PR_DIFF_STATS=$(gh pr diff $PR_NUMBER --stat | tail -1)
+          
+          # Create enhanced description
+          cat > enhanced_description.md << 'EOF'
+          # 🚀 Pull Request: ${{ needs.analyze-pr.outputs.pr-title }}
+
+          ## 📋 Overview
+          This pull request introduces ${{ needs.analyze-pr.outputs.change-type }} changes affecting ${{ needs.analyze-pr.outputs.files-changed }} files across ${{ needs.analyze-pr.outputs.commit-count }} commits.
+
+          ## 🎯 Change Summary
+          
+          ### Type of Change
+          - [x] ${{ needs.analyze-pr.outputs.change-type == 'feature' && '✨ New feature' || '' }}
+          - [x] ${{ needs.analyze-pr.outputs.change-type == 'bugfix' && '🐛 Bug fix' || '' }}
+          - [x] ${{ needs.analyze-pr.outputs.change-type == 'documentation' && '📚 Documentation update' || '' }}
+          - [x] ${{ needs.analyze-pr.outputs.change-type == 'testing' && '🧪 Test improvements' || '' }}
+          - [x] ${{ needs.analyze-pr.outputs.change-type == 'refactor' && '🔧 Code refactoring' || '' }}
+          - [x] ${{ needs.analyze-pr.outputs.change-type == 'performance' && '⚡ Performance improvement' || '' }}
+          - [x] ${{ needs.analyze-pr.outputs.change-type == 'ci-cd' && '🔨 CI/CD improvements' || '' }}
+          - [x] ${{ needs.analyze-pr.outputs.has-breaking-changes == 'true' && '💥 Breaking changes' || '' }}
+
+          ### Complexity Assessment
+          **Complexity Score: ${{ needs.analyze-pr.outputs.complexity-score }}/10**
+          - Files Changed: ${{ needs.analyze-pr.outputs.files-changed }}
+          - Commits: ${{ needs.analyze-pr.outputs.commit-count }}
+          - Breaking Changes: ${{ needs.analyze-pr.outputs.has-breaking-changes }}
+
+          ## 📊 Changes Overview
+
+          ### Commit History
+          ```
+          EOF
+          
+          # Add commit list
+          echo "$PR_COMMITS" >> enhanced_description.md
+          
+          cat >> enhanced_description.md << 'EOF'
+          ```
+
+          ### Modified Files
+          <details>
+          <summary>View changed files (${{ needs.analyze-pr.outputs.files-changed }} total)</summary>
+
+          ```
+          EOF
+          
+          # Add file list
+          echo "$PR_FILES" >> enhanced_description.md
+          [[ ${{ needs.analyze-pr.outputs.files-changed }} -gt 20 ]] && echo "... and $(($${{ needs.analyze-pr.outputs.files-changed }} - 20)) more files" >> enhanced_description.md
+          
+          cat >> enhanced_description.md << 'EOF'
+          ```
+          </details>
+
+          ## 🧪 Testing Checklist
+          - [ ] Unit tests added/updated
+          - [ ] Integration tests verified
+          - [ ] Manual testing completed
+          - [ ] All existing tests pass
+          - [ ] Performance impact assessed
+
+          ## 📚 Documentation
+          - [ ] Code comments updated
+          - [ ] README updated (if applicable)
+          - [ ] API documentation updated
+          - [ ] Migration guide provided (if breaking changes)
+
+          ---
+          
+          **Auto-generated by PR Manager Workflow** 
+          
+          *Original author: @${{ needs.analyze-pr.outputs.pr-author }}*
+          
+          🤖 Enhanced with [Claude Code](https://claude.ai/code)
+          EOF
+          
+          # Store the description
+          echo "description-file=enhanced_description.md" >> $GITHUB_OUTPUT
+
+      - name: Update PR description
+        run: |
+          PR_NUMBER="${{ needs.analyze-pr.outputs.pr-number }}"
+          
+          # Update the PR with enhanced description
+          gh pr edit $PR_NUMBER --body-file enhanced_description.md
+          
+          echo "✅ Enhanced description applied to PR #$PR_NUMBER"
