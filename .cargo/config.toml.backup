@@ -1,0 +1,86 @@
+# Cargo configuration for optimized WASM builds
+
+[target.wasm32-unknown-unknown]
+rustflags = [
+    # Enable SIMD for performance
+    "-C", "target-feature=+simd128",
+    "-C", "target-feature=+bulk-memory",
+    "-C", "target-feature=+mutable-globals",
+    "-C", "target-feature=+sign-ext",
+    
+    # Memory optimization
+    "-C", "link-arg=--import-memory",
+    "-C", "link-arg=--max-memory=67108864",  # 64MB max
+    "-C", "link-arg=--initial-memory=2097152", # 2MB initial
+    "-C", "link-arg=--global-base=1024",
+    
+    # Size optimization
+    "-C", "link-arg=--strip-debug",
+    "-C", "link-arg=--strip-all",
+    "-C", "link-arg=--gc-sections",
+    "-C", "link-arg=--compress-relocations",
+    
+    # Performance optimization
+    "-C", "link-arg=--allow-undefined",
+    "-C", "link-arg=--no-entry",
+    "-C", "link-arg=--export-dynamic",
+    
+    # Advanced optimizations
+    "-C", "llvm-args=-wasm-enable-sjlj",
+    "-C", "llvm-args=-wasm-disable-explicit-locals",
+    "-C", "embed-bitcode=yes"
+]
+
+# Build configuration
+[build]
+# Use multiple jobs for faster builds
+jobs = 4
+
+[profile.release]
+# Aggressive size optimization for WASM
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+overflow-checks = false
+debug-assertions = false
+
+[profile.release.package."*"]
+# Apply optimizations to all dependencies
+opt-level = "z"
+
+# Specific optimizations for common dependencies
+[profile.release.package.wasm-bindgen]
+opt-level = "z"
+
+[profile.release.package.js-sys]
+opt-level = "z"
+
+[profile.release.package.web-sys]
+opt-level = "z"
+
+[profile.release.package.serde]
+opt-level = "z"
+
+[profile.release.package.serde_json]
+opt-level = "z"
+
+# Build cache settings
+[build.cache]
+# Enable incremental compilation for development
+incremental = true
+
+# Registry and source configuration
+[registry]
+default = "crates-io"
+
+[registry.crates-io]
+protocol = "sparse"
+
+# Environment specific settings
+[env]
+# Use system allocator for smaller builds
+RUST_LIB_BACKTRACE = "0"
+CARGO_PROFILE_RELEASE_DEBUG = "false"
+CARGO_PROFILE_RELEASE_PANIC = "abort"

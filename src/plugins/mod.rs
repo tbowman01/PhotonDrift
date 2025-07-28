@@ -3,19 +3,19 @@
 //! This module provides a comprehensive plugin architecture for extending PhotonDrift
 //! with IDE integrations, custom drift analysis rules, and third-party extensions.
 
-pub mod manager;
-pub mod traits;
-pub mod security;
-pub mod marketplace;
 pub mod ide;
+pub mod manager;
+pub mod marketplace;
+pub mod security;
+pub mod traits;
 
-pub use manager::{PluginManager, PluginLoadError};
-pub use traits::{
-    Plugin, DriftAnalysisPlugin, IDEIntegrationPlugin, TemplatePlugin,
-    PluginCapability, PluginMetadata, PluginContext
-};
-pub use security::{PluginValidator, SecurityPolicy, SandboxManager};
+pub use manager::{PluginLoadError, PluginManager};
 pub use marketplace::{MarketplaceClient, PluginPackage, PluginRegistry};
+pub use security::{PluginValidator, SandboxManager, SecurityPolicy};
+pub use traits::{
+    DriftAnalysisPlugin, IDEIntegrationPlugin, Plugin, PluginCapability, PluginContext,
+    PluginMetadata, TemplatePlugin,
+};
 
 /// Plugin system result type
 pub type PluginResult<T> = std::result::Result<T, PluginLoadError>;

@@ -3,7 +3,7 @@
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range, Url};
 use std::collections::HashMap;
 
-use crate::{drift::DriftDetector, config::Config, Result};
+use crate::{config::Config, drift::DriftDetector, Result};
 
 /// Engine for creating LSP diagnostics from drift detection
 pub struct DiagnosticEngine {
@@ -50,11 +50,19 @@ impl DiagnosticEngine {
         if !lines.iter().any(|line| line.starts_with("# ")) {
             diagnostics.push(Diagnostic {
                 range: Range {
-                    start: Position { line: 0, character: 0 },
-                    end: Position { line: 0, character: 0 },
+                    start: Position {
+                        line: 0,
+                        character: 0,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 0,
+                    },
                 },
                 severity: Some(DiagnosticSeverity::WARNING),
-                code: Some(lsp_types::NumberOrString::String("missing-title".to_string())),
+                code: Some(lsp_types::NumberOrString::String(
+                    "missing-title".to_string(),
+                )),
                 source: Some("photondrift".to_string()),
                 message: "ADR should have a title starting with '# ADR-XXX:'".to_string(),
                 related_information: None,
@@ -67,11 +75,19 @@ impl DiagnosticEngine {
         if !content.to_lowercase().contains("## status") {
             diagnostics.push(Diagnostic {
                 range: Range {
-                    start: Position { line: 0, character: 0 },
-                    end: Position { line: 0, character: 0 },
+                    start: Position {
+                        line: 0,
+                        character: 0,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 0,
+                    },
                 },
                 severity: Some(DiagnosticSeverity::WARNING),
-                code: Some(lsp_types::NumberOrString::String("missing-status".to_string())),
+                code: Some(lsp_types::NumberOrString::String(
+                    "missing-status".to_string(),
+                )),
                 source: Some("photondrift".to_string()),
                 message: "ADR should include a '## Status' section".to_string(),
                 related_information: None,
@@ -84,11 +100,19 @@ impl DiagnosticEngine {
         if !content.to_lowercase().contains("## context") {
             diagnostics.push(Diagnostic {
                 range: Range {
-                    start: Position { line: 0, character: 0 },
-                    end: Position { line: 0, character: 0 },
+                    start: Position {
+                        line: 0,
+                        character: 0,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 0,
+                    },
                 },
                 severity: Some(DiagnosticSeverity::INFO),
-                code: Some(lsp_types::NumberOrString::String("missing-context".to_string())),
+                code: Some(lsp_types::NumberOrString::String(
+                    "missing-context".to_string(),
+                )),
                 source: Some("photondrift".to_string()),
                 message: "Consider adding a '## Context' section".to_string(),
                 related_information: None,
@@ -101,11 +125,19 @@ impl DiagnosticEngine {
         if !content.to_lowercase().contains("## decision") {
             diagnostics.push(Diagnostic {
                 range: Range {
-                    start: Position { line: 0, character: 0 },
-                    end: Position { line: 0, character: 0 },
+                    start: Position {
+                        line: 0,
+                        character: 0,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 0,
+                    },
                 },
                 severity: Some(DiagnosticSeverity::WARNING),
-                code: Some(lsp_types::NumberOrString::String("missing-decision".to_string())),
+                code: Some(lsp_types::NumberOrString::String(
+                    "missing-decision".to_string(),
+                )),
                 source: Some("photondrift".to_string()),
                 message: "ADR should include a '## Decision' section".to_string(),
                 related_information: None,
@@ -134,11 +166,19 @@ impl DiagnosticEngine {
                 if next_line_idx < lines.len() && lines[next_line_idx].starts_with("## ") {
                     diagnostics.push(Diagnostic {
                         range: Range {
-                            start: Position { line: i as u32, character: 0 },
-                            end: Position { line: i as u32, character: line.len() as u32 },
+                            start: Position {
+                                line: i as u32,
+                                character: 0,
+                            },
+                            end: Position {
+                                line: i as u32,
+                                character: line.len() as u32,
+                            },
                         },
                         severity: Some(DiagnosticSeverity::WARNING),
-                        code: Some(lsp_types::NumberOrString::String("empty-section".to_string())),
+                        code: Some(lsp_types::NumberOrString::String(
+                            "empty-section".to_string(),
+                        )),
                         source: Some("photondrift".to_string()),
                         message: format!("Section '{}' appears to be empty", line.trim()),
                         related_information: None,
@@ -156,8 +196,14 @@ impl DiagnosticEngine {
                 if line.contains("](http") && (line.contains("404") || line.contains("broken")) {
                     diagnostics.push(Diagnostic {
                         range: Range {
-                            start: Position { line: i as u32, character: 0 },
-                            end: Position { line: i as u32, character: line.len() as u32 },
+                            start: Position {
+                                line: i as u32,
+                                character: 0,
+                            },
+                            end: Position {
+                                line: i as u32,
+                                character: line.len() as u32,
+                            },
                         },
                         severity: Some(DiagnosticSeverity::ERROR),
                         code: Some(lsp_types::NumberOrString::String("broken-link".to_string())),
@@ -178,11 +224,19 @@ impl DiagnosticEngine {
                 if line.to_lowercase().contains(&tech.to_lowercase()) {
                     diagnostics.push(Diagnostic {
                         range: Range {
-                            start: Position { line: i as u32, character: 0 },
-                            end: Position { line: i as u32, character: line.len() as u32 },
+                            start: Position {
+                                line: i as u32,
+                                character: 0,
+                            },
+                            end: Position {
+                                line: i as u32,
+                                character: line.len() as u32,
+                            },
                         },
                         severity: Some(DiagnosticSeverity::HINT),
-                        code: Some(lsp_types::NumberOrString::String("outdated-tech".to_string())),
+                        code: Some(lsp_types::NumberOrString::String(
+                            "outdated-tech".to_string(),
+                        )),
                         source: Some("photondrift".to_string()),
                         message: format!("Reference to potentially outdated technology: {}", tech),
                         related_information: None,
@@ -213,15 +267,23 @@ pub fn create_drift_diagnostic(drift_item: &crate::drift::DriftItem, content: &s
 
     Diagnostic {
         range: Range {
-            start: Position { line: line_number, character: 0 },
-            end: Position { 
-                line: line_number, 
-                character: content.lines().nth(line_number as usize)
-                    .map(|l| l.len()).unwrap_or(0) as u32 
+            start: Position {
+                line: line_number,
+                character: 0,
+            },
+            end: Position {
+                line: line_number,
+                character: content
+                    .lines()
+                    .nth(line_number as usize)
+                    .map(|l| l.len())
+                    .unwrap_or(0) as u32,
             },
         },
         severity: Some(severity),
-        code: Some(lsp_types::NumberOrString::String("drift-detected".to_string())),
+        code: Some(lsp_types::NumberOrString::String(
+            "drift-detected".to_string(),
+        )),
         source: Some("photondrift".to_string()),
         message: format!("{}: {}", drift_item.summary, drift_item.description),
         related_information: None,
@@ -237,20 +299,23 @@ mod tests {
     #[tokio::test]
     async fn test_adr_structure_validation() {
         let engine = DiagnosticEngine::new();
-        
+
         // Test content missing title
         let content = "This is not a proper ADR";
         let uri = Url::parse("file:///test.md").unwrap();
         let diagnostics = engine.analyze_content(content, &uri).await.unwrap();
-        
+
         assert!(!diagnostics.is_empty());
-        assert!(diagnostics.iter().any(|d| d.code == Some(lsp_types::NumberOrString::String("missing-title".to_string()))));
+        assert!(diagnostics.iter().any(|d| d.code
+            == Some(lsp_types::NumberOrString::String(
+                "missing-title".to_string()
+            ))));
     }
 
     #[tokio::test]
     async fn test_proper_adr_structure() {
         let engine = DiagnosticEngine::new();
-        
+
         let content = r#"# ADR-001: Use Rust for Backend
 
 ## Status
@@ -265,15 +330,16 @@ We will use Rust.
 ## Consequences
 Better performance.
 "#;
-        
+
         let uri = Url::parse("file:///test.md").unwrap();
         let diagnostics = engine.analyze_content(content, &uri).await.unwrap();
-        
+
         // Should have fewer warnings for proper ADR
-        let warnings = diagnostics.iter().filter(|d| {
-            matches!(d.severity, Some(DiagnosticSeverity::WARNING))
-        }).count();
-        
+        let warnings = diagnostics
+            .iter()
+            .filter(|d| matches!(d.severity, Some(DiagnosticSeverity::WARNING)))
+            .count();
+
         assert!(warnings <= 1); // May have some minor suggestions
     }
 
@@ -287,10 +353,13 @@ Better performance.
 ## Context
 Some context here
 "#;
-        
+
         let diagnostics = engine.check_adr_content_quality(content);
         assert!(diagnostics.iter().any(|d| {
-            d.code == Some(lsp_types::NumberOrString::String("empty-section".to_string()))
+            d.code
+                == Some(lsp_types::NumberOrString::String(
+                    "empty-section".to_string(),
+                ))
         }));
     }
 }

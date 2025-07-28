@@ -307,7 +307,7 @@ impl FeatureExtractor {
     /// Extract temporal features
     fn extract_temporal_features(&self, drift_item: &DriftItem) -> TemporalFeatures {
         use std::time::{SystemTime, UNIX_EPOCH};
-        
+
         let current_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -462,7 +462,7 @@ impl FeatureExtractor {
         // For now, use a mock timestamp based on item order
         let days_per_item = 7.0; // Assume items are spaced 7 days apart
         let most_recent_index = self.historical_data.len() - 1;
-        
+
         for (index, _item) in similar_items.iter().enumerate() {
             if index == most_recent_index {
                 return days_per_item * (self.historical_data.len() - index) as f64;
@@ -508,7 +508,7 @@ impl FeatureExtractor {
         // Simple seasonal detection: look for patterns in item distribution
         let total_items = similar_items.len();
         let items_per_quarter = total_items / 4;
-        
+
         // Calculate variance in quarterly distribution
         let quarters = [items_per_quarter; 4];
         let mean = items_per_quarter as f64;
@@ -568,9 +568,9 @@ impl FeatureExtractor {
             .map(|&gap| (gap as f64 - mean_gap).powi(2))
             .sum::<f64>()
             / gaps.len() as f64;
-        
+
         let std_dev = variance.sqrt();
-        
+
         // Higher clustering = lower coefficient of variation
         if mean_gap > 0.0 {
             (1.0 - (std_dev / mean_gap)).max(0.0)
@@ -646,7 +646,7 @@ impl FeatureExtractor {
 
         let common_keywords = keywords1.intersection(&keywords2).count();
         let total_keywords = keywords1.union(&keywords2).count();
-        
+
         if total_keywords > 0 {
             let text_similarity = common_keywords as f64 / total_keywords as f64;
             score += text_similarity * 0.3;
@@ -781,7 +781,7 @@ mod tests {
         assert!(temporal.drift_velocity >= 0.0);
         assert!(temporal.clustering_score >= 0.0);
         assert!(temporal.recency_factor >= 0.0);
-        
+
         // Verify ranges
         assert!(temporal.seasonal_strength <= 1.0);
         assert!(temporal.clustering_score <= 1.0);
@@ -791,7 +791,7 @@ mod tests {
     #[test]
     fn test_similarity_score_calculation() {
         let extractor = FeatureExtractor::new();
-        
+
         let item1 = create_test_drift_item();
         let item2 = DriftItem::new(
             "test2".to_string(),
@@ -801,13 +801,13 @@ mod tests {
             "Different description".to_string(),
             DriftLocation::new(PathBuf::from("src/components/Other.tsx")),
         );
-        
+
         let similarity = extractor.calculate_similarity_score(&item1, &item2);
         println!("Similarity score: {}", similarity);
-        
+
         // Both items have same category (0.4) and severity (0.3) = 0.7/2 = 0.35 base
         assert!(similarity > 0.3); // Should be at least category + severity match
-        
+
         let item3 = DriftItem::new(
             "test3".to_string(),
             DriftSeverity::Low,
@@ -816,7 +816,7 @@ mod tests {
             "Completely different".to_string(),
             DriftLocation::new(PathBuf::from("config/db.yml")),
         );
-        
+
         let dissimilarity = extractor.calculate_similarity_score(&item1, &item3);
         println!("Dissimilarity score: {}", dissimilarity);
         assert!(dissimilarity < similarity); // Should be less similar
@@ -826,11 +826,11 @@ mod tests {
     fn test_days_since_similar_calculation() {
         let mut extractor = FeatureExtractor::new();
         let drift_item = create_test_drift_item();
-        
+
         // Test with no historical data
         let days = extractor.calculate_days_since_similar(&drift_item, 0);
         assert!(days.is_infinite());
-        
+
         // Add historical data
         extractor.add_historical_data(vec![drift_item.clone()]);
         let days = extractor.calculate_days_since_similar(&drift_item, 0);
@@ -841,7 +841,7 @@ mod tests {
     fn test_frequency_per_week_calculation() {
         let extractor = FeatureExtractor::new();
         let drift_item = create_test_drift_item();
-        
+
         let frequency = extractor.calculate_frequency_per_week(&drift_item, 0);
         assert!(frequency >= 0.0);
     }
@@ -850,7 +850,7 @@ mod tests {
     fn test_seasonal_strength_calculation() {
         let extractor = FeatureExtractor::new();
         let drift_item = create_test_drift_item();
-        
+
         let strength = extractor.calculate_seasonal_strength(&drift_item, 0);
         assert!(strength >= 0.0 && strength <= 1.0);
     }
@@ -859,7 +859,7 @@ mod tests {
     fn test_drift_velocity_calculation() {
         let extractor = FeatureExtractor::new();
         let drift_item = create_test_drift_item();
-        
+
         let velocity = extractor.calculate_drift_velocity(&drift_item, 0);
         assert!(velocity >= 0.0);
     }
@@ -868,7 +868,7 @@ mod tests {
     fn test_temporal_clustering_calculation() {
         let extractor = FeatureExtractor::new();
         let drift_item = create_test_drift_item();
-        
+
         let clustering = extractor.calculate_temporal_clustering(&drift_item, 0);
         assert!(clustering >= 0.0 && clustering <= 1.0);
     }
@@ -877,11 +877,11 @@ mod tests {
     fn test_recency_factor_calculation() {
         let mut extractor = FeatureExtractor::new();
         let drift_item = create_test_drift_item();
-        
+
         // Test with no historical data
         let recency = extractor.calculate_recency_factor(&drift_item, 0);
         assert_eq!(recency, 0.0);
-        
+
         // Add historical data
         extractor.add_historical_data(vec![drift_item.clone()]);
         let recency = extractor.calculate_recency_factor(&drift_item, 0);

@@ -1,59 +1,29 @@
 {
-  "name": "adrscan-wasm",
+  "name": "adrscan",
+  "collaborators": [
+    "tbowman01"
+  ],
+  "description": "AI-powered Architecture Decision Record (ADR) management with ML-enhanced drift detection",
   "version": "0.2.0-alpha.20250721",
-  "description": "WebAssembly module for ADRScan - AI-powered Architecture Decision Record management with ML-enhanced drift detection",
-  "main": "index.js",
-  "types": "index.d.ts",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tbowman01/PhotonDrift"
+  },
   "files": [
-    "index.js",
-    "index.d.ts",
     "adrscan_bg.wasm",
     "adrscan.js",
-    "adrscan.d.ts",
-    "README.md"
+    "adrscan.d.ts"
   ],
+  "main": "adrscan.js",
+  "types": "adrscan.d.ts",
   "keywords": [
     "adr",
     "architecture",
     "documentation",
+    "cli",
     "drift-detection",
-    "wasm",
-    "webassembly",
     "ml",
-    "ai",
-    "governance"
-  ],
-  "author": {
-    "name": "tbowman01",
-    "email": "github@photondrift.io"
-  },
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/tbowman01/PhotonDrift.git",
-    "directory": "wasm"
-  },
-  "homepage": "https://github.com/tbowman01/PhotonDrift#readme",
-  "bugs": {
-    "url": "https://github.com/tbowman01/PhotonDrift/issues"
-  },
-  "engines": {
-    "node": ">=16.0.0"
-  },
-  "dependencies": {},
-  "devDependencies": {
-    "@types/node": "^20.0.0"
-  },
-  "scripts": {
-    "build": "wasm-pack build --target nodejs --out-dir ../pkg --features wasm && cp -r ../pkg/* .",
-    "build:web": "wasm-pack build --target web --out-dir ../wasm-web --features wasm",
-    "build:bundler": "wasm-pack build --target bundler --out-dir ../wasm-bundler --features wasm",
-    "build:all": "npm run build && npm run build:web && npm run build:bundler",
-    "test": "node test.js",
-    "prepublishOnly": "npm run build && npm test"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
-  }
+    "ai"
+  ]
 }

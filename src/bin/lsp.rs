@@ -1,5 +1,5 @@
 //! ADRScan Language Server Protocol binary
-//! 
+//!
 //! This binary provides LSP server functionality for IDE integration
 //! with real-time ADR analysis and drift detection.
 

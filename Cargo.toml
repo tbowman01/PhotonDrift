@@ -41,8 +41,20 @@ chrono = { version = "0.4", features = ["serde"] }
 # Regular expressions for pattern matching
 regex = "1.10"
 
+# Parallel processing
+rayon = "1.8"
+num_cpus = "1.16"
+
+# Cryptographic hashing
+sha2 = "0.10"
+
 # Async runtime for drift detection (not compatible with WASM)
 tokio = { version = "1.0", features = ["full"], optional = true }
+
+# WASM-specific exclusions
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# Exclude async runtime for WASM builds
+tokio = { version = "1.0", features = [], optional = true, default-features = false }
 
 # Language Server Protocol dependencies (conditional on lsp feature)
 tower-lsp = { version = "0.20", optional = true }
@@ -64,24 +76,34 @@ sha2 = "0.10"
 smartcore = { version = "0.3", optional = true }
 ndarray = { version = "0.15", optional = true }
 rand = { version = "0.8", optional = true }
-nalgebra = { version = "0.32", optional = true }
+nalgebra = { version = "0.33", optional = true }
 
 # Plugin system dependencies
 libloading = { version = "0.8", optional = true }
-wasmtime = { version = "23.0", optional = true }
+wasmtime = { version = "35.0", optional = true }
 reqwest = { version = "0.12", features = ["json"], optional = true }
 dirs = "5.0"
 tempfile = "3.8"
 
 # WebAssembly bindings (only for WASM target)
-wasm-bindgen = { version = "0.2", optional = true }
+wasm-bindgen = { version = "0.2", optional = true, features = ["serde-serialize"] }
 js-sys = { version = "0.3", optional = true }
-web-sys = { version = "0.3", optional = true }
+web-sys = { version = "0.3", optional = true, features = [
+  "console",
+  "Window",
+  "Document",
+  "Element",
+  "HtmlElement",
+  "DomTokenList",
+  "CssStyleDeclaration"
+] }
 console_error_panic_hook = { version = "0.1", optional = true }
+serde-wasm-bindgen = { version = "0.6", optional = true }
+wee_alloc = { version = "0.4", optional = true }
 
 [features]
 default = ["tokio"]
-wasm = ["wasm-bindgen", "js-sys", "web-sys", "console_error_panic_hook"]
+wasm = ["wasm-bindgen", "js-sys", "web-sys", "console_error_panic_hook", "serde-wasm-bindgen", "wee_alloc"]
 ml = ["smartcore", "ndarray", "rand", "nalgebra"]
 lsp = ["tokio", "tower-lsp", "lsp-types", "tokio-util"]
 realtime = ["tokio", "notify", "tokio-tungstenite", "dashmap", "crossbeam-channel", "crossbeam", "futures-util"]
@@ -107,11 +129,14 @@ path = "src/bin/lsp.rs"
 required-features = ["lsp"]
 
 [profile.release]
-lto = true
+lto = "fat"  # Fat LTO for maximum optimization
 codegen-units = 1
-strip = true
-opt-level = "s"  # Optimize for size
+strip = "symbols"  # Strip all symbols for smaller size
+opt-level = "z"  # Aggressive size optimization (changed from "s")
 panic = "abort"  # Reduce WASM size
+overflow-checks = false  # Disable for performance
+debug-assertions = false  # Disable for smaller builds
+rpath = false
 
 # WASM-specific optimizations
 [profile.release.package.adrscan]
@@ -119,4 +144,17 @@ opt-level = "z"  # Aggressive size optimization for WASM
 
 # Optimize specific dependencies for size
 [profile.release.package."*"]
-opt-level = "s"
+opt-level = "z"  # Changed from "s" to "z" for aggressive optimization
+
+# WASM-specific profile
+[profile.wasm-release]
+inherits = "release"
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+overflow-checks = false
+debug-assertions = false
+debug = false
+

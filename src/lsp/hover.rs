@@ -59,12 +59,18 @@ impl HoverProvider {
         let mut end = pos;
 
         // Move start backward to find word start
-        while start > 0 && (chars[start - 1].is_alphanumeric() || chars[start - 1] == '-' || chars[start - 1] == '_') {
+        while start > 0
+            && (chars[start - 1].is_alphanumeric()
+                || chars[start - 1] == '-'
+                || chars[start - 1] == '_')
+        {
             start -= 1;
         }
 
         // Move end forward to find word end
-        while end < chars.len() && (chars[end].is_alphanumeric() || chars[end] == '-' || chars[end] == '_') {
+        while end < chars.len()
+            && (chars[end].is_alphanumeric() || chars[end] == '-' || chars[end] == '_')
+        {
             end += 1;
         }
 
@@ -99,7 +105,10 @@ ADR references help maintain traceability between related architectural decision
     }
 
     fn is_status_value(&self, word: &str) -> bool {
-        matches!(word.to_lowercase().as_str(), "proposed" | "accepted" | "deprecated" | "superseded" | "rejected")
+        matches!(
+            word.to_lowercase().as_str(),
+            "proposed" | "accepted" | "deprecated" | "superseded" | "rejected"
+        )
     }
 
     fn get_status_hover(&self, status: &str) -> Option<Hover> {
@@ -235,11 +244,18 @@ The title should follow the pattern: `# ADR-XXX: Brief description`
 - Use consistent numbering across your ADR collection
 - Keep titles brief but descriptive
 - Use action-oriented language when possible
-"#.to_string(),
+"#
+                .to_string(),
             }),
             range: Some(Range {
-                start: lsp_types::Position { line: 0, character: 0 },
-                end: lsp_types::Position { line: 0, character: title_line.len() as u32 },
+                start: lsp_types::Position {
+                    line: 0,
+                    character: 0,
+                },
+                end: lsp_types::Position {
+                    line: 0,
+                    character: title_line.len() as u32,
+                },
             }),
         })
     }
@@ -248,7 +264,8 @@ The title should follow the pattern: `# ADR-XXX: Brief description`
 /// Create hover information for any ADR element
 pub fn create_hover_info(content: &str, element_type: &str) -> Option<Hover> {
     let info = match element_type {
-        "adr_best_practices" => r#"**ADR Best Practices**
+        "adr_best_practices" => {
+            r#"**ADR Best Practices**
 
 1. **Keep it brief** - ADRs should be concise and focused
 2. **Be specific** - Clearly state what is being decided
@@ -262,8 +279,10 @@ pub fn create_hover_info(content: &str, element_type: &str) -> Option<Hover> {
 - Missing context or rationale
 - Outdated status information
 - No consideration of alternatives
-"#,
-        "adr_lifecycle" => r#"**ADR Lifecycle**
+"#
+        }
+        "adr_lifecycle" => {
+            r#"**ADR Lifecycle**
 
 1. **Proposed** - Initial draft, under discussion
 2. **Accepted** - Approved and implemented
@@ -276,7 +295,8 @@ pub fn create_hover_info(content: &str, element_type: &str) -> Option<Hover> {
 - Accepted → Superseded (evolved decision)
 - Accepted → Deprecated (no longer needed)
 - Proposed → Rejected (decided against)
-"#,
+"#
+        }
         _ => return None,
     };
 
@@ -297,11 +317,14 @@ mod tests {
     async fn test_status_hover() {
         let provider = HoverProvider::new();
         let content = "## Status\nAccepted";
-        let position = Position { line: 1, character: 2 }; // Position in "Accepted"
-        
+        let position = Position {
+            line: 1,
+            character: 2,
+        }; // Position in "Accepted"
+
         let hover = provider.get_hover_info(content, position).await;
         assert!(hover.is_some());
-        
+
         if let Some(h) = hover {
             if let HoverContents::Markup(markup) = h.contents {
                 assert!(markup.value.contains("ACCEPTED"));
@@ -314,14 +337,19 @@ mod tests {
     async fn test_adr_reference_hover() {
         let provider = HoverProvider::new();
         let content = "Related to ADR-001";
-        let position = Position { line: 0, character: 12 }; // Position in "ADR-001"
-        
+        let position = Position {
+            line: 0,
+            character: 12,
+        }; // Position in "ADR-001"
+
         let hover = provider.get_hover_info(content, position).await;
         assert!(hover.is_some());
-        
+
         if let Some(h) = hover {
             if let HoverContents::Markup(markup) = h.contents {
-                assert!(markup.value.contains("Architecture Decision Record Reference"));
+                assert!(markup
+                    .value
+                    .contains("Architecture Decision Record Reference"));
             }
         }
     }
@@ -330,11 +358,14 @@ mod tests {
     async fn test_section_hover() {
         let provider = HoverProvider::new();
         let content = "## Context";
-        let position = Position { line: 0, character: 5 }; // Position in "Context"
-        
+        let position = Position {
+            line: 0,
+            character: 5,
+        }; // Position in "Context"
+
         let hover = provider.get_hover_info(content, position).await;
         assert!(hover.is_some());
-        
+
         if let Some(h) = hover {
             if let HoverContents::Markup(markup) = h.contents {
                 assert!(markup.value.contains("Context Section"));
@@ -346,15 +377,15 @@ mod tests {
     #[test]
     fn test_word_extraction() {
         let provider = HoverProvider::new();
-        
+
         // Test normal word
         let word = provider.get_word_at_position("Hello world", 2);
         assert_eq!(word, Some("Hello".to_string()));
-        
+
         // Test ADR reference
         let word = provider.get_word_at_position("See ADR-001 for details", 7);
         assert_eq!(word, Some("ADR-001".to_string()));
-        
+
         // Test at word boundary
         let word = provider.get_word_at_position("test-word", 4);
         assert_eq!(word, Some("test-word".to_string()));
@@ -363,7 +394,7 @@ mod tests {
     #[test]
     fn test_status_recognition() {
         let provider = HoverProvider::new();
-        
+
         assert!(provider.is_status_value("Proposed"));
         assert!(provider.is_status_value("accepted"));
         assert!(provider.is_status_value("DEPRECATED"));

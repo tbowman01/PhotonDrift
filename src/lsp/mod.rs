@@ -1,21 +1,21 @@
 //! Language Server Protocol (LSP) implementation for PhotonDrift
-//! 
+//!
 //! This module provides LSP server functionality for IDE integration,
 //! enabling real-time ADR analysis, drift detection, and intelligent
 //! code assistance features.
 
-mod server;
-mod handlers;
-mod diagnostics;
 mod completion;
+mod diagnostics;
+mod handlers;
 mod hover;
 mod protocol;
+mod server;
 
-pub use server::{PhotonDriftLspServer, start_lsp_server};
-pub use diagnostics::{DiagnosticEngine, create_drift_diagnostic};
 pub use completion::{CompletionProvider, ADR_TEMPLATE_COMPLETIONS};
-pub use hover::{HoverProvider, create_hover_info};
-pub use protocol::{uri_to_path, path_to_uri, normalize_line_endings};
+pub use diagnostics::{create_drift_diagnostic, DiagnosticEngine};
+pub use hover::{create_hover_info, HoverProvider};
+pub use protocol::{normalize_line_endings, path_to_uri, uri_to_path};
+pub use server::{start_lsp_server, PhotonDriftLspServer};
 
 use crate::Result;
 use lsp_types::Url;
@@ -31,16 +31,16 @@ pub type DocumentStore = RwLock<HashMap<Url, String>>;
 pub struct LspConfig {
     /// Enable real-time drift diagnostics
     pub diagnostics_enabled: bool,
-    
+
     /// Maximum number of diagnostics per file
     pub max_diagnostics: usize,
-    
+
     /// Enable template completion
     pub completion_enabled: bool,
-    
+
     /// Enable hover information
     pub hover_enabled: bool,
-    
+
     /// Workspace root directory
     pub workspace_root: Option<PathBuf>,
 }

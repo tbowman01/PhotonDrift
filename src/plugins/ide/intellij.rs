@@ -1,17 +1,17 @@
 //! IntelliJ IDEA specific plugin implementation
 
+use crate::plugins::ide::{CommonIDEFeatures, IDECapabilities, TextSelection};
 use crate::plugins::{
-    Plugin, IDEIntegrationPlugin, PluginMetadata, PluginCapability, PluginContext,
-    PluginResponse, IDEType, IDEConfig, IDEEvent, IDEResponse, IDEAction, IDECommand,
-    MessageLevel, ArgumentType, CommandArgument
+    ArgumentType, CommandArgument, IDEAction, IDECommand, IDEConfig, IDEEvent,
+    IDEIntegrationPlugin, IDEResponse, IDEType, MessageLevel, Plugin, PluginCapability,
+    PluginContext, PluginMetadata, PluginResponse,
 };
-use crate::plugins::ide::{CommonIDEFeatures, TextSelection, IDECapabilities};
-use crate::{Result, AdrscanError};
+use crate::{AdrscanError, Result};
+use chrono::Utc;
+use log::{debug, info, warn};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-use serde::{Serialize, Deserialize};
-use chrono::Utc;
-use log::{info, debug, warn};
 
 /// IntelliJ IDEA integration plugin
 #[derive(Debug)]
@@ -123,13 +123,17 @@ impl IntelliJPlugin {
             license: "MIT".to_string(),
             homepage: Some("https://github.com/tbowman01/PhotonDrift".to_string()),
             repository: Some("https://github.com/tbowman01/PhotonDrift".to_string()),
-            keywords: vec!["intellij".to_string(), "adr".to_string(), "photondrift".to_string()],
+            keywords: vec![
+                "intellij".to_string(),
+                "adr".to_string(),
+                "photondrift".to_string(),
+            ],
             api_version: crate::plugins::PLUGIN_API_VERSION.to_string(),
             min_adrscan_version: "0.2.0".to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
-        
+
         let capabilities = IDECapabilities {
             supports_lsp: false,
             supports_debugging: true,
@@ -144,14 +148,14 @@ impl IntelliJPlugin {
                 "kotlin".to_string(),
             ],
         };
-        
+
         Self {
             metadata,
             config: None,
             capabilities,
         }
     }
-    
+
     /// Generate IntelliJ plugin descriptor
     pub fn generate_plugin_descriptor(&self) -> IntelliJPluginDescriptor {
         IntelliJPluginDescriptor {
@@ -163,7 +167,8 @@ impl IntelliJPlugin {
                 email: "support@photondrift.io".to_string(),
                 url: "https://github.com/tbowman01/PhotonDrift".to_string(),
             },
-            description: "Architecture Decision Record analysis and management for IntelliJ IDEA".to_string(),
+            description: "Architecture Decision Record analysis and management for IntelliJ IDEA"
+                .to_string(),
             change_notes: "Initial release with ADR analysis capabilities".to_string(),
             idea_version: IntelliJIdeaVersion {
                 since_build: "203".to_string(),
@@ -176,13 +181,15 @@ impl IntelliJPlugin {
             extensions: self.generate_extensions(),
         }
     }
-    
+
     /// Generate Java plugin implementation
     pub fn generate_plugin_java_code(&self) -> HashMap<String, String> {
         let mut files = HashMap::new();
-        
+
         // Main plugin class
-        files.insert("PhotonDriftPlugin.java".to_string(), r#"
+        files.insert(
+            "PhotonDriftPlugin.java".to_string(),
+            r#"
 package com.photondrift.intellij;
 
 import com.intellij.openapi.components.ApplicationComponent;
@@ -206,10 +213,14 @@ public class PhotonDriftPlugin implements ApplicationComponent {
         return "PhotonDriftPlugin";
     }
 }
-"#.to_string());
+"#
+            .to_string(),
+        );
 
         // ADR Analysis Action
-        files.insert("AnalyzeADRAction.java".to_string(), r#"
+        files.insert(
+            "AnalyzeADRAction.java".to_string(),
+            r#"
 package com.photondrift.intellij.actions;
 
 import com.intellij.openapi.actionSystem.AnAction;
@@ -254,10 +265,14 @@ public class AnalyzeADRAction extends AnAction {
         e.getPresentation().setEnabledAndVisible(file != null && file.getName().endsWith(".md"));
     }
 }
-"#.to_string());
+"#
+            .to_string(),
+        );
 
         // PhotonDrift Service
-        files.insert("PhotonDriftService.java".to_string(), r#"
+        files.insert(
+            "PhotonDriftService.java".to_string(),
+            r#"
 package com.photondrift.intellij.services;
 
 import com.intellij.execution.ExecutionException;
@@ -334,10 +349,14 @@ public final class PhotonDriftService {
         return new ArrayList<>();
     }
 }
-"#.to_string());
+"#
+            .to_string(),
+        );
 
         // ADR Inspection
-        files.insert("ADRInspection.java".to_string(), r#"
+        files.insert(
+            "ADRInspection.java".to_string(),
+            r#"
 package com.photondrift.intellij.inspections;
 
 import com.intellij.codeInspection.*;
@@ -385,10 +404,14 @@ public class ADRInspection extends LocalInspectionTool {
         return "PhotonDrift";
     }
 }
-"#.to_string());
+"#
+            .to_string(),
+        );
 
         // Tool Window
-        files.insert("PhotonDriftToolWindow.java".to_string(), r#"
+        files.insert(
+            "PhotonDriftToolWindow.java".to_string(),
+            r#"
 package com.photondrift.intellij.toolwindow;
 
 import com.intellij.openapi.project.Project;
@@ -441,11 +464,13 @@ public class PhotonDriftToolWindow implements ToolWindowFactory {
         }
     }
 }
-"#.to_string());
+"#
+            .to_string(),
+        );
 
         files
     }
-    
+
     /// Generate build.gradle file
     pub fn generate_build_gradle(&self) -> String {
         r#"
@@ -496,9 +521,10 @@ signPlugin {
 publishPlugin {
     token = System.getenv("PUBLISH_TOKEN")
 }
-"#.to_string()
+"#
+        .to_string()
     }
-    
+
     fn generate_extensions(&self) -> IntelliJExtensions {
         IntelliJExtensions {
             actions: vec![
@@ -517,34 +543,30 @@ publishPlugin {
                     group_id: "ToolsMenu".to_string(),
                 },
             ],
-            inspections: vec![
-                IntelliJInspection {
-                    short_name: "ADRInspection".to_string(),
-                    display_name: "ADR Structure Inspection".to_string(),
-                    group_path: "PhotonDrift".to_string(),
-                    group_key: "photondrift.inspections".to_string(),
-                    group_bundle: "messages.PhotonDriftBundle".to_string(),
-                    level: "WARNING".to_string(),
-                    implementation_class: "com.photondrift.intellij.inspections.ADRInspection".to_string(),
-                },
-            ],
-            file_types: vec![
-                IntelliJFileType {
-                    name: "ADR_MARKDOWN".to_string(),
-                    implementation_class: "com.photondrift.intellij.filetypes.ADRFileType".to_string(),
-                    field_name: "INSTANCE".to_string(),
-                    language: "Markdown".to_string(),
-                    extensions: "adr.md".to_string(),
-                },
-            ],
-            tool_windows: vec![
-                IntelliJToolWindow {
-                    id: "PhotonDrift".to_string(),
-                    factory_class: "com.photondrift.intellij.toolwindow.PhotonDriftToolWindow".to_string(),
-                    anchor: "bottom".to_string(),
-                    secondary: false,
-                },
-            ],
+            inspections: vec![IntelliJInspection {
+                short_name: "ADRInspection".to_string(),
+                display_name: "ADR Structure Inspection".to_string(),
+                group_path: "PhotonDrift".to_string(),
+                group_key: "photondrift.inspections".to_string(),
+                group_bundle: "messages.PhotonDriftBundle".to_string(),
+                level: "WARNING".to_string(),
+                implementation_class: "com.photondrift.intellij.inspections.ADRInspection"
+                    .to_string(),
+            }],
+            file_types: vec![IntelliJFileType {
+                name: "ADR_MARKDOWN".to_string(),
+                implementation_class: "com.photondrift.intellij.filetypes.ADRFileType".to_string(),
+                field_name: "INSTANCE".to_string(),
+                language: "Markdown".to_string(),
+                extensions: "adr.md".to_string(),
+            }],
+            tool_windows: vec![IntelliJToolWindow {
+                id: "PhotonDrift".to_string(),
+                factory_class: "com.photondrift.intellij.toolwindow.PhotonDriftToolWindow"
+                    .to_string(),
+                anchor: "bottom".to_string(),
+                secondary: false,
+            }],
         }
     }
 }
@@ -552,17 +574,18 @@ publishPlugin {
 impl Plugin for IntelliJPlugin {
     fn initialize(&mut self, _context: &PluginContext) -> Result<()> {
         info!("Initializing IntelliJ plugin");
-        
-        self.config = Some(crate::plugins::ide::IDEPluginFactory::get_recommended_config(IDEType::IntelliJ));
-        
+
+        self.config =
+            Some(crate::plugins::ide::IDEPluginFactory::get_recommended_config(IDEType::IntelliJ));
+
         debug!("IntelliJ plugin initialized successfully");
         Ok(())
     }
-    
+
     fn metadata(&self) -> &PluginMetadata {
         &self.metadata
     }
-    
+
     fn capabilities(&self) -> Vec<PluginCapability> {
         vec![
             PluginCapability::IDEIntegration,
@@ -570,16 +593,16 @@ impl Plugin for IntelliJPlugin {
             PluginCapability::CommandExtension,
         ]
     }
-    
+
     fn execute(&self, command: &str, params: &HashMap<String, String>) -> Result<PluginResponse> {
         debug!("Executing IntelliJ command: {}", command);
-        
+
         match command {
             "generate_plugin" => {
                 let java_files = self.generate_plugin_java_code();
                 let build_gradle = self.generate_build_gradle();
                 let descriptor = self.generate_plugin_descriptor();
-                
+
                 Ok(PluginResponse {
                     success: true,
                     data: Some(serde_json::json!({
@@ -610,11 +633,14 @@ impl Plugin for IntelliJPlugin {
                 data: None,
                 message: Some(format!("Unknown command: {}", command)),
                 warnings: vec![],
-                errors: vec![format!("Command '{}' not supported by IntelliJ plugin", command)],
-            })
+                errors: vec![format!(
+                    "Command '{}' not supported by IntelliJ plugin",
+                    command
+                )],
+            }),
         }
     }
-    
+
     fn shutdown(&mut self) -> Result<()> {
         info!("Shutting down IntelliJ plugin");
         Ok(())
@@ -625,54 +651,46 @@ impl IDEIntegrationPlugin for IntelliJPlugin {
     fn ide_type(&self) -> IDEType {
         IDEType::IntelliJ
     }
-    
+
     fn setup_ide_integration(&self, config: &IDEConfig) -> Result<()> {
         info!("Setting up IntelliJ integration with config: {:?}", config);
         Ok(())
     }
-    
+
     fn handle_ide_event(&self, event: &IDEEvent) -> Result<IDEResponse> {
         debug!("Handling IntelliJ event: {:?}", event);
-        
+
         match event {
-            IDEEvent::FileOpened { path } => {
-                Ok(IDEResponse {
-                    handled: true,
-                    actions: vec![
-                        IDEAction::ShowMessage {
-                            level: MessageLevel::Info,
-                            message: format!("PhotonDrift: File opened {}", path.display()),
-                        }
-                    ],
-                    diagnostics: vec![],
-                })
-            }
-            IDEEvent::ProjectOpened { root } => {
-                Ok(IDEResponse {
-                    handled: true,
-                    actions: vec![
-                        IDEAction::ShowMessage {
-                            level: MessageLevel::Info,
-                            message: "PhotonDrift plugin activated for project".to_string(),
-                        }
-                    ],
-                    diagnostics: vec![],
-                })
-            }
+            IDEEvent::FileOpened { path } => Ok(IDEResponse {
+                handled: true,
+                actions: vec![IDEAction::ShowMessage {
+                    level: MessageLevel::Info,
+                    message: format!("PhotonDrift: File opened {}", path.display()),
+                }],
+                diagnostics: vec![],
+            }),
+            IDEEvent::ProjectOpened { root } => Ok(IDEResponse {
+                handled: true,
+                actions: vec![IDEAction::ShowMessage {
+                    level: MessageLevel::Info,
+                    message: "PhotonDrift plugin activated for project".to_string(),
+                }],
+                diagnostics: vec![],
+            }),
             _ => Ok(IDEResponse {
                 handled: false,
                 actions: vec![],
                 diagnostics: vec![],
-            })
+            }),
         }
     }
-    
+
     fn get_ide_config(&self) -> IDEConfig {
         self.config.clone().unwrap_or_else(|| {
             crate::plugins::ide::IDEPluginFactory::get_recommended_config(IDEType::IntelliJ)
         })
     }
-    
+
     fn register_commands(&self) -> Vec<IDECommand> {
         vec![
             IDECommand {
@@ -680,15 +698,13 @@ impl IDEIntegrationPlugin for IntelliJPlugin {
                 title: "Analyze ADR File".to_string(),
                 category: "PhotonDrift".to_string(),
                 description: Some("Analyze the current ADR file for patterns".to_string()),
-                arguments: vec![
-                    CommandArgument {
-                        name: "file_path".to_string(),
-                        arg_type: ArgumentType::File,
-                        description: Some("Path to the ADR file".to_string()),
-                        required: false,
-                        default_value: None,
-                    }
-                ],
+                arguments: vec![CommandArgument {
+                    name: "file_path".to_string(),
+                    arg_type: ArgumentType::File,
+                    description: Some("Path to the ADR file".to_string()),
+                    required: false,
+                    default_value: None,
+                }],
             },
             IDECommand {
                 id: "photondrift.scanProject".to_string(),
@@ -706,21 +722,27 @@ impl CommonIDEFeatures for IntelliJPlugin {
         debug!("IntelliJ notification: {} (level: {:?})", message, level);
         Ok(())
     }
-    
+
     fn open_file(&self, path: &Path, line: Option<u32>) -> Result<()> {
         debug!("IntelliJ open file: {} at line {:?}", path.display(), line);
         Ok(())
     }
-    
+
     fn insert_text(&self, path: &Path, line: u32, column: u32, text: &str) -> Result<()> {
-        debug!("IntelliJ insert text at {}:{}:{}: {}", path.display(), line, column, text);
+        debug!(
+            "IntelliJ insert text at {}:{}:{}: {}",
+            path.display(),
+            line,
+            column,
+            text
+        );
         Ok(())
     }
-    
+
     fn get_selection(&self) -> Result<Option<TextSelection>> {
         Ok(None)
     }
-    
+
     fn set_status_message(&self, message: &str) -> Result<()> {
         debug!("IntelliJ status message: {}", message);
         Ok(())

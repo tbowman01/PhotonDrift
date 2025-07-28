@@ -1,23 +1,25 @@
 //! IDE integration plugins for PhotonDrift
 
-pub mod vscode;
 pub mod intellij;
 pub mod universal;
+pub mod vscode;
 
-pub use vscode::VSCodePlugin;
 pub use intellij::IntelliJPlugin;
 pub use universal::UniversalLSPPlugin;
+pub use vscode::VSCodePlugin;
 
-use crate::plugins::{IDEType, IDEConfig, IDEEvent, IDEResponse};
+use crate::plugins::{IDEConfig, IDEEvent, IDEResponse, IDEType};
 use crate::Result;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Factory for creating IDE-specific plugins
 pub struct IDEPluginFactory;
 
 impl IDEPluginFactory {
     /// Create an IDE plugin for the specified type
-    pub fn create_plugin(ide_type: IDEType) -> Result<Box<dyn crate::plugins::IDEIntegrationPlugin>> {
+    pub fn create_plugin(
+        ide_type: IDEType,
+    ) -> Result<Box<dyn crate::plugins::IDEIntegrationPlugin>> {
         match ide_type {
             IDEType::VSCode => Ok(Box::new(VSCodePlugin::new())),
             IDEType::IntelliJ => Ok(Box::new(IntelliJPlugin::new())),
@@ -28,18 +30,18 @@ impl IDEPluginFactory {
             }
         }
     }
-    
+
     /// Detect IDE type from environment or configuration
     pub fn detect_ide() -> IDEType {
         // Check environment variables and common IDE indicators
         if std::env::var("VSCODE_PID").is_ok() || std::env::var("VSCODE_IPC_HOOK").is_ok() {
             return IDEType::VSCode;
         }
-        
+
         if std::env::var("IDEA_INITIAL_DIRECTORY").is_ok() {
             return IDEType::IntelliJ;
         }
-        
+
         // Check for common IDE processes (simplified)
         if let Ok(processes) = get_running_processes() {
             if processes.contains("code") || processes.contains("code.exe") {
@@ -55,11 +57,11 @@ impl IDEPluginFactory {
                 return IDEType::Emacs;
             }
         }
-        
+
         // Default to Universal LSP
         IDEType::Universal
     }
-    
+
     /// Get recommended configuration for IDE type
     pub fn get_recommended_config(ide_type: IDEType) -> IDEConfig {
         match ide_type {
@@ -72,7 +74,10 @@ impl IDEPluginFactory {
                     "showInlineHints": true,
                     "autoFormat": true,
                     "enableCodeLens": true
-                }).as_object().unwrap().clone(),
+                })
+                .as_object()
+                .unwrap()
+                .clone(),
             },
             IDEType::IntelliJ => IDEConfig {
                 ide_type,
@@ -83,7 +88,10 @@ impl IDEPluginFactory {
                     "showQuickFixes": true,
                     "autoImport": true,
                     "enableRefactoring": true
-                }).as_object().unwrap().clone(),
+                })
+                .as_object()
+                .unwrap()
+                .clone(),
             },
             _ => IDEConfig {
                 ide_type,
@@ -92,7 +100,10 @@ impl IDEPluginFactory {
                 settings: serde_json::json!({
                     "enableBasicFeatures": true,
                     "useTextMateGrammar": true
-                }).as_object().unwrap().clone(),
+                })
+                .as_object()
+                .unwrap()
+                .clone(),
             },
         }
     }
@@ -102,16 +113,17 @@ impl IDEPluginFactory {
 pub trait CommonIDEFeatures {
     /// Show notification in IDE
     fn show_notification(&self, message: &str, level: crate::plugins::MessageLevel) -> Result<()>;
-    
+
     /// Open file at specific line
     fn open_file(&self, path: &std::path::Path, line: Option<u32>) -> Result<()>;
-    
+
     /// Insert text at position
-    fn insert_text(&self, path: &std::path::Path, line: u32, column: u32, text: &str) -> Result<()>;
-    
+    fn insert_text(&self, path: &std::path::Path, line: u32, column: u32, text: &str)
+        -> Result<()>;
+
     /// Get current selection
     fn get_selection(&self) -> Result<Option<TextSelection>>;
-    
+
     /// Set status bar message
     fn set_status_message(&self, message: &str) -> Result<()>;
 }
@@ -155,14 +167,14 @@ fn detect_vscode_installation() -> Option<std::path::PathBuf> {
         "C:\\Program Files\\Microsoft VS Code\\Code.exe",
         "C:\\Users\\{user}\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe",
     ];
-    
+
     for path in &common_paths {
         let path_buf = std::path::PathBuf::from(path);
         if path_buf.exists() {
             return Some(path_buf);
         }
     }
-    
+
     None
 }
 
@@ -174,13 +186,13 @@ fn detect_intellij_installation() -> Option<std::path::PathBuf> {
         "/usr/local/bin/idea",
         "C:\\Program Files\\JetBrains\\IntelliJ IDEA\\bin\\idea64.exe",
     ];
-    
+
     for path in &common_paths {
         let path_buf = std::path::PathBuf::from(path);
         if path_buf.exists() {
             return Some(path_buf);
         }
     }
-    
+
     None
 }

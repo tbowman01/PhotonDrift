@@ -184,14 +184,14 @@ impl Config {
     pub fn from_workspace_root(workspace_root: &std::path::Path) -> Result<Self> {
         // Look for config file in workspace root
         let config_files = [".adrscan.yml", ".adrscan.yaml", ".adrscan.toml"];
-        
+
         for filename in &config_files {
             let config_path = workspace_root.join(filename);
             if config_path.exists() {
                 return Self::load_from_file(&config_path);
             }
         }
-        
+
         // No config file found, return default config
         Ok(Self::default())
     }
