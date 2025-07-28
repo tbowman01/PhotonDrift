@@ -52,3 +52,4 @@ wasm-*
 # Swarm memory and coordination
 .swarm/
 .hive-mind/
+hive-mind-**-fallback.txt
