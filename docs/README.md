@@ -27,9 +27,9 @@ Technical architecture and design decisions:
 
 - **[Architecture Enhancements](architecture/ARCHITECTURE_ENHANCEMENTS.md)** - System architecture improvements
 - **[Requirements Summary](architecture/REQUIREMENTS_SUMMARY.md)** - Technical requirements and specifications
-- **[ADR Files](architecture/adr/)** - Architecture Decision Records
-  - [0001-use-rust-for-cli.md](architecture/adr/0001-use-rust-for-cli.md)
-  - [0003-containerization-deployment-strategy.md](architecture/adr/0003-containerization-deployment-strategy.md)
+- **[ADR Files](adr/)** - Architecture Decision Records
+  - [0001-use-rust-for-cli.md](adr/0001-use-rust-for-cli.md)
+  - [0003-containerization-deployment-strategy.md](adr/0003-containerization-deployment-strategy.md)
 
 ### 🚀 Deployment
 Deployment, containerization, and operations:
