@@ -251,33 +251,38 @@ drift:
 
 ## 📚 Documentation
 
-### Core Documentation
-- **[User Guide](docs/USER_GUIDE.md)** - Comprehensive usage guide
-- **[Quick Start](docs/QUICK_START.md)** - Get started quickly
-- **[Development Guide](docs/DEVELOPMENT.md)** - Contributing guidelines
-- **[Configuration](docs/CONFIGURATION.md)** - Configuration options
+### 📚 Documentation
+**[Complete Documentation Index](docs/README.md)** - Navigate all documentation by category
 
-### ML & Security Features ✨
-- **[ML Security Guide](docs/ML_SECURITY_GUIDE.md)** - AI-powered security analysis and secret detection
-- **[Neural Training](docs/NEURAL_TRAINING.md)** - Train models from operations and improve accuracy
-- **[Performance Analysis](docs/PERFORMANCE_ANALYSIS.md)** - Monitor performance and optimize bottlenecks
+### 🚀 Getting Started
+- **[Quick Start Guide](docs/getting-started/QUICK_START.md)** - Get up and running in minutes
+- **[User Guide](docs/getting-started/USER_GUIDE.md)** - Comprehensive usage guide
+- **[CLI Reference](docs/getting-started/CLI.md)** - Complete command-line interface documentation
+- **[Configuration Reference](docs/getting-started/CONFIG.md)** - All configuration options and examples
 
-### Integration & Automation
-- **[GitHub Integration](docs/GITHUB_LABELS.md)** - GitHub automation features
-- **[Development Hooks](docs/DEVELOPMENT_HOOKS.md)** - Pre-commit hooks and automation setup
-- **[Docker Build Guide](docs/DOCKER_BUILD_GUIDE.md)** - Comprehensive Docker build instructions
+### 🤖 ML & AI Features ✨
+- **[ML Security Guide](docs/ml-features/ML_SECURITY_GUIDE.md)** - AI-powered security analysis and secret detection
+- **[Neural Training](docs/ml-features/NEURAL_TRAINING.md)** - Train models from operations and improve accuracy
+- **[Performance Analysis](docs/ml-features/PERFORMANCE_ANALYSIS.md)** - Monitor performance and optimize bottlenecks
 
-### Technical Reference
+### 👥 Development & Contributing
+- **[Development Guide](docs/development/DEVELOPMENT.md)** - Contributing guidelines and setup
+- **[Development Hooks](docs/development/DEVELOPMENT_HOOKS.md)** - Pre-commit hooks and automation
+- **[GitHub Integration](docs/development/GITHUB_LABELS.md)** - GitHub automation features
+
+### 🚀 Deployment & Operations
+- **[Docker Build Guide](docs/deployment/DOCKER_BUILD_GUIDE.md)** - Comprehensive Docker build instructions
+- **[Versioning Strategy](docs/deployment/VERSIONING_STRATEGY.md)** - Semantic versioning and release management
+
+### 🏗️ Architecture & Technical Reference
+- **[Architecture Enhancements](docs/architecture/ARCHITECTURE_ENHANCEMENTS.md)** - System architecture improvements
+- **[Requirements Summary](docs/architecture/REQUIREMENTS_SUMMARY.md)** - Technical requirements and specifications
 - **[CHANGELOG.md](CHANGELOG.md)** - Complete version history and release notes
 - **[ROADMAP.md](ROADMAP.md)** - Development roadmap through 2025
-- **[Requirements & Architecture](docs/REQUIREMENTS_SUMMARY.md)** - Technical requirements and phases
-- **[Training & Optimization](src/ml/training.rs)** - Model training and hyperparameter tuning
 
-### Integration & Usage
-- **[GitHub Action Guide](.github/workflows/)** - CI/CD integration with ML features
-- **[WebAssembly Integration](src/wasm_simple.rs)** - Browser and Node.js usage
-- **[Configuration Reference](docs/CONFIG.md)** - Complete configuration options
-- **[CLI Reference](docs/CLI.md)** - All commands and parameters
+### 📋 Project Planning
+- **[Phase 3 Strategic Plan](docs/phase-planning/PHASE_3_STRATEGIC_PLAN.md)** - Future development roadmap
+- **[Repository Analysis](docs/phase-planning/REPOSITORY_ANALYSIS_AND_ROADMAP.md)** - Comprehensive project analysis
 
 ## 🚀 Implementation Status
 
