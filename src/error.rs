@@ -54,5 +54,6 @@ pub enum AdrscanError {
     EventBusError(String),
 
     #[error("File watcher error: {0}")]
+    #[allow(dead_code)] // Planned for file watching features
     FileWatcherError(String),
 }

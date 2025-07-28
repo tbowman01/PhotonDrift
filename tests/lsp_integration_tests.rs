@@ -2,10 +2,10 @@
 
 #[cfg(feature = "lsp")]
 mod lsp_tests {
-    use adrscan::lsp::{PhotonDriftLspServer, DiagnosticEngine, CompletionProvider, HoverProvider};
+    use adrscan::lsp::{CompletionProvider, DiagnosticEngine, HoverProvider, PhotonDriftLspServer};
     use lsp_types::*;
-    use tower_lsp::{Client, LanguageServer};
     use std::collections::HashMap;
+    use tower_lsp::{Client, LanguageServer};
 
     // Mock client for testing
     struct MockClient;
@@ -14,7 +14,13 @@ mod lsp_tests {
     impl Client for MockClient {
         async fn log_message(&self, _typ: MessageType, _message: String) {}
         async fn show_message(&self, _typ: MessageType, _message: String) {}
-        async fn publish_diagnostics(&self, _uri: Url, _diagnostics: Vec<Diagnostic>, _version: Option<i32>) {}
+        async fn publish_diagnostics(
+            &self,
+            _uri: Url,
+            _diagnostics: Vec<Diagnostic>,
+            _version: Option<i32>,
+        ) {
+        }
     }
 
     #[tokio::test]
@@ -55,19 +61,19 @@ mod lsp_tests {
         };
 
         let result = server.initialize(init_params).await.unwrap();
-        
+
         // Verify server info
         assert_eq!(result.server_info.as_ref().unwrap().name, "PhotonDrift LSP");
-        
+
         // Verify capabilities
         let caps = result.capabilities;
         assert!(caps.text_document_sync.is_some());
         assert!(caps.completion_provider.is_some());
         assert!(caps.hover_provider.is_some());
-        
+
         // Test initialized notification
         server.initialized(InitializedParams {}).await;
-        
+
         // Test shutdown
         server.shutdown().await.unwrap();
     }
@@ -107,7 +113,10 @@ We will use Rust for our backend services.
         let completion_params = CompletionParams {
             text_document_position: TextDocumentPositionParams {
                 text_document: TextDocumentIdentifier { uri: uri.clone() },
-                position: Position { line: 8, character: 0 },
+                position: Position {
+                    line: 8,
+                    character: 0,
+                },
             },
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: PartialResultParams::default(),
@@ -126,7 +135,10 @@ We will use Rust for our backend services.
             content_changes: vec![TextDocumentContentChangeEvent {
                 range: None,
                 range_length: None,
-                text: format!("{}\n\n## Consequences\nBetter performance.", initial_content),
+                text: format!(
+                    "{}\n\n## Consequences\nBetter performance.",
+                    initial_content
+                ),
             }],
         };
 
@@ -146,16 +158,26 @@ We will use Rust for our backend services.
 
         // Test template completion at document start
         let content = "";
-        let position = Position { line: 0, character: 0 };
+        let position = Position {
+            line: 0,
+            character: 0,
+        };
         let completions = provider.get_completions(content, position).await;
 
         assert!(!completions.is_empty());
-        assert!(completions.iter().any(|c| c.label.contains("Full ADR Template")));
-        assert!(completions.iter().any(|c| c.label.contains("Simple ADR Template")));
+        assert!(completions
+            .iter()
+            .any(|c| c.label.contains("Full ADR Template")));
+        assert!(completions
+            .iter()
+            .any(|c| c.label.contains("Simple ADR Template")));
 
         // Test section completion
         let content = "# ADR-001: Test\n\n## ";
-        let position = Position { line: 2, character: 3 };
+        let position = Position {
+            line: 2,
+            character: 3,
+        };
         let completions = provider.get_completions(content, position).await;
 
         assert!(completions.iter().any(|c| c.label.contains("Status")));
@@ -164,7 +186,10 @@ We will use Rust for our backend services.
 
         // Test status value completion
         let content = "# ADR-001: Test\n\n## Status\n";
-        let position = Position { line: 3, character: 0 };
+        let position = Position {
+            line: 3,
+            character: 0,
+        };
         let completions = provider.get_completions(content, position).await;
 
         assert!(completions.iter().any(|c| c.label == "Proposed"));
@@ -178,8 +203,11 @@ We will use Rust for our backend services.
 
         // Test status hover
         let content = "## Status\nAccepted\n\n## Context\nSome context";
-        let position = Position { line: 1, character: 3 }; // Position in "Accepted"
-        
+        let position = Position {
+            line: 1,
+            character: 3,
+        }; // Position in "Accepted"
+
         let hover = provider.get_hover_info(content, position).await;
         assert!(hover.is_some());
 
@@ -192,21 +220,29 @@ We will use Rust for our backend services.
 
         // Test ADR reference hover
         let content = "Related to ADR-001 for database decisions";
-        let position = Position { line: 0, character: 12 }; // Position in "ADR-001"
-        
+        let position = Position {
+            line: 0,
+            character: 12,
+        }; // Position in "ADR-001"
+
         let hover = provider.get_hover_info(content, position).await;
         assert!(hover.is_some());
 
         if let Some(h) = hover {
             if let HoverContents::Markup(markup) = h.contents {
-                assert!(markup.value.contains("Architecture Decision Record Reference"));
+                assert!(markup
+                    .value
+                    .contains("Architecture Decision Record Reference"));
             }
         }
 
         // Test section hover
         let content = "## Context\nThis is the context section";
-        let position = Position { line: 0, character: 5 }; // Position in "Context"
-        
+        let position = Position {
+            line: 0,
+            character: 5,
+        }; // Position in "Context"
+
         let hover = provider.get_hover_info(content, position).await;
         assert!(hover.is_some());
 
@@ -220,7 +256,7 @@ We will use Rust for our backend services.
     #[tokio::test]
     async fn test_diagnostics_engine() {
         let engine = DiagnosticEngine::new();
-        
+
         // Test well-formed ADR (should have minimal diagnostics)
         let good_content = r#"# ADR-001: Use Rust for Backend
 
@@ -239,24 +275,25 @@ Better performance and memory safety, but steeper learning curve for the team.
 
         let uri = Url::parse("file:///tmp/good-adr.md").unwrap();
         let diagnostics = engine.analyze_content(good_content, &uri).await.unwrap();
-        
+
         // Should have few or no warnings for a well-formed ADR
-        let warnings = diagnostics.iter().filter(|d| {
-            matches!(d.severity, Some(DiagnosticSeverity::WARNING))
-        }).count();
+        let warnings = diagnostics
+            .iter()
+            .filter(|d| matches!(d.severity, Some(DiagnosticSeverity::WARNING)))
+            .count();
         assert!(warnings <= 1);
 
         // Test malformed ADR (should have many diagnostics)
         let bad_content = "This is not a proper ADR at all";
         let diagnostics = engine.analyze_content(bad_content, &uri).await.unwrap();
-        
+
         assert!(!diagnostics.is_empty());
-        assert!(diagnostics.iter().any(|d| {
-            d.code == Some(NumberOrString::String("missing-title".to_string()))
-        }));
-        assert!(diagnostics.iter().any(|d| {
-            d.code == Some(NumberOrString::String("missing-status".to_string()))
-        }));
+        assert!(diagnostics
+            .iter()
+            .any(|d| { d.code == Some(NumberOrString::String("missing-title".to_string())) }));
+        assert!(diagnostics
+            .iter()
+            .any(|d| { d.code == Some(NumberOrString::String("missing-status".to_string())) }));
 
         // Test empty sections
         let empty_sections_content = r#"# ADR-001: Test
@@ -269,12 +306,16 @@ Some context here
 ## Decision
 
 "#;
-        
-        let diagnostics = engine.analyze_content(empty_sections_content, &uri).await.unwrap();
-        let empty_section_warnings = diagnostics.iter().filter(|d| {
-            d.code == Some(NumberOrString::String("empty-section".to_string()))
-        }).count();
-        
+
+        let diagnostics = engine
+            .analyze_content(empty_sections_content, &uri)
+            .await
+            .unwrap();
+        let empty_section_warnings = diagnostics
+            .iter()
+            .filter(|d| d.code == Some(NumberOrString::String("empty-section".to_string())))
+            .count();
+
         assert!(empty_section_warnings >= 1); // Should detect empty Status and Decision sections
     }
 
@@ -318,7 +359,10 @@ Some context here
         let completion_params = CompletionParams {
             text_document_position: TextDocumentPositionParams {
                 text_document: TextDocumentIdentifier { uri: uri.clone() },
-                position: Position { line: 2, character: 0 },
+                position: Position {
+                    line: 2,
+                    character: 0,
+                },
             },
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: PartialResultParams::default(),
@@ -332,7 +376,10 @@ Some context here
         let hover_params = HoverParams {
             text_document_position_params: TextDocumentPositionParams {
                 text_document: TextDocumentIdentifier { uri: uri.clone() },
-                position: Position { line: 0, character: 5 }, // On "ADR-001"
+                position: Position {
+                    line: 0,
+                    character: 5,
+                }, // On "ADR-001"
             },
             work_done_progress_params: WorkDoneProgressParams::default(),
         };

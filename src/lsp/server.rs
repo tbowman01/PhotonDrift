@@ -4,16 +4,14 @@ use std::collections::HashMap;
 
 use lsp_types::{
     CompletionOptions, CompletionParams, CompletionResponse, DidChangeTextDocumentParams,
-    DidCloseTextDocumentParams, DidOpenTextDocumentParams, Hover, HoverParams, HoverProviderCapability,
-    InitializeParams, InitializeResult, MessageType, ServerCapabilities, TextDocumentSyncCapability,
-    TextDocumentSyncKind, Url, WorkDoneProgressOptions,
+    DidCloseTextDocumentParams, DidOpenTextDocumentParams, Hover, HoverParams,
+    HoverProviderCapability, InitializeParams, InitializeResult, MessageType, ServerCapabilities,
+    TextDocumentSyncCapability, TextDocumentSyncKind, Url, WorkDoneProgressOptions,
 };
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 
-use crate::lsp::{
-    DocumentStore, DiagnosticEngine, CompletionProvider, HoverProvider, LspConfig
-};
+use crate::lsp::{CompletionProvider, DiagnosticEngine, DocumentStore, HoverProvider, LspConfig};
 
 /// PhotonDrift Language Server implementation
 pub struct PhotonDriftLspServer {
@@ -95,29 +93,43 @@ impl LanguageServer for PhotonDriftLspServer {
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         let uri = params.text_document.uri.clone();
         let content = params.text_document.text.clone();
-        
+
         // Store document
-        self.documents.write().await.insert(uri.clone(), content.clone());
-        
+        self.documents
+            .write()
+            .await
+            .insert(uri.clone(), content.clone());
+
         // Run diagnostics if enabled
         if self.config.diagnostics_enabled {
             if let Ok(diagnostics) = self.diagnostic_engine.analyze_content(&content, &uri).await {
-                self.client.publish_diagnostics(uri, diagnostics, None).await;
+                self.client
+                    .publish_diagnostics(uri, diagnostics, None)
+                    .await;
             }
         }
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         let uri = params.text_document.uri.clone();
-        
+
         if let Some(change) = params.content_changes.into_iter().next() {
             // Update document store
-            self.documents.write().await.insert(uri.clone(), change.text.clone());
-            
+            self.documents
+                .write()
+                .await
+                .insert(uri.clone(), change.text.clone());
+
             // Run diagnostics if enabled
             if self.config.diagnostics_enabled {
-                if let Ok(diagnostics) = self.diagnostic_engine.analyze_content(&change.text, &uri).await {
-                    self.client.publish_diagnostics(uri, diagnostics, None).await;
+                if let Ok(diagnostics) = self
+                    .diagnostic_engine
+                    .analyze_content(&change.text, &uri)
+                    .await
+                {
+                    self.client
+                        .publish_diagnostics(uri, diagnostics, None)
+                        .await;
                 }
             }
         }
@@ -125,8 +137,11 @@ impl LanguageServer for PhotonDriftLspServer {
 
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         // Remove from document store
-        self.documents.write().await.remove(&params.text_document.uri);
-        
+        self.documents
+            .write()
+            .await
+            .remove(&params.text_document.uri);
+
         // Clear diagnostics
         self.client
             .publish_diagnostics(params.text_document.uri, Vec::new(), None)
@@ -144,7 +159,10 @@ impl LanguageServer for PhotonDriftLspServer {
         // Get document content
         let documents = self.documents.read().await;
         if let Some(content) = documents.get(&uri) {
-            let completions = self.completion_provider.get_completions(content, position).await;
+            let completions = self
+                .completion_provider
+                .get_completions(content, position)
+                .await;
             Ok(Some(CompletionResponse::Array(completions)))
         } else {
             Ok(None)
@@ -193,7 +211,13 @@ mod tests {
     impl Client for MockClient {
         async fn log_message(&self, _typ: MessageType, _message: String) {}
         async fn show_message(&self, _typ: MessageType, _message: String) {}
-        async fn publish_diagnostics(&self, _uri: Url, _diagnostics: Vec<lsp_types::Diagnostic>, _version: Option<i32>) {}
+        async fn publish_diagnostics(
+            &self,
+            _uri: Url,
+            _diagnostics: Vec<lsp_types::Diagnostic>,
+            _version: Option<i32>,
+        ) {
+        }
     }
 
     #[tokio::test]

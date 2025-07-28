@@ -52,7 +52,7 @@ impl DebounceTracker {
     fn record_change(&mut self, event: FileChangeEvent) {
         let path = event.path.clone();
         let now = Instant::now();
-        
+
         self.pending_changes.insert(path.clone(), event);
         self.last_change.insert(path, now);
     }
@@ -60,21 +60,21 @@ impl DebounceTracker {
     fn get_ready_changes(&mut self) -> Vec<FileChangeEvent> {
         let now = Instant::now();
         let mut ready_changes = Vec::new();
-        
+
         let ready_paths: Vec<PathBuf> = self
             .last_change
             .iter()
             .filter(|(_, &last_time)| now.duration_since(last_time) >= self.debounce_duration)
             .map(|(path, _)| path.clone())
             .collect();
-        
+
         for path in ready_paths {
             if let Some(event) = self.pending_changes.remove(&path) {
                 self.last_change.remove(&path);
                 ready_changes.push(event);
             }
         }
-        
+
         ready_changes
     }
 
@@ -99,7 +99,7 @@ impl FileWatcher {
         let (event_sender, _) = broadcast::channel(1024);
         let debounce_duration = Duration::from_millis(config.debounce_delay_ms);
         let debounce_tracker = Arc::new(Mutex::new(DebounceTracker::new(debounce_duration)));
-        
+
         Ok(Self {
             config: config.clone(),
             watcher: None,
@@ -113,13 +113,14 @@ impl FileWatcher {
     /// Add a path to watch for changes
     pub fn add_watch_path<P: AsRef<Path>>(&mut self, path: P) -> RealtimeResult<()> {
         let path = path.as_ref().to_path_buf();
-        
+
         if self.watched_paths.len() >= self.config.max_watched_files {
-            return Err(AdrscanError::RealtimeError(
-                format!("Maximum number of watched files ({}) exceeded", self.config.max_watched_files)
-            ));
+            return Err(AdrscanError::RealtimeError(format!(
+                "Maximum number of watched files ({}) exceeded",
+                self.config.max_watched_files
+            )));
         }
-        
+
         self.watched_paths.push(path);
         log::debug!("Added watch path: {:?}", self.watched_paths.last().unwrap());
         Ok(())
@@ -130,26 +131,28 @@ impl FileWatcher {
         {
             let mut running = self.running.lock().unwrap();
             if *running {
-                return Err(AdrscanError::RealtimeError("File watcher is already running".to_string()));
+                return Err(AdrscanError::RealtimeError(
+                    "File watcher is already running".to_string(),
+                ));
             }
             *running = true;
         }
 
         let (tx, rx) = mpsc::channel();
-        
+
         // Configure the watcher
         let config = Config::default()
             .with_poll_interval(Duration::from_millis(self.config.max_latency_ms / 2))
             .with_compare_contents(true);
-            
+
         let mut watcher = RecommendedWatcher::new(tx, config)
             .map_err(|e| AdrscanError::RealtimeError(format!("Failed to create watcher: {}", e)))?;
 
         // Watch all configured paths
         for path in &self.watched_paths {
-            watcher
-                .watch(path, RecursiveMode::Recursive)
-                .map_err(|e| AdrscanError::RealtimeError(format!("Failed to watch path {:?}: {}", path, e)))?;
+            watcher.watch(path, RecursiveMode::Recursive).map_err(|e| {
+                AdrscanError::RealtimeError(format!("Failed to watch path {:?}: {}", path, e))
+            })?;
             log::info!("Watching path: {:?}", path);
         }
 
@@ -159,7 +162,10 @@ impl FileWatcher {
         self.start_event_processor(rx).await;
         self.start_debounce_processor().await;
 
-        log::info!("File watcher started with {} paths", self.watched_paths.len());
+        log::info!(
+            "File watcher started with {} paths",
+            self.watched_paths.len()
+        );
         Ok(())
     }
 
@@ -196,7 +202,7 @@ impl FileWatcher {
     async fn start_event_processor(&self, rx: mpsc::Receiver<Result<Event, notify::Error>>) {
         let debounce_tracker = Arc::clone(&self.debounce_tracker);
         let running = Arc::clone(&self.running);
-        
+
         tokio::spawn(async move {
             while *running.lock().unwrap() {
                 match rx.recv() {
@@ -223,24 +229,24 @@ impl FileWatcher {
         let event_sender = self.event_sender.clone();
         let running = Arc::clone(&self.running);
         let check_interval = Duration::from_millis(self.config.max_latency_ms / 4);
-        
+
         tokio::spawn(async move {
             let mut interval = interval(check_interval);
-            
+
             while *running.lock().unwrap() {
                 interval.tick().await;
-                
+
                 let ready_changes = {
                     let mut tracker = debounce_tracker.lock().unwrap();
                     tracker.get_ready_changes()
                 };
-                
+
                 for change in ready_changes {
                     if let Err(e) = event_sender.send(change) {
                         log::debug!("No subscribers for file change event: {}", e);
                     }
                 }
-                
+
                 // Sleep if no pending changes to reduce CPU usage
                 if !debounce_tracker.lock().unwrap().has_pending_changes() {
                     sleep(Duration::from_millis(100)).await;
@@ -251,7 +257,7 @@ impl FileWatcher {
 
     fn convert_notify_event(event: Event) -> Option<FileChangeEvent> {
         let timestamp = Instant::now();
-        
+
         match event.kind {
             EventKind::Create(_) => {
                 if let Some(path) = event.paths.first() {
@@ -310,7 +316,7 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
     use tokio::time::timeout;
-    
+
     #[tokio::test]
     async fn test_file_watcher_creation() {
         let config = RealtimeConfig::default();
@@ -323,7 +329,7 @@ mod tests {
         let config = RealtimeConfig::default();
         let mut watcher = FileWatcher::new(&config).unwrap();
         let temp_dir = tempdir().unwrap();
-        
+
         watcher.add_watch_path(temp_dir.path()).unwrap();
         assert_eq!(watcher.get_stats().watched_paths, 1);
     }
@@ -332,11 +338,11 @@ mod tests {
     async fn test_max_watched_files_limit() {
         let mut config = RealtimeConfig::default();
         config.max_watched_files = 1;
-        
+
         let mut watcher = FileWatcher::new(&config).unwrap();
         let temp_dir1 = tempdir().unwrap();
         let temp_dir2 = tempdir().unwrap();
-        
+
         watcher.add_watch_path(temp_dir1.path()).unwrap();
         assert!(watcher.add_watch_path(temp_dir2.path()).is_err());
     }

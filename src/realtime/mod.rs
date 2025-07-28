@@ -86,7 +86,7 @@ impl RealtimeSystem {
         let pipeline = MLPipeline::new(&config)?;
         let event_bus = EventBus::new();
         let cache = IntelligentCache::new(&config)?;
-        
+
         let websocket_server = if config.websocket_port > 0 {
             Some(WebSocketServer::new(config.websocket_port)?)
         } else {
@@ -106,15 +106,15 @@ impl RealtimeSystem {
     /// Start the real-time monitoring system
     pub async fn start(&mut self) -> RealtimeResult<()> {
         log::info!("Starting real-time analysis system");
-        
+
         // Start WebSocket server if configured
         if let Some(websocket_server) = &mut self.websocket_server {
             websocket_server.start().await?;
         }
-        
+
         // Start file watcher
         self.watcher.start().await?;
-        
+
         log::info!("Real-time analysis system started successfully");
         Ok(())
     }
@@ -122,15 +122,15 @@ impl RealtimeSystem {
     /// Stop the real-time monitoring system
     pub async fn stop(&mut self) -> RealtimeResult<()> {
         log::info!("Stopping real-time analysis system");
-        
+
         // Stop file watcher
         self.watcher.stop().await?;
-        
+
         // Stop WebSocket server
         if let Some(websocket_server) = &mut self.websocket_server {
             websocket_server.stop().await?;
         }
-        
+
         log::info!("Real-time analysis system stopped");
         Ok(())
     }

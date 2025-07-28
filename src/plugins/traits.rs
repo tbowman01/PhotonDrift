@@ -1,32 +1,32 @@
 //! Plugin trait definitions for the PhotonDrift plugin system
 
-use crate::{Result, AdrscanError};
-use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
+use crate::{AdrscanError, Result};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Core plugin trait that all plugins must implement
 pub trait Plugin: Send + Sync {
     /// Initialize the plugin with the given context
     fn initialize(&mut self, context: &PluginContext) -> Result<()>;
-    
+
     /// Get plugin metadata
     fn metadata(&self) -> &PluginMetadata;
-    
+
     /// Get plugin capabilities
     fn capabilities(&self) -> Vec<PluginCapability>;
-    
+
     /// Execute a plugin command with the given parameters
     fn execute(&self, command: &str, params: &HashMap<String, String>) -> Result<PluginResponse>;
-    
+
     /// Cleanup plugin resources
     fn shutdown(&mut self) -> Result<()>;
-    
+
     /// Check if plugin is compatible with the current system
     fn is_compatible(&self) -> bool {
         true
     }
-    
+
     /// Get plugin configuration schema
     fn config_schema(&self) -> Option<serde_json::Value> {
         None
@@ -36,11 +36,15 @@ pub trait Plugin: Send + Sync {
 /// Plugin for custom drift analysis rules
 pub trait DriftAnalysisPlugin: Plugin {
     /// Analyze drift in the given ADR content
-    fn analyze_drift(&self, adr_content: &str, context: &DriftAnalysisContext) -> Result<Vec<DriftAlert>>;
-    
+    fn analyze_drift(
+        &self,
+        adr_content: &str,
+        context: &DriftAnalysisContext,
+    ) -> Result<Vec<DriftAlert>>;
+
     /// Get supported drift pattern types
     fn supported_patterns(&self) -> Vec<String>;
-    
+
     /// Validate drift analysis configuration
     fn validate_config(&self, config: &serde_json::Value) -> Result<()>;
 }
@@ -49,16 +53,16 @@ pub trait DriftAnalysisPlugin: Plugin {
 pub trait IDEIntegrationPlugin: Plugin {
     /// Get supported IDE type
     fn ide_type(&self) -> IDEType;
-    
+
     /// Initialize IDE-specific features
     fn setup_ide_integration(&self, config: &IDEConfig) -> Result<()>;
-    
+
     /// Handle IDE events
     fn handle_ide_event(&self, event: &IDEEvent) -> Result<IDEResponse>;
-    
+
     /// Get IDE-specific configuration
     fn get_ide_config(&self) -> IDEConfig;
-    
+
     /// Register IDE commands
     fn register_commands(&self) -> Vec<IDECommand>;
 }
@@ -67,13 +71,21 @@ pub trait IDEIntegrationPlugin: Plugin {
 pub trait TemplatePlugin: Plugin {
     /// Get available templates
     fn get_templates(&self) -> Vec<TemplateInfo>;
-    
+
     /// Render template with given variables
-    fn render_template(&self, template_id: &str, variables: &HashMap<String, String>) -> Result<String>;
-    
+    fn render_template(
+        &self,
+        template_id: &str,
+        variables: &HashMap<String, String>,
+    ) -> Result<String>;
+
     /// Validate template variables
-    fn validate_template_variables(&self, template_id: &str, variables: &HashMap<String, String>) -> Result<()>;
-    
+    fn validate_template_variables(
+        &self,
+        template_id: &str,
+        variables: &HashMap<String, String>,
+    ) -> Result<()>;
+
     /// Get template schema
     fn get_template_schema(&self, template_id: &str) -> Result<serde_json::Value>;
 }
@@ -203,13 +215,30 @@ pub struct IDEConfig {
 /// IDE events that plugins can handle
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IDEEvent {
-    FileOpened { path: std::path::PathBuf },
-    FileSaved { path: std::path::PathBuf },
-    FileModified { path: std::path::PathBuf, changes: Vec<TextChange> },
-    ProjectOpened { root: std::path::PathBuf },
-    ProjectClosed { root: std::path::PathBuf },
-    Command { name: String, args: Vec<String> },
-    Custom { event_type: String, data: serde_json::Value },
+    FileOpened {
+        path: std::path::PathBuf,
+    },
+    FileSaved {
+        path: std::path::PathBuf,
+    },
+    FileModified {
+        path: std::path::PathBuf,
+        changes: Vec<TextChange>,
+    },
+    ProjectOpened {
+        root: std::path::PathBuf,
+    },
+    ProjectClosed {
+        root: std::path::PathBuf,
+    },
+    Command {
+        name: String,
+        args: Vec<String>,
+    },
+    Custom {
+        event_type: String,
+        data: serde_json::Value,
+    },
 }
 
 /// Text changes in IDE events
@@ -244,13 +273,37 @@ pub struct IDEResponse {
 /// IDE actions that plugins can request
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IDEAction {
-    ShowMessage { level: MessageLevel, message: String },
-    ShowProgress { title: String, message: String, percentage: Option<u32> },
-    OpenFile { path: std::path::PathBuf, line: Option<u32> },
-    InsertText { path: std::path::PathBuf, position: TextPosition, text: String },
-    ReplaceText { path: std::path::PathBuf, range: TextRange, text: String },
-    ExecuteCommand { command: String, args: Vec<String> },
-    Custom { action_type: String, data: serde_json::Value },
+    ShowMessage {
+        level: MessageLevel,
+        message: String,
+    },
+    ShowProgress {
+        title: String,
+        message: String,
+        percentage: Option<u32>,
+    },
+    OpenFile {
+        path: std::path::PathBuf,
+        line: Option<u32>,
+    },
+    InsertText {
+        path: std::path::PathBuf,
+        position: TextPosition,
+        text: String,
+    },
+    ReplaceText {
+        path: std::path::PathBuf,
+        range: TextRange,
+        text: String,
+    },
+    ExecuteCommand {
+        command: String,
+        args: Vec<String>,
+    },
+    Custom {
+        action_type: String,
+        data: serde_json::Value,
+    },
 }
 
 /// Message levels for IDE messages

@@ -4,8 +4,8 @@
 //! of the file watching and ML analysis system.
 
 use crate::error::AdrscanError;
-use crate::realtime::{RealtimeConfig, RealtimeResult};
 use crate::realtime::events::{EventBus, PipelineEvent};
+use crate::realtime::{RealtimeConfig, RealtimeResult};
 
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -14,9 +14,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, RwLock};
-use tokio_tungstenite::{
-    accept_async, tungstenite::protocol::Message, WebSocketStream,
-};
+use tokio_tungstenite::{accept_async, tungstenite::protocol::Message, WebSocketStream};
 
 /// WebSocket message types
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,7 +94,7 @@ impl WebSocketServer {
         let clients = Arc::new(RwLock::new(HashMap::new()));
         let message_sender = Arc::new(RwLock::new(None));
         let stats = Arc::new(RwLock::new(WebSocketStats::default()));
-        
+
         Ok(Self {
             port,
             event_bus,
@@ -111,47 +109,51 @@ impl WebSocketServer {
     /// Start the WebSocket server
     pub async fn start(&mut self) -> RealtimeResult<()> {
         let addr = format!("127.0.0.1:{}", self.port);
-        let listener = TcpListener::bind(&addr).await
-            .map_err(|e| AdrscanError::RealtimeError(format!("Failed to bind to {}: {}", addr, e)))?;
-        
+        let listener = TcpListener::bind(&addr).await.map_err(|e| {
+            AdrscanError::RealtimeError(format!("Failed to bind to {}: {}", addr, e))
+        })?;
+
         log::info!("WebSocket server listening on {}", addr);
-        
+
         // Create message broadcast channel
         let (msg_sender, _) = broadcast::channel(1024);
         {
             let mut sender_guard = self.message_sender.write().await;
             *sender_guard = Some(msg_sender.clone());
         }
-        
+
         self.listener = Some(listener);
-        
+
         // Start event subscription
         self.start_event_subscription().await;
-        
+
         // Start client connection handler
         self.start_connection_handler().await;
-        
+
         // Start periodic tasks
         self.start_periodic_tasks().await;
-        
-        log::info!("WebSocket server started successfully on port {}", self.port);
+
+        log::info!(
+            "WebSocket server started successfully on port {}",
+            self.port
+        );
         Ok(())
     }
 
     /// Stop the WebSocket server
     pub async fn stop(&mut self) -> RealtimeResult<()> {
         self.listener = None;
-        
+
         // Disconnect all clients
         let client_ids: Vec<String> = {
             let clients = self.clients.read().await;
             clients.keys().cloned().collect()
         };
-        
+
         for client_id in client_ids {
             self.disconnect_client(&client_id).await;
         }
-        
+
         log::info!("WebSocket server stopped");
         Ok(())
     }
@@ -185,10 +187,10 @@ impl WebSocketServer {
     async fn start_event_subscription(&self) {
         let event_bus = Arc::clone(&self.event_bus);
         let message_sender = Arc::clone(&self.message_sender);
-        
+
         tokio::spawn(async move {
             let mut event_receiver = event_bus.subscribe();
-            
+
             while let Ok(event) = event_receiver.recv().await {
                 let ws_message = WebSocketMessage::Event {
                     event,
@@ -197,7 +199,7 @@ impl WebSocketServer {
                         .unwrap_or_default()
                         .as_millis() as u64,
                 };
-                
+
                 let sender_guard = message_sender.read().await;
                 if let Some(sender) = sender_guard.as_ref() {
                     if let Err(e) = sender.send(ws_message) {
@@ -210,20 +212,22 @@ impl WebSocketServer {
 
     async fn start_connection_handler(&self) {
         if let Some(listener) = &self.listener {
-            let listener = listener.try_clone()
-                .expect("Failed to clone listener");
+            let listener = listener.try_clone().expect("Failed to clone listener");
             let clients = Arc::clone(&self.clients);
             let message_sender = Arc::clone(&self.message_sender);
             let stats = Arc::clone(&self.stats);
-            
+
             tokio::spawn(async move {
                 while let Ok((stream, addr)) = listener.accept().await {
                     let clients = Arc::clone(&clients);
                     let message_sender = Arc::clone(&message_sender);
                     let stats = Arc::clone(&stats);
-                    
+
                     tokio::spawn(async move {
-                        if let Err(e) = Self::handle_connection(stream, addr, clients, message_sender, stats).await {
+                        if let Err(e) =
+                            Self::handle_connection(stream, addr, clients, message_sender, stats)
+                                .await
+                        {
                             log::error!("WebSocket connection error: {}", e);
                         }
                     });
@@ -240,46 +244,52 @@ impl WebSocketServer {
         stats: Arc<RwLock<WebSocketStats>>,
     ) -> RealtimeResult<()> {
         log::info!("New WebSocket connection from {}", addr);
-        
-        let ws_stream = accept_async(stream).await
-            .map_err(|e| AdrscanError::RealtimeError(format!("WebSocket handshake failed: {}", e)))?;
-        
+
+        let ws_stream = accept_async(stream).await.map_err(|e| {
+            AdrscanError::RealtimeError(format!("WebSocket handshake failed: {}", e))
+        })?;
+
         // Update connection stats
         {
             let mut stats = stats.write().await;
             stats.total_connections += 1;
         }
-        
+
         let (mut ws_sender, mut ws_receiver) = ws_stream.split();
         let client_id = format!("client_{}", addr);
-        
+
         // Register client
         {
             let mut clients = clients.write().await;
-            clients.insert(client_id.clone(), WebSocketClient {
-                id: client_id.clone(),
-                addr,
-                subscriptions: vec!["all".to_string()], // Default subscription
-                connected_at: std::time::SystemTime::now(),
-                last_ping: std::time::SystemTime::now(),
-            });
+            clients.insert(
+                client_id.clone(),
+                WebSocketClient {
+                    id: client_id.clone(),
+                    addr,
+                    subscriptions: vec!["all".to_string()], // Default subscription
+                    connected_at: std::time::SystemTime::now(),
+                    last_ping: std::time::SystemTime::now(),
+                },
+            );
         }
-        
+
         // Subscribe to broadcast messages
         let mut message_receiver = {
             let sender_guard = message_sender.read().await;
             if let Some(sender) = sender_guard.as_ref() {
                 sender.subscribe()
             } else {
-                return Err(AdrscanError::RealtimeError("Message sender not available".to_string()));
+                return Err(AdrscanError::RealtimeError(
+                    "Message sender not available".to_string(),
+                ));
             }
         };
-        
+
         // Handle outgoing messages
         let clients_clone = Arc::clone(&clients);
         let stats_clone = Arc::clone(&stats);
         let client_id_clone = client_id.clone();
-        
+
         let send_task = tokio::spawn(async move {
             while let Ok(message) = message_receiver.recv().await {
                 // Check if client should receive this message
@@ -291,32 +301,34 @@ impl WebSocketServer {
                         false
                     }
                 };
-                
+
                 if should_send {
                     let json_msg = serde_json::to_string(&message).unwrap_or_default();
                     if let Err(e) = ws_sender.send(Message::Text(json_msg)).await {
                         log::error!("Failed to send WebSocket message: {}", e);
                         break;
                     }
-                    
+
                     let mut stats = stats_clone.write().await;
                     stats.messages_sent += 1;
                 }
             }
         });
-        
+
         // Handle incoming messages
         let clients_clone = Arc::clone(&clients);
         let stats_clone = Arc::clone(&stats);
-        
+
         while let Some(msg) = ws_receiver.next().await {
             match msg {
                 Ok(Message::Text(text)) => {
                     let mut stats = stats_clone.write().await;
                     stats.messages_received += 1;
                     drop(stats);
-                    
-                    if let Err(e) = Self::handle_client_message(&text, &client_id, &clients_clone).await {
+
+                    if let Err(e) =
+                        Self::handle_client_message(&text, &client_id, &clients_clone).await
+                    {
                         log::error!("Error handling client message: {}", e);
                         let mut stats = stats_clone.write().await;
                         stats.errors += 1;
@@ -344,14 +356,14 @@ impl WebSocketServer {
                 }
             }
         }
-        
+
         // Cleanup
         send_task.abort();
         {
             let mut clients = clients.write().await;
             clients.remove(&client_id);
         }
-        
+
         log::info!("Client {} disconnected", client_id);
         Ok(())
     }
@@ -363,17 +375,27 @@ impl WebSocketServer {
     ) -> RealtimeResult<()> {
         let message: WebSocketMessage = serde_json::from_str(text)
             .map_err(|e| AdrscanError::RealtimeError(format!("Invalid message format: {}", e)))?;
-        
+
         match message {
-            WebSocketMessage::Register { client_id: reg_id, subscriptions } => {
+            WebSocketMessage::Register {
+                client_id: reg_id,
+                subscriptions,
+            } => {
                 let mut clients = clients.write().await;
                 if let Some(client) = clients.get_mut(client_id) {
                     client.id = reg_id;
                     client.subscriptions = subscriptions;
-                    log::info!("Client {} registered with subscriptions: {:?}", client.id, client.subscriptions);
+                    log::info!(
+                        "Client {} registered with subscriptions: {:?}",
+                        client.id,
+                        client.subscriptions
+                    );
                 }
             }
-            WebSocketMessage::Subscribe { client_id: sub_id, event_types } => {
+            WebSocketMessage::Subscribe {
+                client_id: sub_id,
+                event_types,
+            } => {
                 let mut clients = clients.write().await;
                 if let Some(client) = clients.get_mut(client_id) {
                     for event_type in event_types {
@@ -381,14 +403,25 @@ impl WebSocketServer {
                             client.subscriptions.push(event_type);
                         }
                     }
-                    log::debug!("Client {} updated subscriptions: {:?}", sub_id, client.subscriptions);
+                    log::debug!(
+                        "Client {} updated subscriptions: {:?}",
+                        sub_id,
+                        client.subscriptions
+                    );
                 }
             }
-            WebSocketMessage::Unsubscribe { client_id: unsub_id, event_types } => {
+            WebSocketMessage::Unsubscribe {
+                client_id: unsub_id,
+                event_types,
+            } => {
                 let mut clients = clients.write().await;
                 if let Some(client) = clients.get_mut(client_id) {
                     client.subscriptions.retain(|s| !event_types.contains(s));
-                    log::debug!("Client {} updated subscriptions: {:?}", unsub_id, client.subscriptions);
+                    log::debug!(
+                        "Client {} updated subscriptions: {:?}",
+                        unsub_id,
+                        client.subscriptions
+                    );
                 }
             }
             WebSocketMessage::Ping { .. } => {
@@ -401,7 +434,7 @@ impl WebSocketServer {
                 log::debug!("Received unexpected message type from client {}", client_id);
             }
         }
-        
+
         Ok(())
     }
 
@@ -410,7 +443,7 @@ impl WebSocketServer {
         if client.subscriptions.contains(&"all".to_string()) {
             return true;
         }
-        
+
         // Check specific subscriptions based on message type
         match message {
             WebSocketMessage::Event { event, .. } => {
@@ -425,9 +458,7 @@ impl WebSocketServer {
                 };
                 client.subscriptions.contains(&event_type.to_string())
             }
-            WebSocketMessage::Status { .. } => {
-                client.subscriptions.contains(&"status".to_string())
-            }
+            WebSocketMessage::Status { .. } => client.subscriptions.contains(&"status".to_string()),
             _ => true, // Send system messages to all clients
         }
     }
@@ -435,7 +466,7 @@ impl WebSocketServer {
     async fn start_periodic_tasks(&self) {
         // Start status broadcast task
         self.start_status_broadcast_task().await;
-        
+
         // Start client cleanup task
         self.start_client_cleanup_task().await;
     }
@@ -444,20 +475,20 @@ impl WebSocketServer {
         let message_sender = Arc::clone(&self.message_sender);
         let clients = Arc::clone(&self.clients);
         let start_time = self.start_time;
-        
+
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
-            
+
             loop {
                 interval.tick().await;
-                
+
                 let status_message = WebSocketMessage::Status {
-                    active_watchers: 0, // Would be populated by actual system
-                    pending_analyses: 0, // Would be populated by actual system
+                    active_watchers: 0,   // Would be populated by actual system
+                    pending_analyses: 0,  // Would be populated by actual system
                     cache_hit_ratio: 0.0, // Would be populated by actual system
                     uptime_seconds: start_time.elapsed().unwrap_or_default().as_secs(),
                 };
-                
+
                 let sender_guard = message_sender.read().await;
                 if let Some(sender) = sender_guard.as_ref() {
                     if let Err(e) = sender.send(status_message) {
@@ -470,17 +501,17 @@ impl WebSocketServer {
 
     async fn start_client_cleanup_task(&self) {
         let clients = Arc::clone(&self.clients);
-        
+
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
             let timeout_duration = std::time::Duration::from_secs(300); // 5 minutes
-            
+
             loop {
                 interval.tick().await;
-                
+
                 let now = std::time::SystemTime::now();
                 let mut to_remove = Vec::new();
-                
+
                 {
                     let clients = clients.read().await;
                     for (id, client) in clients.iter() {
@@ -491,7 +522,7 @@ impl WebSocketServer {
                         }
                     }
                 }
-                
+
                 if !to_remove.is_empty() {
                     let mut clients = clients.write().await;
                     for id in to_remove {
@@ -513,7 +544,7 @@ impl WebSocketServer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_websocket_server_creation() {
         let server = WebSocketServer::new(8080).unwrap();
@@ -530,12 +561,14 @@ mod tests {
             cache_hit_ratio: 0.85,
             uptime_seconds: 3600,
         };
-        
+
         let json = serde_json::to_string(&message).unwrap();
         let deserialized: WebSocketMessage = serde_json::from_str(&json).unwrap();
-        
+
         match deserialized {
-            WebSocketMessage::Status { active_watchers, .. } => {
+            WebSocketMessage::Status {
+                active_watchers, ..
+            } => {
                 assert_eq!(active_watchers, 5);
             }
             _ => panic!("Unexpected message type"),

@@ -70,8 +70,8 @@ pub struct CacheConfig {
 impl Default for CacheConfig {
     fn default() -> Self {
         Self {
-            max_memory_bytes: 100 * 1024 * 1024, // 100MB
-            default_ttl: Duration::from_secs(3600), // 1 hour
+            max_memory_bytes: 100 * 1024 * 1024,       // 100MB
+            default_ttl: Duration::from_secs(3600),    // 1 hour
             cleanup_interval: Duration::from_secs(60), // 1 minute
             enable_lru_eviction: true,
             max_entries: 10000,
@@ -140,8 +140,10 @@ impl IntelligentCache {
         // Start background cleanup task
         cache.start_cleanup_task();
 
-        log::info!("Initialized intelligent cache with {}MB limit", 
-                  config.max_memory_bytes / (1024 * 1024));
+        log::info!(
+            "Initialized intelligent cache with {}MB limit",
+            config.max_memory_bytes / (1024 * 1024)
+        );
         Ok(cache)
     }
 
@@ -154,7 +156,7 @@ impl IntelligentCache {
             .map_err(|e| AdrscanError::RealtimeError(format!("Serialization failed: {}", e)))?;
 
         let size_bytes = serialized.len();
-        
+
         // Check memory limits before insertion
         if self.should_evict_for_memory(size_bytes).await {
             self.evict_lru_entries(size_bytes).await;
@@ -176,7 +178,12 @@ impl IntelligentCache {
             stats.calculate_memory_usage_percent(self.config.max_memory_bytes);
         }
 
-        log::debug!("Cached entry '{}' with TTL {:?} ({} bytes)", key, ttl, size_bytes);
+        log::debug!(
+            "Cached entry '{}' with TTL {:?} ({} bytes)",
+            key,
+            ttl,
+            size_bytes
+        );
         Ok(())
     }
 
@@ -194,13 +201,13 @@ impl IntelligentCache {
         T: for<'de> Deserialize<'de>,
     {
         let start_time = Instant::now();
-        
+
         let result = if let Some(mut entry) = self.storage.get_mut(key) {
             if entry.is_expired() {
                 // Remove expired entry
                 drop(entry);
                 self.storage.remove(key);
-                
+
                 if self.config.enable_statistics {
                     let mut stats = self.stats.write().await;
                     stats.misses += 1;
@@ -210,26 +217,27 @@ impl IntelligentCache {
                     stats.calculate_hit_ratio();
                     stats.calculate_memory_usage_percent(self.config.max_memory_bytes);
                 }
-                
+
                 log::debug!("Cache entry '{}' expired", key);
                 None
             } else {
                 // Access the entry (updates access time and count)
                 let data = entry.access().clone();
-                
+
                 if self.config.enable_statistics {
                     let mut stats = self.stats.write().await;
                     stats.hits += 1;
                     stats.calculate_hit_ratio();
-                    
+
                     let access_time_ms = start_time.elapsed().as_millis() as f64;
                     stats.average_access_time_ms = if stats.hits == 1 {
                         access_time_ms
                     } else {
-                        (stats.average_access_time_ms * (stats.hits - 1) as f64 + access_time_ms) / stats.hits as f64
+                        (stats.average_access_time_ms * (stats.hits - 1) as f64 + access_time_ms)
+                            / stats.hits as f64
                     };
                 }
-                
+
                 // Deserialize
                 match serde_json::from_slice(&data) {
                     Ok(value) => Some(value),
@@ -264,14 +272,14 @@ impl IntelligentCache {
     /// Remove a specific key from the cache
     pub async fn remove(&self, key: &str) -> RealtimeResult<bool> {
         let removed = self.storage.remove(key).is_some();
-        
+
         if removed && self.config.enable_statistics {
             let mut stats = self.stats.write().await;
             stats.entries = self.storage.len();
             stats.memory_usage_bytes = self.calculate_memory_usage();
             stats.calculate_memory_usage_percent(self.config.max_memory_bytes);
         }
-        
+
         log::debug!("Removed cache entry '{}': {}", key, removed);
         Ok(removed)
     }
@@ -280,14 +288,14 @@ impl IntelligentCache {
     pub async fn clear(&self) -> RealtimeResult<()> {
         let count = self.storage.len();
         self.storage.clear();
-        
+
         if self.config.enable_statistics {
             let mut stats = self.stats.write().await;
             stats.entries = 0;
             stats.memory_usage_bytes = 0;
             stats.memory_usage_percent = 0.0;
         }
-        
+
         log::info!("Cleared cache ({} entries removed)", count);
         Ok(())
     }
@@ -308,7 +316,10 @@ impl IntelligentCache {
 
     /// Get all cache keys (for debugging)
     pub fn get_keys(&self) -> Vec<String> {
-        self.storage.iter().map(|entry| entry.key().clone()).collect()
+        self.storage
+            .iter()
+            .map(|entry| entry.key().clone())
+            .collect()
     }
 
     /// Check if cache contains a key
@@ -337,7 +348,8 @@ impl IntelligentCache {
             return;
         }
 
-        let mut eviction_candidates: Vec<(String, Instant, usize)> = self.storage
+        let mut eviction_candidates: Vec<(String, Instant, usize)> = self
+            .storage
             .iter()
             .map(|entry| {
                 let key = entry.key().clone();
@@ -374,7 +386,11 @@ impl IntelligentCache {
         }
 
         if evicted_count > 0 {
-            log::info!("Evicted {} cache entries ({} bytes)", evicted_count, evicted_bytes);
+            log::info!(
+                "Evicted {} cache entries ({} bytes)",
+                evicted_count,
+                evicted_bytes
+            );
         }
     }
 
@@ -387,13 +403,13 @@ impl IntelligentCache {
 
         tokio::spawn(async move {
             let mut interval = interval(cleanup_interval);
-            
+
             loop {
                 interval.tick().await;
-                
+
                 let mut expired_keys = Vec::new();
                 let mut expired_bytes = 0;
-                
+
                 // Find expired entries
                 for entry in storage.iter() {
                     if entry.value().is_expired() {
@@ -401,23 +417,25 @@ impl IntelligentCache {
                         expired_bytes += entry.value().size_bytes;
                     }
                 }
-                
+
                 // Remove expired entries
                 for key in &expired_keys {
                     storage.remove(key);
                 }
-                
+
                 if !expired_keys.is_empty() {
-                    log::debug!("Cleaned up {} expired cache entries ({} bytes)", 
-                               expired_keys.len(), expired_bytes);
-                    
+                    log::debug!(
+                        "Cleaned up {} expired cache entries ({} bytes)",
+                        expired_keys.len(),
+                        expired_bytes
+                    );
+
                     if enable_statistics {
                         let mut stats = stats.write().await;
                         stats.expirations += expired_keys.len() as u64;
                         stats.entries = storage.len();
-                        let current_memory: usize = storage.iter()
-                            .map(|entry| entry.value().size_bytes)
-                            .sum();
+                        let current_memory: usize =
+                            storage.iter().map(|entry| entry.value().size_bytes).sum();
                         stats.memory_usage_bytes = current_memory;
                         stats.calculate_memory_usage_percent(max_memory);
                     }
@@ -439,7 +457,7 @@ mod tests {
     use super::*;
     use serde::{Deserialize, Serialize};
     use tokio::time::sleep;
-    
+
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     struct TestData {
         id: u32,
@@ -461,20 +479,20 @@ mod tests {
     async fn test_cache_set_and_get() {
         let config = RealtimeConfig::default();
         let cache = IntelligentCache::new(&config).unwrap();
-        
+
         let test_data = TestData {
             id: 1,
             name: "test".to_string(),
             values: vec![1.0, 2.0, 3.0],
         };
-        
+
         // Set value
         cache.set("test_key", &test_data).await.unwrap();
-        
+
         // Get value
         let retrieved: Option<TestData> = cache.get("test_key").await.unwrap();
         assert_eq!(retrieved, Some(test_data));
-        
+
         let stats = cache.get_stats().await;
         assert_eq!(stats.entries, 1);
         assert_eq!(stats.hits, 1);
@@ -485,10 +503,10 @@ mod tests {
     async fn test_cache_miss() {
         let config = RealtimeConfig::default();
         let cache = IntelligentCache::new(&config).unwrap();
-        
+
         let result: Option<TestData> = cache.get("nonexistent").await.unwrap();
         assert_eq!(result, None);
-        
+
         let stats = cache.get_stats().await;
         assert_eq!(stats.hits, 0);
         assert_eq!(stats.misses, 1);
@@ -498,28 +516,31 @@ mod tests {
     async fn test_cache_expiration() {
         let config = RealtimeConfig::default();
         let cache = IntelligentCache::new(&config).unwrap();
-        
+
         let test_data = TestData {
             id: 1,
             name: "test".to_string(),
             values: vec![1.0, 2.0, 3.0],
         };
-        
+
         // Set with short TTL
         let short_ttl = Duration::from_millis(50);
-        cache.set_with_ttl("test_key", &test_data, short_ttl).await.unwrap();
-        
+        cache
+            .set_with_ttl("test_key", &test_data, short_ttl)
+            .await
+            .unwrap();
+
         // Should exist immediately
         let retrieved: Option<TestData> = cache.get("test_key").await.unwrap();
         assert_eq!(retrieved, Some(test_data));
-        
+
         // Wait for expiration
         sleep(Duration::from_millis(100)).await;
-        
+
         // Should be expired
         let retrieved: Option<TestData> = cache.get("test_key").await.unwrap();
         assert_eq!(retrieved, None);
-        
+
         let stats = cache.get_stats().await;
         assert_eq!(stats.expirations, 1);
     }
@@ -528,16 +549,16 @@ mod tests {
     async fn test_cache_remove() {
         let config = RealtimeConfig::default();
         let cache = IntelligentCache::new(&config).unwrap();
-        
+
         let test_data = TestData {
             id: 1,
             name: "test".to_string(),
             values: vec![1.0, 2.0, 3.0],
         };
-        
+
         cache.set("test_key", &test_data).await.unwrap();
         assert!(cache.contains_key("test_key"));
-        
+
         let removed = cache.remove("test_key").await.unwrap();
         assert!(removed);
         assert!(!cache.contains_key("test_key"));
@@ -547,21 +568,21 @@ mod tests {
     async fn test_cache_clear() {
         let config = RealtimeConfig::default();
         let cache = IntelligentCache::new(&config).unwrap();
-        
+
         let test_data = TestData {
             id: 1,
             name: "test".to_string(),
             values: vec![1.0, 2.0, 3.0],
         };
-        
+
         cache.set("key1", &test_data).await.unwrap();
         cache.set("key2", &test_data).await.unwrap();
-        
+
         assert_eq!(cache.get_keys().len(), 2);
-        
+
         cache.clear().await.unwrap();
         assert_eq!(cache.get_keys().len(), 0);
-        
+
         let stats = cache.get_stats().await;
         assert_eq!(stats.entries, 0);
     }
@@ -570,22 +591,22 @@ mod tests {
     async fn test_hit_ratio_calculation() {
         let config = RealtimeConfig::default();
         let cache = IntelligentCache::new(&config).unwrap();
-        
+
         let test_data = TestData {
             id: 1,
             name: "test".to_string(),
             values: vec![1.0, 2.0, 3.0],
         };
-        
+
         cache.set("test_key", &test_data).await.unwrap();
-        
+
         // 2 hits
         let _: Option<TestData> = cache.get("test_key").await.unwrap();
         let _: Option<TestData> = cache.get("test_key").await.unwrap();
-        
+
         // 1 miss
         let _: Option<TestData> = cache.get("nonexistent").await.unwrap();
-        
+
         let stats = cache.get_stats().await;
         assert_eq!(stats.hits, 2);
         assert_eq!(stats.misses, 1);
