@@ -888,3 +888,101 @@ mod tests {
         assert!(recency >= 0.0 && recency <= 1.0);
     }
 }
+
+    #[test]
+    fn test_feature_config_default() {
+        let config = FeatureConfig::default();
+        
+        assert!(config.enable_temporal);
+        assert!(config.enable_text_analysis);
+        assert!(config.enable_structural);
+        assert_eq!(config.temporal_window_days, 30);
+    }
+
+    #[test]
+    fn test_feature_extractor_with_custom_config() {
+        let config = FeatureConfig {
+            enable_temporal: false,
+            enable_text_analysis: true,
+            enable_structural: false,
+            temporal_window_days: 7,
+        };
+        
+        let extractor = FeatureExtractor::with_config(config.clone());
+        assert_eq!(extractor.config.temporal_window_days, 7);
+        assert!(!extractor.config.enable_temporal);
+        assert!(extractor.config.enable_text_analysis);
+        assert!(!extractor.config.enable_structural);
+    }
+
+    #[test]
+    fn test_drift_features_default() {
+        let features = DriftFeatures::default();
+        
+        assert_eq!(features.file_count, 0);
+        assert_eq!(features.complexity_score, 0.0);
+        assert_eq!(features.lines_changed, 0);
+        assert_eq!(features.tech_diversity, 0);
+        assert_eq!(features.pattern_frequency, 0.0);
+    }
+
+    #[test]
+    fn test_temporal_features_default() {
+        let features = TemporalFeatures::default();
+        
+        assert_eq!(features.days_since_last, 0.0);
+        assert_eq!(features.frequency_per_week, 0.0);
+        assert_eq!(features.seasonal_strength, 0.0);
+        assert_eq!(features.drift_velocity, 0.0);
+        assert_eq!(features.clustering_score, 0.0);
+        assert_eq!(features.recency_factor, 0.0);
+    }
+
+    #[test]
+    fn test_text_features_default() {
+        let features = TextFeatures::default();
+        
+        assert_eq!(features.sentiment_score, 0.0);
+        assert_eq!(features.tech_term_count, 0);
+        assert_eq!(features.readability_score, 0.0);
+        assert_eq!(features.description_length, 0);
+    }
+
+    #[test]
+    fn test_structural_features_default() {
+        let features = StructuralFeatures::default();
+        
+        assert_eq!(features.directory_depth, 0);
+        assert_eq!(features.extension_diversity, 0);
+        assert_eq!(features.coupling_strength, 0.0);
+        assert_eq!(features.cohesion_score, 0.0);
+    }
+
+    #[test]
+    fn test_feature_extractor_default_trait() {
+        let extractor1 = FeatureExtractor::default();
+        let extractor2 = FeatureExtractor::new();
+        
+        // Both should have the same configuration
+        assert_eq!(extractor1.config.enable_temporal, extractor2.config.enable_temporal);
+        assert_eq!(extractor1.config.enable_text_analysis, extractor2.config.enable_text_analysis);
+        assert_eq!(extractor1.config.enable_structural, extractor2.config.enable_structural);
+        assert_eq!(extractor1.config.temporal_window_days, extractor2.config.temporal_window_days);
+    }
+
+    #[test]
+    fn test_feature_extraction_with_disabled_features() {
+        let config = FeatureConfig {
+            enable_temporal: false,
+            enable_text_analysis: false,
+            enable_structural: false,
+            temporal_window_days: 30,
+        };
+        
+        let extractor = FeatureExtractor::with_config(config);
+        let drift_item = create_test_drift_item();
+        
+        let features = extractor.extract_features(&drift_item).unwrap();
+        
+        // Basic features should still be extracted
+        assert_eq!(features.file_count, 1);
