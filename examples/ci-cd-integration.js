@@ -8,7 +8,7 @@
 
 const fs = require('fs').promises;
 const path = require('path');
-const { ADRScan, utils } = require('@adrscan/wasm');
+const { ADRScan, utils } = require('../wasm');
 
 class CiCdIntegration {
     constructor(options = {}) {

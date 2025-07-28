@@ -2,6 +2,11 @@
 //!
 //! This module provides a WASM-compatible version without async/tokio dependencies
 
+// Use smaller allocator for WASM builds
+#[cfg(all(feature = "wasm", feature = "wee_alloc"))]
+#[global_allocator]
+static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
 #[cfg(feature = "wasm")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "wasm")]
@@ -28,12 +33,9 @@ pub fn main() {
 #[wasm_bindgen]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WasmConfig {
-    /// ADR directory path
-    pub adr_dir: String,
-    /// Template format
-    pub template_format: String,
-    /// Enable drift detection
-    pub drift_enabled: bool,
+    adr_dir: String,
+    template_format: String,
+    drift_enabled: bool,
 }
 
 #[cfg(feature = "wasm")]
@@ -64,23 +66,40 @@ impl WasmConfig {
 #[wasm_bindgen]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WasmDriftReport {
-    /// Timestamp of the report
-    pub timestamp: String,
-    /// Directory that was scanned
-    pub scanned_directory: String,
-    /// Total number of drift items
-    pub total_items: usize,
-    /// Drift summary
+    timestamp: String,
+    scanned_directory: String,
+    total_items: usize,
     summary: String,
 }
 
 #[cfg(feature = "wasm")]
 #[wasm_bindgen]
 impl WasmDriftReport {
+    #[wasm_bindgen(getter)]
+    pub fn timestamp(&self) -> String {
+        self.timestamp.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn scanned_directory(&self) -> String {
+        self.scanned_directory.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn total_items(&self) -> usize {
+        self.total_items
+    }
+
     /// Get report as JSON string
     #[wasm_bindgen]
     pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).unwrap_or_default()
+        serde_json::to_string(self).unwrap_or_else(|_| "{}".to_string())
+    }
+
+    /// Get report as pretty JSON string
+    #[wasm_bindgen]
+    pub fn to_pretty_json(&self) -> String {
+        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".to_string())
     }
 
     /// Get summary
@@ -132,8 +151,7 @@ impl AdrscanWasm {
     /// Parse ADR files and return inventory (simplified - requires file contents from host)
     #[wasm_bindgen]
     pub fn parse_adr(&self, content: &str, filename: &str) -> Result<String, JsValue> {
-        let parser = AdrParser::new();
-        match parser.parse_content(content, filename) {
+        match AdrParser::parse_content(content, filename.into()) {
             Ok(adr) => serde_json::to_string(&adr)
                 .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e))),
             Err(e) => Err(JsValue::from_str(&format!("Parse error: {}", e))),
@@ -278,7 +296,6 @@ impl AdrscanWasm {
         let files: HashMap<String, String> = serde_json::from_str(files_json)
             .map_err(|e| JsValue::from_str(&format!("Invalid files JSON: {}", e)))?;
 
-        let parser = AdrParser::new();
         let mut adr_summaries = Vec::new();
         let mut total_size = 0u64;
         let mut total_lines = 0;
@@ -293,27 +310,11 @@ impl AdrscanWasm {
                 total_size += file_size;
                 total_lines += line_count;
 
-                match parser.parse_content(content, path) {
+                match AdrParser::parse_content(content, path.into()) {
                     Ok(adr) => {
-                        // Extract metadata
-                        let status = adr
-                            .frontmatter
-                            .get("status")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("unknown")
-                            .to_string();
-
-                        let tags: Vec<String> = adr
-                            .frontmatter
-                            .get("tags")
-                            .and_then(|v| v.as_array())
-                            .map(|arr| {
-                                arr.iter()
-                                    .filter_map(|v| v.as_str())
-                                    .map(|s| s.to_string())
-                                    .collect()
-                            })
-                            .unwrap_or_default();
+                        // Extract metadata from parsed structure
+                        let status = adr.metadata.status.clone();
+                        let tags = adr.metadata.tags.clone();
 
                         // Update breakdowns
                         *status_breakdown.entry(status.clone()).or_insert(0) += 1;
@@ -323,12 +324,9 @@ impl AdrscanWasm {
 
                         let summary = serde_json::json!({
                             "path": path,
-                            "title": adr.frontmatter.get("title")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("Untitled"),
+                            "title": adr.metadata.title,
                             "status": status,
-                            "date": adr.frontmatter.get("date")
-                                .and_then(|v| v.as_str()),
+                            "date": adr.metadata.date.map(|d| d.to_string()),
                             "tags": tags,
                             "file_size": file_size,
                             "line_count": line_count
@@ -424,7 +422,7 @@ impl AdrscanWasm {
             ("drift_enabled", self.config.drift.enabled.to_string()),
         ]);
 
-        JsValue::from_serde(&config_map)
+        serde_wasm_bindgen::to_value(&config_map)
             .map_err(|e| JsValue::from_str(&format!("Config serialization error: {}", e)))
     }
 }
@@ -459,9 +457,8 @@ impl WasmUtils {
     /// Parse ADR frontmatter from markdown content
     #[wasm_bindgen]
     pub fn parse_frontmatter(content: &str) -> Result<JsValue, JsValue> {
-        let parser = AdrParser::new();
-        match parser.parse_content(content, "test.md") {
-            Ok(adr) => JsValue::from_serde(&adr)
+        match AdrParser::parse_content(content, "test.md".into()) {
+            Ok(adr) => serde_wasm_bindgen::to_value(&adr)
                 .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e))),
             Err(e) => Err(JsValue::from_str(&format!("Parse error: {}", e))),
         }
@@ -500,5 +497,5 @@ pub fn features() -> JsValue {
         "template_validation",
     ];
 
-    JsValue::from_serde(&features).unwrap_or(JsValue::NULL)
+    serde_wasm_bindgen::to_value(&features).unwrap_or(JsValue::NULL)
 }

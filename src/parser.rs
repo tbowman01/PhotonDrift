@@ -37,7 +37,7 @@ pub struct AdrMetadata {
 }
 
 /// Parsed ADR document
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdrDocument {
     /// File path
     #[allow(dead_code)] // Planned for enhanced file tracking

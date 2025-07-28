@@ -6,9 +6,9 @@
     ],
     "deny": []
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "claude-flow",
     "ruv-swarm"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }

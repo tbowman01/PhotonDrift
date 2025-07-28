@@ -37,6 +37,8 @@ build/
 dist/
 *.wasm
 pkg/
+wasm/
+wasm-*
 
 # Temporary files
 *.tmp
