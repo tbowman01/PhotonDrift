@@ -70,14 +70,16 @@ RUN apk add --no-cache ca-certificates && \
 # Copy the binary from builder stage and verify it exists
 COPY --from=builder /usr/src/adrscan/target/release/adrscan /usr/local/bin/adrscan
 
+# Create metadata directory first
+RUN mkdir -p /etc/adrscan
+
 # Copy version metadata files
 COPY --from=builder /tmp/version.txt /etc/adrscan/version
 COPY --from=builder /tmp/build_date.txt /etc/adrscan/build_date
 COPY --from=builder /tmp/git_sha.txt /etc/adrscan/git_sha
 
-# Create metadata directory and set permissions
-RUN mkdir -p /etc/adrscan && \
-    chmod 755 /etc/adrscan && \
+# Set permissions after files are copied
+RUN chmod 755 /etc/adrscan && \
     chmod 644 /etc/adrscan/* && \
     chmod +x /usr/local/bin/adrscan
 
