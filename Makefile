@@ -69,6 +69,11 @@ validate: ## Run pre-commit validation hooks
 	@./scripts/security-check.sh
 	@echo "✅ Validation complete"
 
+test-versioning: ## Test container versioning implementation
+	@echo "Testing container versioning implementation..."
+	@./scripts/test-versioning.sh
+	@echo "✅ Versioning tests complete"
+
 monitor: ## Monitor container health
 	@./scripts/container-health-monitor.sh monitor
 

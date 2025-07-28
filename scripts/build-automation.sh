@@ -225,14 +225,35 @@ cmd_build() {
         read -r dockerfile context <<< "$(get_build_config "$service")"
         tag=$(get_image_tag "$service")
         
-        # Build arguments
+        # Extract version and git information
+        VERSION=$(grep version Cargo.toml | head -1 | cut -d'"' -f2 || echo 'unknown')
+        GIT_SHA_FULL=$(git rev-parse HEAD 2>/dev/null || echo 'unknown')
+        GIT_SHA_SHORT=$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')
+        GIT_REF=$(git symbolic-ref HEAD 2>/dev/null || echo 'unknown')
+        BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'unknown')
+        BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        
+        # Determine semantic version
+        if [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]]; then
+            SEMVER="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+        else
+            SEMVER="$VERSION"
+        fi
+        
+        # Build arguments with comprehensive versioning
         build_args=(
             --file "$PROJECT_ROOT/$dockerfile"
             --tag "$tag"
             --platform "$PLATFORMS"
-            --build-arg "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            --build-arg "GIT_REVISION=$(git rev-parse HEAD 2>/dev/null || echo 'unknown')"
-            --build-arg "VERSION=$(grep version Cargo.toml | head -1 | cut -d'"' -f2 || echo 'unknown')"
+            --build-arg "BUILD_DATE=$BUILD_DATE"
+            --build-arg "GIT_SHA=$GIT_SHA_FULL"
+            --build-arg "GIT_SHA_SHORT=$GIT_SHA_SHORT"
+            --build-arg "GIT_REF=$GIT_REF"
+            --build-arg "VERSION=$VERSION"
+            --build-arg "SEMVER=$SEMVER"
+            --build-arg "BRANCH=$BRANCH"
+            --build-arg "BUILD_TYPE=$ENVIRONMENT"
+            --build-arg "GIT_REVISION=$GIT_SHA_FULL"
         )
         
         # Cache configuration
@@ -266,9 +287,34 @@ cmd_build() {
             build_args+=(--progress plain)
         fi
         
-        # Execute build
+        # Execute build with verbose logging
+        log_info "Building with arguments:"
+        log_info "  VERSION=$VERSION"
+        log_info "  SEMVER=$SEMVER"
+        log_info "  GIT_SHA_SHORT=$GIT_SHA_SHORT"
+        log_info "  BRANCH=$BRANCH"
+        log_info "  BUILD_TYPE=$ENVIRONMENT"
+        log_info "  PLATFORMS=$PLATFORMS"
+        
         if docker buildx build "${build_args[@]}" "$PROJECT_ROOT/$context"; then
             log_success "Built $service: $tag"
+            
+            # Verify binary exists and works in the built image
+            if [[ "$ENVIRONMENT" == "dev" ]]; then
+                log_info "Verifying binary in container..."
+                if docker run --rm "$tag" --version >/dev/null 2>&1; then
+                    log_success "Binary verification passed"
+                else
+                    log_warning "Binary verification failed"
+                fi
+                
+                # Check if binary is at correct location
+                if docker run --rm "$tag" which adrscan | grep -q "/usr/local/bin/adrscan"; then
+                    log_success "Binary correctly located at /usr/local/bin/adrscan"
+                else
+                    log_warning "Binary location verification failed"
+                fi
+            fi
         else
             log_error "Failed to build $service"
             exit 1
