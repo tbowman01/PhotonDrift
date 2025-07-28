@@ -78,6 +78,7 @@ COPY --from=builder /tmp/version.txt /etc/adrscan/version
 COPY --from=builder /tmp/build_date.txt /etc/adrscan/build_date
 COPY --from=builder /tmp/git_sha.txt /etc/adrscan/git_sha
 
+
 # Set permissions after files are copied
 RUN chmod 755 /etc/adrscan && \
     chmod 644 /etc/adrscan/* && \
