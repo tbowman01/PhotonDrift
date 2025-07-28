@@ -1,13 +1,15 @@
 //! Plugin security validation and sandboxing
 
-use crate::plugins::{PluginMetadata, PluginConfig, PluginCapability, SecurityLevel, PluginLoadError};
-use crate::{Result, AdrscanError};
-use std::path::{Path, PathBuf};
+use crate::plugins::{
+    PluginCapability, PluginConfig, PluginLoadError, PluginMetadata, SecurityLevel,
+};
+use crate::{AdrscanError, Result};
+use log::{debug, error, info, warn};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
-use log::{info, warn, error, debug};
-use sha2::{Sha256, Digest};
 use std::fs;
+use std::path::{Path, PathBuf};
 
 /// Plugin security validator
 #[derive(Debug, Clone)]
@@ -151,11 +153,11 @@ impl PluginValidator {
             trusted_signatures: HashMap::new(),
             security_rules: Vec::new(),
         };
-        
+
         validator.initialize_default_rules();
         validator
     }
-    
+
     /// Validate a plugin against security policies
     pub fn validate_plugin(
         &self,
@@ -164,66 +166,77 @@ impl PluginValidator {
         config: &PluginConfig,
     ) -> Result<SecurityValidationResult, PluginLoadError> {
         debug!("Validating plugin security: {}", metadata.id);
-        
+
         let mut violations = Vec::new();
         let mut recommendations = Vec::new();
         let mut risk_score = 0u32;
-        
+
         // Run all security rules
         for rule in &self.security_rules {
-            if let Some(violation) = self.apply_security_rule(rule, plugin_path, metadata, config)? {
+            if let Some(violation) =
+                self.apply_security_rule(rule, plugin_path, metadata, config)?
+            {
                 risk_score += self.calculate_risk_score(&violation);
                 violations.push(violation);
             }
         }
-        
+
         // Generate recommendations based on violations
         if !violations.is_empty() {
             recommendations.extend(self.generate_security_recommendations(&violations));
         }
-        
-        let passed = violations.iter().all(|v| !matches!(v.action, SecurityAction::Block));
-        
+
+        let passed = violations
+            .iter()
+            .all(|v| !matches!(v.action, SecurityAction::Block));
+
         let result = SecurityValidationResult {
             passed,
             violations,
             recommendations,
             risk_score,
         };
-        
-        info!("Plugin {} security validation: {} (risk score: {})", 
-              metadata.id, if result.passed { "PASSED" } else { "FAILED" }, result.risk_score);
-        
+
+        info!(
+            "Plugin {} security validation: {} (risk score: {})",
+            metadata.id,
+            if result.passed { "PASSED" } else { "FAILED" },
+            result.risk_score
+        );
+
         Ok(result)
     }
-    
+
     /// Check if a plugin signature is trusted
     pub fn verify_signature(&self, plugin_path: &Path) -> Result<bool, PluginLoadError> {
         if !self.security_policy.enforce_signatures {
             return Ok(true);
         }
-        
+
         let file_hash = self.calculate_file_hash(plugin_path)?;
         let signature_path = plugin_path.with_extension("sig");
-        
+
         if !signature_path.exists() {
-            warn!("No signature file found for plugin: {}", plugin_path.display());
+            warn!(
+                "No signature file found for plugin: {}",
+                plugin_path.display()
+            );
             return Ok(self.security_policy.allow_untrusted_plugins);
         }
-        
+
         let signature = fs::read_to_string(signature_path)?;
         Ok(self.trusted_signatures.get(&file_hash) == Some(&signature))
     }
-    
+
     /// Scan plugin for malware patterns
     pub fn scan_for_malware(&self, plugin_path: &Path) -> Result<Vec<String>, PluginLoadError> {
         if !self.security_policy.scan_for_malware {
             return Ok(Vec::new());
         }
-        
+
         let content = fs::read(plugin_path)?;
         let mut suspicious_patterns = Vec::new();
-        
+
         // Define suspicious patterns to look for
         let patterns = [
             (b"eval(", "Dynamic code execution"),
@@ -235,33 +248,39 @@ impl PluginValidator {
             (b"curl ", "Network requests"),
             (b"wget ", "File downloads"),
         ];
-        
+
         for (pattern, description) in &patterns {
-            if content.windows(pattern.len()).any(|window| window == *pattern) {
+            if content
+                .windows(pattern.len())
+                .any(|window| window == *pattern)
+            {
                 suspicious_patterns.push(description.to_string());
             }
         }
-        
+
         if !suspicious_patterns.is_empty() {
-            warn!("Suspicious patterns found in plugin {}: {:?}", 
-                  plugin_path.display(), suspicious_patterns);
+            warn!(
+                "Suspicious patterns found in plugin {}: {:?}",
+                plugin_path.display(),
+                suspicious_patterns
+            );
         }
-        
+
         Ok(suspicious_patterns)
     }
-    
+
     /// Add a trusted signature for a plugin
     pub fn add_trusted_signature(&mut self, file_hash: String, signature: String) {
         self.trusted_signatures.insert(file_hash, signature);
     }
-    
+
     /// Add a custom security rule
     pub fn add_security_rule(&mut self, rule: SecurityRule) {
         self.security_rules.push(rule);
     }
-    
+
     // Private helper methods
-    
+
     fn initialize_default_rules(&mut self) {
         // File integrity rule
         self.security_rules.push(SecurityRule {
@@ -271,7 +290,7 @@ impl PluginValidator {
             severity: SecuritySeverity::High,
             action: SecurityAction::Block,
         });
-        
+
         // Capability check rule
         self.security_rules.push(SecurityRule {
             name: "capability_check".to_string(),
@@ -280,7 +299,7 @@ impl PluginValidator {
             severity: SecuritySeverity::Medium,
             action: SecurityAction::Sandbox,
         });
-        
+
         // Author validation rule
         self.security_rules.push(SecurityRule {
             name: "author_validation".to_string(),
@@ -289,7 +308,7 @@ impl PluginValidator {
             severity: SecuritySeverity::Low,
             action: SecurityAction::Warn,
         });
-        
+
         // Malware pattern rule
         self.security_rules.push(SecurityRule {
             name: "malware_scan".to_string(),
@@ -298,7 +317,7 @@ impl PluginValidator {
             severity: SecuritySeverity::Critical,
             action: SecurityAction::Block,
         });
-        
+
         // Size limit rule
         self.security_rules.push(SecurityRule {
             name: "size_limit".to_string(),
@@ -308,7 +327,7 @@ impl PluginValidator {
             action: SecurityAction::Warn,
         });
     }
-    
+
     fn apply_security_rule(
         &self,
         rule: &SecurityRule,
@@ -324,32 +343,38 @@ impl PluginValidator {
                         severity: rule.severity.clone(),
                         message: "Plugin signature verification failed".to_string(),
                         action: rule.action.clone(),
-                        details: HashMap::from([
-                            ("file".to_string(), plugin_path.display().to_string()),
-                        ]),
+                        details: HashMap::from([(
+                            "file".to_string(),
+                            plugin_path.display().to_string(),
+                        )]),
                     }));
                 }
             }
-            
+
             SecurityRuleType::CapabilityCheck => {
                 // This would be implemented with actual plugin loading
                 // For now, assume all capabilities are allowed
             }
-            
+
             SecurityRuleType::AuthorValidation => {
-                if !self.security_policy.trusted_authors.contains(&metadata.author) {
+                if !self
+                    .security_policy
+                    .trusted_authors
+                    .contains(&metadata.author)
+                {
                     return Ok(Some(SecurityViolation {
                         rule_name: rule.name.clone(),
                         severity: rule.severity.clone(),
-                        message: format!("Plugin author '{}' is not in trusted list", metadata.author),
+                        message: format!(
+                            "Plugin author '{}' is not in trusted list",
+                            metadata.author
+                        ),
                         action: rule.action.clone(),
-                        details: HashMap::from([
-                            ("author".to_string(), metadata.author.clone()),
-                        ]),
+                        details: HashMap::from([("author".to_string(), metadata.author.clone())]),
                     }));
                 }
             }
-            
+
             SecurityRuleType::MalwarePattern => {
                 let suspicious_patterns = self.scan_for_malware(plugin_path)?;
                 if !suspicious_patterns.is_empty() {
@@ -358,42 +383,48 @@ impl PluginValidator {
                         severity: rule.severity.clone(),
                         message: format!("Suspicious patterns detected: {:?}", suspicious_patterns),
                         action: rule.action.clone(),
-                        details: HashMap::from([
-                            ("patterns".to_string(), suspicious_patterns.join(", ")),
-                        ]),
+                        details: HashMap::from([(
+                            "patterns".to_string(),
+                            suspicious_patterns.join(", "),
+                        )]),
                     }));
                 }
             }
-            
+
             SecurityRuleType::SizeLimit => {
                 let file_size = fs::metadata(plugin_path)?.len();
                 if file_size > self.security_policy.max_plugin_size_bytes {
                     return Ok(Some(SecurityViolation {
                         rule_name: rule.name.clone(),
                         severity: rule.severity.clone(),
-                        message: format!("Plugin size {} exceeds limit {}", 
-                                       file_size, self.security_policy.max_plugin_size_bytes),
+                        message: format!(
+                            "Plugin size {} exceeds limit {}",
+                            file_size, self.security_policy.max_plugin_size_bytes
+                        ),
                         action: rule.action.clone(),
                         details: HashMap::from([
                             ("size".to_string(), file_size.to_string()),
-                            ("limit".to_string(), self.security_policy.max_plugin_size_bytes.to_string()),
+                            (
+                                "limit".to_string(),
+                                self.security_policy.max_plugin_size_bytes.to_string(),
+                            ),
                         ]),
                     }));
                 }
             }
-            
+
             SecurityRuleType::DependencyCheck => {
                 // TODO: Implement dependency validation
             }
-            
+
             SecurityRuleType::Custom(_pattern) => {
                 // TODO: Implement custom rule pattern matching
             }
         }
-        
+
         Ok(None)
     }
-    
+
     fn calculate_risk_score(&self, violation: &SecurityViolation) -> u32 {
         match violation.severity {
             SecuritySeverity::Low => 1,
@@ -402,10 +433,10 @@ impl PluginValidator {
             SecuritySeverity::Critical => 50,
         }
     }
-    
+
     fn generate_security_recommendations(&self, violations: &[SecurityViolation]) -> Vec<String> {
         let mut recommendations = Vec::new();
-        
+
         for violation in violations {
             match &violation.action {
                 SecurityAction::Block => {
@@ -434,10 +465,10 @@ impl PluginValidator {
                 }
             }
         }
-        
+
         recommendations
     }
-    
+
     fn calculate_file_hash(&self, path: &Path) -> Result<String, PluginLoadError> {
         let content = fs::read(path)?;
         let mut hasher = Sha256::new();
@@ -454,11 +485,11 @@ impl SandboxManager {
             wasm_runtime: Some(WasmRuntime { _placeholder: () }),
         }
     }
-    
+
     /// Initialize sandbox for a plugin
     pub fn initialize_sandbox(&mut self, plugin_id: &str) -> Result<(), PluginLoadError> {
         debug!("Initializing sandbox for plugin: {}", plugin_id);
-        
+
         let sandbox = PluginSandbox {
             plugin_id: plugin_id.to_string(),
             resource_limits: ResourceLimits::default(),
@@ -466,12 +497,12 @@ impl SandboxManager {
             network_restrictions: NetworkRestrictions::default(),
             is_active: true,
         };
-        
+
         self.sandboxes.insert(plugin_id.to_string(), sandbox);
         info!("Sandbox initialized for plugin: {}", plugin_id);
         Ok(())
     }
-    
+
     /// Execute plugin in sandbox
     pub fn execute_in_sandbox<F, T>(
         &mut self,
@@ -481,15 +512,17 @@ impl SandboxManager {
     where
         F: FnOnce() -> Result<T, PluginLoadError>,
     {
-        let _sandbox = self.sandboxes.get(plugin_id)
+        let _sandbox = self
+            .sandboxes
+            .get(plugin_id)
             .ok_or_else(|| PluginLoadError::NotFound(format!("Sandbox for {}", plugin_id)))?;
-        
+
         // TODO: Implement actual sandboxing
         // For now, just execute the operation directly
         debug!("Executing operation in sandbox for plugin: {}", plugin_id);
         operation()
     }
-    
+
     /// Cleanup sandbox for a plugin
     pub fn cleanup_sandbox(&mut self, plugin_id: &str) -> Result<(), PluginLoadError> {
         if let Some(_sandbox) = self.sandboxes.remove(plugin_id) {
@@ -497,7 +530,7 @@ impl SandboxManager {
         }
         Ok(())
     }
-    
+
     /// Get sandbox status
     pub fn get_sandbox_status(&self, plugin_id: &str) -> Option<&PluginSandbox> {
         self.sandboxes.get(plugin_id)
@@ -510,9 +543,7 @@ impl Default for SecurityPolicy {
             enforce_signatures: false,
             allow_untrusted_plugins: true,
             default_security_level: SecurityLevel::Standard,
-            blocked_capabilities: vec![
-                PluginCapability::SystemExecution,
-            ],
+            blocked_capabilities: vec![PluginCapability::SystemExecution],
             trusted_authors: vec![
                 "photondrift-team".to_string(),
                 "official-plugins".to_string(),
@@ -528,7 +559,7 @@ impl Default for ResourceLimits {
     fn default() -> Self {
         Self {
             max_memory_bytes: 50 * 1024 * 1024, // 50MB
-            max_cpu_time_ms: 5000, // 5 seconds
+            max_cpu_time_ms: 5000,              // 5 seconds
             max_file_descriptors: 100,
             max_network_connections: 10,
         }

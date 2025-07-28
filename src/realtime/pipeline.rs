@@ -4,10 +4,10 @@
 //! incremental processing and result caching.
 
 use crate::error::AdrscanError;
-use crate::realtime::{RealtimeConfig, RealtimeResult};
+use crate::realtime::cache::IntelligentCache;
 use crate::realtime::events::{EventBus, PipelineEvent};
 use crate::realtime::watcher::FileChangeEvent;
-use crate::realtime::cache::IntelligentCache;
+use crate::realtime::{RealtimeConfig, RealtimeResult};
 
 #[cfg(feature = "ml")]
 use crate::ml::{MLDetector, MLFeatures};
@@ -77,7 +77,7 @@ pub struct MLPipeline {
     stats: Arc<RwLock<PipelineStats>>,
     processing_queue: Arc<Mutex<mpsc::UnboundedSender<FileChangeEvent>>>,
     active_jobs: Arc<Mutex<HashMap<PathBuf, Instant>>>,
-    
+
     #[cfg(feature = "ml")]
     ml_detector: Arc<Mutex<MLDetector>>,
 }
@@ -92,10 +92,10 @@ impl MLPipeline {
         let (tx, rx) = mpsc::unbounded_channel();
         let processing_queue = Arc::new(Mutex::new(tx));
         let active_jobs = Arc::new(Mutex::new(HashMap::new()));
-        
+
         #[cfg(feature = "ml")]
         let ml_detector = Arc::new(Mutex::new(MLDetector::new()?));
-        
+
         let pipeline = Self {
             config: config.clone(),
             pipeline_config,
@@ -104,27 +104,30 @@ impl MLPipeline {
             stats,
             processing_queue,
             active_jobs,
-            
+
             #[cfg(feature = "ml")]
             ml_detector,
         };
-        
+
         // Start processing workers
         pipeline.start_processing_workers(rx);
-        
+
         Ok(pipeline)
     }
 
     /// Process a file change event through the ML pipeline
-    pub async fn process_file_change(&self, event: FileChangeEvent) -> RealtimeResult<Option<MLAnalysisResult>> {
+    pub async fn process_file_change(
+        &self,
+        event: FileChangeEvent,
+    ) -> RealtimeResult<Option<MLAnalysisResult>> {
         let start_time = Instant::now();
-        
+
         // Check if file is already being processed
         if self.is_file_being_processed(&event.path).await {
             log::debug!("File {:?} is already being processed, skipping", event.path);
             return Ok(None);
         }
-        
+
         // Check cache first if enabled
         if self.pipeline_config.enable_caching {
             if let Some(cached_result) = self.get_cached_result(&event.path).await? {
@@ -132,17 +135,18 @@ impl MLPipeline {
                 return Ok(Some(cached_result));
             }
         }
-        
+
         self.update_cache_miss_stats().await;
-        
+
         // Mark file as being processed
         self.mark_file_processing(&event.path, start_time).await;
-        
+
         // Queue for processing
         let processing_queue = self.processing_queue.lock().await;
-        processing_queue.send(event)
-            .map_err(|e| AdrscanError::RealtimeError(format!("Failed to queue file for processing: {}", e)))?;
-        
+        processing_queue.send(event).map_err(|e| {
+            AdrscanError::RealtimeError(format!("Failed to queue file for processing: {}", e))
+        })?;
+
         Ok(None) // Actual result will be available via event bus
     }
 
@@ -158,31 +162,36 @@ impl MLPipeline {
 
     /// Perform ML analysis on a file
     #[cfg(feature = "ml")]
-    async fn perform_ml_analysis(&self, event: &FileChangeEvent) -> RealtimeResult<MLAnalysisResult> {
+    async fn perform_ml_analysis(
+        &self,
+        event: &FileChangeEvent,
+    ) -> RealtimeResult<MLAnalysisResult> {
         let start_time = Instant::now();
-        
+
         // Extract features from the file
         let features = self.extract_features(&event.path).await?;
-        
+
         // Perform drift detection
         let drift_probability = if self.pipeline_config.drift_detection_enabled {
             self.detect_drift(&features).await?
         } else {
             0.0
         };
-        
+
         // Perform anomaly detection
         let anomaly_score = if self.pipeline_config.anomaly_detection_enabled {
             self.detect_anomaly(&features).await?
         } else {
             0.0
         };
-        
+
         // Generate recommendations
-        let recommendations = self.generate_recommendations(drift_probability, anomaly_score).await;
-        
+        let recommendations = self
+            .generate_recommendations(drift_probability, anomaly_score)
+            .await;
+
         let processing_time = start_time.elapsed();
-        
+
         let result = MLAnalysisResult {
             file_path: event.path.clone(),
             analysis_timestamp: std::time::SystemTime::now(),
@@ -193,22 +202,25 @@ impl MLPipeline {
             recommendations,
             metadata: self.create_metadata(&event).await,
         };
-        
+
         // Update statistics
         self.update_processing_stats(processing_time).await;
-        
+
         Ok(result)
     }
 
     /// Fallback analysis when ML features are not available
     #[cfg(not(feature = "ml"))]
-    async fn perform_ml_analysis(&self, event: &FileChangeEvent) -> RealtimeResult<MLAnalysisResult> {
+    async fn perform_ml_analysis(
+        &self,
+        event: &FileChangeEvent,
+    ) -> RealtimeResult<MLAnalysisResult> {
         let start_time = Instant::now();
-        
+
         // Basic analysis without ML features
         let basic_features = self.extract_basic_features(&event.path).await?;
         let processing_time = start_time.elapsed();
-        
+
         let result = MLAnalysisResult {
             file_path: event.path.clone(),
             analysis_timestamp: std::time::SystemTime::now(),
@@ -216,28 +228,37 @@ impl MLPipeline {
             drift_probability: 0.0, // No ML analysis available
             feature_vector: basic_features,
             anomaly_score: 0.0,
-            recommendations: vec!["ML features not available - enable 'ml' feature for advanced analysis".to_string()],
+            recommendations: vec![
+                "ML features not available - enable 'ml' feature for advanced analysis".to_string(),
+            ],
             metadata: self.create_metadata(&event).await,
         };
-        
+
         self.update_processing_stats(processing_time).await;
         Ok(result)
     }
 
     fn start_processing_workers(&self, mut rx: mpsc::UnboundedReceiver<FileChangeEvent>) {
         let pipeline = Arc::new(self.clone_for_worker());
-        
+
         for worker_id in 0..self.pipeline_config.max_concurrent_jobs {
             let pipeline_worker = Arc::clone(&pipeline);
             let mut rx_worker = rx; // Move receiver to first worker
-            
+
             tokio::spawn(async move {
                 log::debug!("Starting ML pipeline worker {}", worker_id);
-                
+
                 while let Some(event) = rx_worker.recv().await {
-                    let processing_timeout = Duration::from_millis(pipeline_worker.pipeline_config.processing_timeout_ms);
-                    
-                    match timeout(processing_timeout, pipeline_worker.perform_ml_analysis(&event)).await {
+                    let processing_timeout = Duration::from_millis(
+                        pipeline_worker.pipeline_config.processing_timeout_ms,
+                    );
+
+                    match timeout(
+                        processing_timeout,
+                        pipeline_worker.perform_ml_analysis(&event),
+                    )
+                    .await
+                    {
                         Ok(Ok(result)) => {
                             // Cache the result if caching is enabled
                             if pipeline_worker.pipeline_config.enable_caching {
@@ -245,51 +266,55 @@ impl MLPipeline {
                                     log::error!("Failed to cache analysis result: {}", e);
                                 }
                             }
-                            
+
                             // Publish result via event bus
                             let pipeline_event = PipelineEvent::AnalysisCompleted {
                                 file_path: result.file_path.clone(),
                                 result: result.clone(),
                             };
-                            
-                            if let Err(e) = pipeline_worker.event_bus.publish(pipeline_event).await {
+
+                            if let Err(e) = pipeline_worker.event_bus.publish(pipeline_event).await
+                            {
                                 log::error!("Failed to publish analysis result: {}", e);
                             }
-                            
-                            log::debug!("Completed ML analysis for {:?} in {}ms", 
-                                       result.file_path, result.processing_time_ms);
+
+                            log::debug!(
+                                "Completed ML analysis for {:?} in {}ms",
+                                result.file_path,
+                                result.processing_time_ms
+                            );
                         }
                         Ok(Err(e)) => {
                             log::error!("ML analysis failed for {:?}: {}", event.path, e);
                             pipeline_worker.update_error_stats().await;
-                            
+
                             let error_event = PipelineEvent::AnalysisError {
                                 file_path: event.path.clone(),
                                 error: format!("Analysis failed: {}", e),
                             };
-                            
+
                             let _ = pipeline_worker.event_bus.publish(error_event).await;
                         }
                         Err(_) => {
                             log::error!("ML analysis timed out for {:?}", event.path);
                             pipeline_worker.update_error_stats().await;
-                            
+
                             let timeout_event = PipelineEvent::AnalysisError {
                                 file_path: event.path.clone(),
                                 error: "Analysis timed out".to_string(),
                             };
-                            
+
                             let _ = pipeline_worker.event_bus.publish(timeout_event).await;
                         }
                     }
-                    
+
                     // Remove from active jobs
                     pipeline_worker.unmark_file_processing(&event.path).await;
                 }
-                
+
                 log::debug!("ML pipeline worker {} stopped", worker_id);
             });
-            
+
             // Only create receiver for first worker
             break;
         }
@@ -304,7 +329,7 @@ impl MLPipeline {
             stats: Arc::clone(&self.stats),
             processing_queue: Arc::clone(&self.processing_queue),
             active_jobs: Arc::clone(&self.active_jobs),
-            
+
             #[cfg(feature = "ml")]
             ml_detector: Arc::clone(&self.ml_detector),
         }
@@ -344,16 +369,20 @@ impl MLPipeline {
 
     async fn extract_basic_features(&self, path: &PathBuf) -> RealtimeResult<Vec<f64>> {
         // Basic features without ML: file size, modification time, etc.
-        let metadata = std::fs::metadata(path)
-            .map_err(|e| AdrscanError::RealtimeError(format!("Failed to read file metadata: {}", e)))?;
-        
+        let metadata = std::fs::metadata(path).map_err(|e| {
+            AdrscanError::RealtimeError(format!("Failed to read file metadata: {}", e))
+        })?;
+
         let file_size = metadata.len() as f64;
-        let modified_time = metadata.modified()
-            .map_err(|e| AdrscanError::RealtimeError(format!("Failed to get modification time: {}", e)))?
+        let modified_time = metadata
+            .modified()
+            .map_err(|e| {
+                AdrscanError::RealtimeError(format!("Failed to get modification time: {}", e))
+            })?
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(|e| AdrscanError::RealtimeError(format!("Invalid modification time: {}", e)))?
             .as_secs() as f64;
-        
+
         Ok(vec![file_size, modified_time])
     }
 
@@ -369,54 +398,63 @@ impl MLPipeline {
         // Placeholder for anomaly detection
         // In real implementation, this would use statistical methods or ML models
         let mean = features.iter().sum::<f64>() / features.len() as f64;
-        let variance = features.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / features.len() as f64;
+        let variance =
+            features.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / features.len() as f64;
         Ok(variance.sqrt())
     }
 
     async fn generate_recommendations(&self, drift_prob: f64, anomaly_score: f64) -> Vec<String> {
         let mut recommendations = Vec::new();
-        
+
         if drift_prob > 0.7 {
             recommendations.push("High drift detected - consider updating ADRs".to_string());
         } else if drift_prob > 0.5 {
             recommendations.push("Moderate drift detected - monitor for changes".to_string());
         }
-        
+
         if anomaly_score > 0.8 {
-            recommendations.push("Unusual file patterns detected - manual review recommended".to_string());
+            recommendations
+                .push("Unusual file patterns detected - manual review recommended".to_string());
         }
-        
+
         if recommendations.is_empty() {
             recommendations.push("File appears normal - no action needed".to_string());
         }
-        
+
         recommendations
     }
 
     async fn create_metadata(&self, event: &FileChangeEvent) -> HashMap<String, serde_json::Value> {
         let mut metadata = HashMap::new();
-        
-        metadata.insert("event_kind".to_string(), 
-                        serde_json::Value::String(format!("{:?}", event.kind)));
-        metadata.insert("timestamp".to_string(), 
-                        serde_json::Value::String(format!("{:?}", event.timestamp)));
-        
+
+        metadata.insert(
+            "event_kind".to_string(),
+            serde_json::Value::String(format!("{:?}", event.kind)),
+        );
+        metadata.insert(
+            "timestamp".to_string(),
+            serde_json::Value::String(format!("{:?}", event.timestamp)),
+        );
+
         if let Some(size) = event.size {
-            metadata.insert("file_size".to_string(), 
-                           serde_json::Value::Number(serde_json::Number::from(size)));
+            metadata.insert(
+                "file_size".to_string(),
+                serde_json::Value::Number(serde_json::Number::from(size)),
+            );
         }
-        
+
         metadata
     }
 
     async fn update_processing_stats(&self, processing_time: Duration) {
         let mut stats = self.stats.write().await;
         stats.files_processed += 1;
-        
+
         let processing_time_ms = processing_time.as_millis() as u64;
         stats.total_processing_time_ms += processing_time_ms;
-        stats.average_latency_ms = stats.total_processing_time_ms as f64 / stats.files_processed as f64;
-        
+        stats.average_latency_ms =
+            stats.total_processing_time_ms as f64 / stats.files_processed as f64;
+
         if processing_time_ms > stats.peak_latency_ms {
             stats.peak_latency_ms = processing_time_ms;
         }
@@ -441,14 +479,14 @@ impl MLPipeline {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use crate::realtime::watcher::FileChangeKind;
-    
+    use tempfile::tempdir;
+
     #[tokio::test]
     async fn test_pipeline_creation() {
         let config = RealtimeConfig::default();
         let pipeline = MLPipeline::new(&config).unwrap();
-        
+
         let stats = pipeline.get_stats().await;
         assert_eq!(stats.files_processed, 0);
     }
@@ -460,7 +498,7 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let temp_file = temp_dir.path().join("test.txt");
         std::fs::write(&temp_file, "test content").unwrap();
-        
+
         let features = pipeline.extract_basic_features(&temp_file).await.unwrap();
         assert_eq!(features.len(), 2); // file size and modification time
         assert!(features[0] > 0.0); // file size should be positive

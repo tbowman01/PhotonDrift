@@ -1,17 +1,17 @@
 //! VS Code specific plugin implementation
 
+use crate::plugins::ide::{CommonIDEFeatures, IDECapabilities, TextSelection};
 use crate::plugins::{
-    Plugin, IDEIntegrationPlugin, PluginMetadata, PluginCapability, PluginContext,
-    PluginResponse, IDEType, IDEConfig, IDEEvent, IDEResponse, IDEAction, IDECommand,
-    MessageLevel, ArgumentType, CommandArgument, IDEDiagnostic, DiagnosticSeverity
+    ArgumentType, CommandArgument, DiagnosticSeverity, IDEAction, IDECommand, IDEConfig,
+    IDEDiagnostic, IDEEvent, IDEIntegrationPlugin, IDEResponse, IDEType, MessageLevel, Plugin,
+    PluginCapability, PluginContext, PluginMetadata, PluginResponse,
 };
-use crate::plugins::ide::{CommonIDEFeatures, TextSelection, IDECapabilities};
-use crate::{Result, AdrscanError};
+use crate::{AdrscanError, Result};
+use chrono::Utc;
+use log::{debug, info, warn};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-use serde::{Serialize, Deserialize};
-use chrono::Utc;
-use log::{info, debug, warn};
 
 /// VS Code integration plugin
 #[derive(Debug)]
@@ -115,13 +115,17 @@ impl VSCodePlugin {
             license: "MIT".to_string(),
             homepage: Some("https://github.com/tbowman01/PhotonDrift".to_string()),
             repository: Some("https://github.com/tbowman01/PhotonDrift".to_string()),
-            keywords: vec!["vscode".to_string(), "adr".to_string(), "photondrift".to_string()],
+            keywords: vec![
+                "vscode".to_string(),
+                "adr".to_string(),
+                "photondrift".to_string(),
+            ],
             api_version: crate::plugins::PLUGIN_API_VERSION.to_string(),
             min_adrscan_version: "0.2.0".to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
-        
+
         let capabilities = IDECapabilities {
             supports_lsp: true,
             supports_debugging: false,
@@ -134,14 +138,14 @@ impl VSCodePlugin {
                 "json".to_string(),
             ],
         };
-        
+
         Self {
             metadata,
             config: None,
             capabilities,
         }
     }
-    
+
     /// Generate VS Code extension manifest
     pub fn generate_manifest(&self) -> VSCodeManifest {
         VSCodeManifest {
@@ -149,7 +153,8 @@ impl VSCodePlugin {
             display_name: "PhotonDrift ADR Analyzer".to_string(),
             version: "1.0.0".to_string(),
             publisher: "photondrift-team".to_string(),
-            description: "Architecture Decision Record analysis and management for VS Code".to_string(),
+            description: "Architecture Decision Record analysis and management for VS Code"
+                .to_string(),
             engines: VSCodeEngines {
                 vscode: "^1.60.0".to_string(),
             },
@@ -167,7 +172,7 @@ impl VSCodePlugin {
             contributes: self.generate_contributes(),
         }
     }
-    
+
     /// Generate TypeScript extension code
     pub fn generate_extension_code(&self) -> String {
         r#"import * as vscode from 'vscode';
@@ -461,12 +466,12 @@ function generateScanHTML(results: any): string {
 export function deactivate() {}
 "#.to_string()
     }
-    
+
     /// Generate package.json for the extension
     pub fn generate_package_json(&self) -> String {
         serde_json::to_string_pretty(&self.generate_manifest()).unwrap_or_default()
     }
-    
+
     fn generate_contributes(&self) -> VSCodeContributes {
         VSCodeContributes {
             commands: vec![
@@ -489,36 +494,38 @@ export function deactivate() {}
                     icon: Some("$(rocket)".to_string()),
                 },
             ],
-            languages: vec![
-                VSCodeLanguage {
-                    id: "adr-markdown".to_string(),
-                    aliases: vec!["ADR Markdown".to_string(), "adr".to_string()],
-                    extensions: vec![".adr.md".to_string(), ".md".to_string()],
-                    configuration: "./language-configuration.json".to_string(),
-                },
-            ],
-            grammars: vec![
-                VSCodeGrammar {
-                    language: "adr-markdown".to_string(),
-                    scope_name: "text.html.markdown.adr".to_string(),
-                    path: "./syntaxes/adr-markdown.tmGrammar.json".to_string(),
-                },
-            ],
+            languages: vec![VSCodeLanguage {
+                id: "adr-markdown".to_string(),
+                aliases: vec!["ADR Markdown".to_string(), "adr".to_string()],
+                extensions: vec![".adr.md".to_string(), ".md".to_string()],
+                configuration: "./language-configuration.json".to_string(),
+            }],
+            grammars: vec![VSCodeGrammar {
+                language: "adr-markdown".to_string(),
+                scope_name: "text.html.markdown.adr".to_string(),
+                path: "./syntaxes/adr-markdown.tmGrammar.json".to_string(),
+            }],
             configuration: VSCodeConfiguration {
                 title: "PhotonDrift".to_string(),
                 properties: HashMap::from([
-                    ("photondrift.enableRealTimeAnalysis".to_string(), VSCodeProperty {
-                        property_type: "boolean".to_string(),
-                        default: serde_json::Value::Bool(true),
-                        description: "Enable real-time ADR analysis as you type".to_string(),
-                        scope: Some("resource".to_string()),
-                    }),
-                    ("photondrift.autoScanInterval".to_string(), VSCodeProperty {
-                        property_type: "number".to_string(),
-                        default: serde_json::Value::Number(serde_json::Number::from(30)),
-                        description: "Auto-scan interval in seconds (0 to disable)".to_string(),
-                        scope: Some("resource".to_string()),
-                    }),
+                    (
+                        "photondrift.enableRealTimeAnalysis".to_string(),
+                        VSCodeProperty {
+                            property_type: "boolean".to_string(),
+                            default: serde_json::Value::Bool(true),
+                            description: "Enable real-time ADR analysis as you type".to_string(),
+                            scope: Some("resource".to_string()),
+                        },
+                    ),
+                    (
+                        "photondrift.autoScanInterval".to_string(),
+                        VSCodeProperty {
+                            property_type: "number".to_string(),
+                            default: serde_json::Value::Number(serde_json::Number::from(30)),
+                            description: "Auto-scan interval in seconds (0 to disable)".to_string(),
+                            scope: Some("resource".to_string()),
+                        },
+                    ),
                 ]),
             },
         }
@@ -528,18 +535,19 @@ export function deactivate() {}
 impl Plugin for VSCodePlugin {
     fn initialize(&mut self, context: &PluginContext) -> Result<()> {
         info!("Initializing VS Code plugin");
-        
+
         // Set default configuration
-        self.config = Some(crate::plugins::ide::IDEPluginFactory::get_recommended_config(IDEType::VSCode));
-        
+        self.config =
+            Some(crate::plugins::ide::IDEPluginFactory::get_recommended_config(IDEType::VSCode));
+
         debug!("VS Code plugin initialized successfully");
         Ok(())
     }
-    
+
     fn metadata(&self) -> &PluginMetadata {
         &self.metadata
     }
-    
+
     fn capabilities(&self) -> Vec<PluginCapability> {
         vec![
             PluginCapability::IDEIntegration,
@@ -547,15 +555,15 @@ impl Plugin for VSCodePlugin {
             PluginCapability::CommandExtension,
         ]
     }
-    
+
     fn execute(&self, command: &str, params: &HashMap<String, String>) -> Result<PluginResponse> {
         debug!("Executing VS Code command: {}", command);
-        
+
         match command {
             "generate_extension" => {
                 let extension_code = self.generate_extension_code();
                 let package_json = self.generate_package_json();
-                
+
                 Ok(PluginResponse {
                     success: true,
                     data: Some(serde_json::json!({
@@ -586,11 +594,14 @@ impl Plugin for VSCodePlugin {
                 data: None,
                 message: Some(format!("Unknown command: {}", command)),
                 warnings: vec![],
-                errors: vec![format!("Command '{}' not supported by VS Code plugin", command)],
-            })
+                errors: vec![format!(
+                    "Command '{}' not supported by VS Code plugin",
+                    command
+                )],
+            }),
         }
     }
-    
+
     fn shutdown(&mut self) -> Result<()> {
         info!("Shutting down VS Code plugin");
         Ok(())
@@ -601,56 +612,48 @@ impl IDEIntegrationPlugin for VSCodePlugin {
     fn ide_type(&self) -> IDEType {
         IDEType::VSCode
     }
-    
+
     fn setup_ide_integration(&self, config: &IDEConfig) -> Result<()> {
         info!("Setting up VS Code integration with config: {:?}", config);
         // Implementation would set up VS Code specific integration
         Ok(())
     }
-    
+
     fn handle_ide_event(&self, event: &IDEEvent) -> Result<IDEResponse> {
         debug!("Handling VS Code event: {:?}", event);
-        
+
         match event {
-            IDEEvent::FileOpened { path } => {
-                Ok(IDEResponse {
-                    handled: true,
-                    actions: vec![
-                        IDEAction::ShowMessage {
-                            level: MessageLevel::Info,
-                            message: format!("PhotonDrift: Analyzing {}", path.display()),
-                        }
-                    ],
-                    diagnostics: vec![],
-                })
-            }
-            IDEEvent::FileSaved { path } => {
-                Ok(IDEResponse {
-                    handled: true,
-                    actions: vec![
-                        IDEAction::ShowProgress {
-                            title: "PhotonDrift Analysis".to_string(),
-                            message: "Analyzing saved ADR file...".to_string(),
-                            percentage: None,
-                        }
-                    ],
-                    diagnostics: vec![],
-                })
-            }
+            IDEEvent::FileOpened { path } => Ok(IDEResponse {
+                handled: true,
+                actions: vec![IDEAction::ShowMessage {
+                    level: MessageLevel::Info,
+                    message: format!("PhotonDrift: Analyzing {}", path.display()),
+                }],
+                diagnostics: vec![],
+            }),
+            IDEEvent::FileSaved { path } => Ok(IDEResponse {
+                handled: true,
+                actions: vec![IDEAction::ShowProgress {
+                    title: "PhotonDrift Analysis".to_string(),
+                    message: "Analyzing saved ADR file...".to_string(),
+                    percentage: None,
+                }],
+                diagnostics: vec![],
+            }),
             _ => Ok(IDEResponse {
                 handled: false,
                 actions: vec![],
                 diagnostics: vec![],
-            })
+            }),
         }
     }
-    
+
     fn get_ide_config(&self) -> IDEConfig {
         self.config.clone().unwrap_or_else(|| {
             crate::plugins::ide::IDEPluginFactory::get_recommended_config(IDEType::VSCode)
         })
     }
-    
+
     fn register_commands(&self) -> Vec<IDECommand> {
         vec![
             IDECommand {
@@ -658,15 +661,13 @@ impl IDEIntegrationPlugin for VSCodePlugin {
                 title: "Analyze ADR File".to_string(),
                 category: "PhotonDrift".to_string(),
                 description: Some("Analyze the current ADR file for drift patterns".to_string()),
-                arguments: vec![
-                    CommandArgument {
-                        name: "file_path".to_string(),
-                        arg_type: ArgumentType::File,
-                        description: Some("Path to the ADR file".to_string()),
-                        required: false,
-                        default_value: None,
-                    }
-                ],
+                arguments: vec![CommandArgument {
+                    name: "file_path".to_string(),
+                    arg_type: ArgumentType::File,
+                    description: Some("Path to the ADR file".to_string()),
+                    required: false,
+                    default_value: None,
+                }],
             },
             IDECommand {
                 id: "photondrift.scanProject".to_string(),
@@ -685,24 +686,30 @@ impl CommonIDEFeatures for VSCodePlugin {
         // In a real implementation, this would send commands to VS Code
         Ok(())
     }
-    
+
     fn open_file(&self, path: &Path, line: Option<u32>) -> Result<()> {
         debug!("VS Code open file: {} at line {:?}", path.display(), line);
         // In a real implementation, this would send commands to VS Code
         Ok(())
     }
-    
+
     fn insert_text(&self, path: &Path, line: u32, column: u32, text: &str) -> Result<()> {
-        debug!("VS Code insert text at {}:{}:{}: {}", path.display(), line, column, text);
+        debug!(
+            "VS Code insert text at {}:{}:{}: {}",
+            path.display(),
+            line,
+            column,
+            text
+        );
         // In a real implementation, this would send commands to VS Code
         Ok(())
     }
-    
+
     fn get_selection(&self) -> Result<Option<TextSelection>> {
         // In a real implementation, this would get the current selection from VS Code
         Ok(None)
     }
-    
+
     fn set_status_message(&self, message: &str) -> Result<()> {
         debug!("VS Code status message: {}", message);
         // In a real implementation, this would update the VS Code status bar

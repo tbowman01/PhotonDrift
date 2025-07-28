@@ -46,27 +46,31 @@ impl CompletionProvider {
     }
 
     fn get_title_completions(&self) -> Vec<CompletionItem> {
-        vec![
-            CompletionItem {
-                label: "ADR Title Template".to_string(),
-                kind: Some(CompletionItemKind::SNIPPET),
-                detail: Some("Standard ADR title format".to_string()),
-                documentation: Some(lsp_types::Documentation::String(
-                    "Creates a properly formatted ADR title with sequential numbering".to_string(),
-                )),
-                insert_text: Some("# ADR-${1:001}: ${2:Title of the decision}".to_string()),
-                insert_text_format: Some(InsertTextFormat::SNIPPET),
-                ..Default::default()
-            },
-        ]
+        vec![CompletionItem {
+            label: "ADR Title Template".to_string(),
+            kind: Some(CompletionItemKind::SNIPPET),
+            detail: Some("Standard ADR title format".to_string()),
+            documentation: Some(lsp_types::Documentation::String(
+                "Creates a properly formatted ADR title with sequential numbering".to_string(),
+            )),
+            insert_text: Some("# ADR-${1:001}: ${2:Title of the decision}".to_string()),
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
+        }]
     }
 
     fn get_section_completions(&self) -> Vec<CompletionItem> {
         let sections = [
             ("Status", "Current status of this ADR"),
             ("Context", "The issue motivating this decision"),
-            ("Decision", "The change that we're proposing or have agreed to implement"),
-            ("Consequences", "What becomes easier or more difficult to do and any risks introduced"),
+            (
+                "Decision",
+                "The change that we're proposing or have agreed to implement",
+            ),
+            (
+                "Consequences",
+                "What becomes easier or more difficult to do and any risks introduced",
+            ),
             ("Alternatives", "Other options considered"),
             ("Related", "Related decisions and references"),
         ];
@@ -92,8 +96,14 @@ impl CompletionProvider {
         let statuses = [
             ("Proposed", "This ADR is proposed and under consideration"),
             ("Accepted", "This ADR has been accepted and is active"),
-            ("Deprecated", "This ADR is no longer in effect but kept for historical reference"),
-            ("Superseded", "This ADR has been replaced by a newer decision"),
+            (
+                "Deprecated",
+                "This ADR is no longer in effect but kept for historical reference",
+            ),
+            (
+                "Superseded",
+                "This ADR has been replaced by a newer decision",
+            ),
             ("Rejected", "This ADR was considered but rejected"),
         ];
 
@@ -113,15 +123,13 @@ impl CompletionProvider {
     fn get_adr_number_suggestions(&self) -> Vec<CompletionItem> {
         // This would ideally scan existing ADRs to suggest the next number
         // For now, provide some common patterns
-        vec![
-            CompletionItem {
-                label: "001".to_string(),
-                kind: Some(CompletionItemKind::VALUE),
-                detail: Some("ADR numbering suggestion".to_string()),
-                insert_text: Some("001".to_string()),
-                ..Default::default()
-            },
-        ]
+        vec![CompletionItem {
+            label: "001".to_string(),
+            kind: Some(CompletionItemKind::VALUE),
+            detail: Some("ADR numbering suggestion".to_string()),
+            insert_text: Some("001".to_string()),
+            ..Default::default()
+        }]
     }
 }
 
@@ -196,10 +204,13 @@ mod tests {
     async fn test_section_completions() {
         let provider = CompletionProvider::new();
         let content = "# ADR-001: Test\n\n## ";
-        let position = Position { line: 2, character: 3 };
-        
+        let position = Position {
+            line: 2,
+            character: 3,
+        };
+
         let completions = provider.get_completions(content, position).await;
-        
+
         assert!(!completions.is_empty());
         assert!(completions.iter().any(|c| c.label.contains("Status")));
         assert!(completions.iter().any(|c| c.label.contains("Context")));
@@ -210,10 +221,13 @@ mod tests {
     async fn test_status_completions() {
         let provider = CompletionProvider::new();
         let content = "# ADR-001: Test\n\n## Status\n";
-        let position = Position { line: 3, character: 0 };
-        
+        let position = Position {
+            line: 3,
+            character: 0,
+        };
+
         let completions = provider.get_completions(content, position).await;
-        
+
         assert!(completions.iter().any(|c| c.label == "Proposed"));
         assert!(completions.iter().any(|c| c.label == "Accepted"));
         assert!(completions.iter().any(|c| c.label == "Deprecated"));
@@ -223,21 +237,35 @@ mod tests {
     async fn test_template_completions() {
         let provider = CompletionProvider::new();
         let content = "";
-        let position = Position { line: 0, character: 0 };
-        
+        let position = Position {
+            line: 0,
+            character: 0,
+        };
+
         let completions = provider.get_completions(content, position).await;
-        
-        assert!(completions.iter().any(|c| c.label.contains("Full ADR Template")));
-        assert!(completions.iter().any(|c| c.label.contains("Simple ADR Template")));
+
+        assert!(completions
+            .iter()
+            .any(|c| c.label.contains("Full ADR Template")));
+        assert!(completions
+            .iter()
+            .any(|c| c.label.contains("Simple ADR Template")));
     }
 
     #[test]
     fn test_predefined_templates() {
         assert_eq!(ADR_TEMPLATE_COMPLETIONS.len(), 2);
-        
+
         let full_template = &ADR_TEMPLATE_COMPLETIONS[0];
         assert_eq!(full_template.label, "Full ADR Template");
-        assert!(matches!(full_template.kind, Some(CompletionItemKind::SNIPPET)));
-        assert!(full_template.insert_text.as_ref().unwrap().contains("# ADR-"));
+        assert!(matches!(
+            full_template.kind,
+            Some(CompletionItemKind::SNIPPET)
+        ));
+        assert!(full_template
+            .insert_text
+            .as_ref()
+            .unwrap()
+            .contains("# ADR-"));
     }
 }

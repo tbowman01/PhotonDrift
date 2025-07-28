@@ -1,19 +1,18 @@
 //! Universal LSP (Language Server Protocol) plugin implementation
 
+use crate::plugins::ide::{CommonIDEFeatures, IDECapabilities, TextSelection};
 use crate::plugins::{
-    Plugin, IDEIntegrationPlugin, PluginMetadata, PluginCapability, PluginContext,
-    PluginResponse, IDEType, IDEConfig, IDEEvent, IDEResponse, IDEAction, IDECommand,
-    MessageLevel, ArgumentType, CommandArgument, IDEDiagnostic, DiagnosticSeverity,
-    TextRange, TextPosition
+    ArgumentType, CommandArgument, DiagnosticSeverity, IDEAction, IDECommand, IDEConfig,
+    IDEDiagnostic, IDEEvent, IDEIntegrationPlugin, IDEResponse, IDEType, MessageLevel, Plugin,
+    PluginCapability, PluginContext, PluginMetadata, PluginResponse, TextPosition, TextRange,
 };
-use crate::plugins::ide::{CommonIDEFeatures, TextSelection, IDECapabilities};
-use crate::{Result, AdrscanError};
+use crate::{AdrscanError, Result};
+use chrono::Utc;
+use log::{debug, error, info, warn};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::Path;
-use serde::{Serialize, Deserialize};
-use serde_json::{json, Value};
-use chrono::Utc;
-use log::{info, debug, warn, error};
 
 /// Universal Language Server Protocol plugin for broad IDE compatibility
 #[derive(Debug)]
@@ -544,18 +543,23 @@ impl UniversalLSPPlugin {
             id: "universal-lsp".to_string(),
             name: "PhotonDrift LSP Server".to_string(),
             version: "1.0.0".to_string(),
-            description: "Universal Language Server Protocol implementation for PhotonDrift".to_string(),
+            description: "Universal Language Server Protocol implementation for PhotonDrift"
+                .to_string(),
             author: "PhotonDrift Team".to_string(),
             license: "MIT".to_string(),
             homepage: Some("https://github.com/tbowman01/PhotonDrift".to_string()),
             repository: Some("https://github.com/tbowman01/PhotonDrift".to_string()),
-            keywords: vec!["lsp".to_string(), "adr".to_string(), "photondrift".to_string()],
+            keywords: vec![
+                "lsp".to_string(),
+                "adr".to_string(),
+                "photondrift".to_string(),
+            ],
             api_version: crate::plugins::PLUGIN_API_VERSION.to_string(),
             min_adrscan_version: "0.2.0".to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
-        
+
         let capabilities = IDECapabilities {
             supports_lsp: true,
             supports_debugging: false,
@@ -568,7 +572,7 @@ impl UniversalLSPPlugin {
                 "json".to_string(),
             ],
         };
-        
+
         let server_capabilities = LSPServerCapabilities {
             text_document_sync: TextDocumentSyncKind::Incremental,
             hover_provider: true,
@@ -586,10 +590,7 @@ impl UniversalLSPPlugin {
             document_symbol_provider: true,
             workspace_symbol_provider: true,
             code_action_provider: Some(CodeActionOptions {
-                code_action_kinds: vec![
-                    "quickfix".to_string(),
-                    "refactor".to_string(),
-                ],
+                code_action_kinds: vec!["quickfix".to_string(), "refactor".to_string()],
                 resolve_provider: false,
             }),
             code_lens_provider: Some(CodeLensOptions {
@@ -612,7 +613,7 @@ impl UniversalLSPPlugin {
                 workspace_diagnostics: true,
             }),
         };
-        
+
         Self {
             metadata,
             config: None,
@@ -620,39 +621,23 @@ impl UniversalLSPPlugin {
             server_capabilities,
         }
     }
-    
+
     /// Handle LSP message
     pub fn handle_lsp_message(&self, message: &LSPMessage) -> Result<Option<Value>> {
         debug!("Handling LSP message: {:?}", message);
-        
+
         match message {
-            LSPMessage::Initialize { params } => {
-                self.handle_initialize(params)
-            }
-            LSPMessage::DidOpen { params } => {
-                self.handle_did_open(params)
-            }
-            LSPMessage::DidChange { params } => {
-                self.handle_did_change(params)
-            }
-            LSPMessage::DidSave { params } => {
-                self.handle_did_save(params)
-            }
-            LSPMessage::DidClose { params } => {
-                self.handle_did_close(params)
-            }
-            LSPMessage::Hover { params } => {
-                self.handle_hover(params)
-            }
-            LSPMessage::Completion { params } => {
-                self.handle_completion(params)
-            }
-            LSPMessage::PublishDiagnostics { params } => {
-                self.handle_publish_diagnostics(params)
-            }
+            LSPMessage::Initialize { params } => self.handle_initialize(params),
+            LSPMessage::DidOpen { params } => self.handle_did_open(params),
+            LSPMessage::DidChange { params } => self.handle_did_change(params),
+            LSPMessage::DidSave { params } => self.handle_did_save(params),
+            LSPMessage::DidClose { params } => self.handle_did_close(params),
+            LSPMessage::Hover { params } => self.handle_hover(params),
+            LSPMessage::Completion { params } => self.handle_completion(params),
+            LSPMessage::PublishDiagnostics { params } => self.handle_publish_diagnostics(params),
         }
     }
-    
+
     /// Generate LSP server configuration
     pub fn generate_lsp_config(&self) -> Value {
         json!({
@@ -669,7 +654,7 @@ impl UniversalLSPPlugin {
             }
         })
     }
-    
+
     /// Generate LSP server executable
     pub fn generate_lsp_server_code(&self) -> String {
         r#"#!/usr/bin/env node
@@ -1026,9 +1011,9 @@ const server = new PhotonDriftLSPServer();
 server.start();
 "#.to_string()
     }
-    
+
     // Private handler methods
-    
+
     fn handle_initialize(&self, _params: &InitializeParams) -> Result<Option<Value>> {
         Ok(Some(json!({
             "capabilities": self.server_capabilities,
@@ -1038,33 +1023,36 @@ server.start();
             }
         })))
     }
-    
+
     fn handle_did_open(&self, params: &DidOpenTextDocumentParams) -> Result<Option<Value>> {
         debug!("Document opened: {}", params.text_document.uri);
         // In a real implementation, this would store the document and trigger analysis
         Ok(None)
     }
-    
+
     fn handle_did_change(&self, params: &DidChangeTextDocumentParams) -> Result<Option<Value>> {
         debug!("Document changed: {}", params.text_document.uri);
         // In a real implementation, this would update the document and trigger incremental analysis
         Ok(None)
     }
-    
+
     fn handle_did_save(&self, params: &DidSaveTextDocumentParams) -> Result<Option<Value>> {
         debug!("Document saved: {}", params.text_document.uri);
         // In a real implementation, this would trigger full analysis and publish diagnostics
         Ok(None)
     }
-    
+
     fn handle_did_close(&self, params: &DidCloseTextDocumentParams) -> Result<Option<Value>> {
         debug!("Document closed: {}", params.text_document.uri);
         // In a real implementation, this would clean up document state
         Ok(None)
     }
-    
+
     fn handle_hover(&self, params: &HoverParams) -> Result<Option<Value>> {
-        debug!("Hover request at {}:{}", params.position.line, params.position.character);
+        debug!(
+            "Hover request at {}:{}",
+            params.position.line, params.position.character
+        );
         // In a real implementation, this would provide hover information
         Ok(Some(json!({
             "contents": {
@@ -1073,10 +1061,13 @@ server.start();
             }
         })))
     }
-    
+
     fn handle_completion(&self, params: &CompletionParams) -> Result<Option<Value>> {
-        debug!("Completion request at {}:{}", params.position.line, params.position.character);
-        
+        debug!(
+            "Completion request at {}:{}",
+            params.position.line, params.position.character
+        );
+
         let items = vec![
             json!({
                 "label": "ADR Template",
@@ -1090,16 +1081,19 @@ server.start();
                 "insertText": "Proposed"
             }),
             json!({
-                "label": "Status: Accepted", 
+                "label": "Status: Accepted",
                 "kind": 12, // Value
                 "insertText": "Accepted"
-            })
+            }),
         ];
-        
+
         Ok(Some(json!({ "items": items })))
     }
-    
-    fn handle_publish_diagnostics(&self, params: &PublishDiagnosticsParams) -> Result<Option<Value>> {
+
+    fn handle_publish_diagnostics(
+        &self,
+        params: &PublishDiagnosticsParams,
+    ) -> Result<Option<Value>> {
         debug!("Publishing diagnostics for {}", params.uri);
         // In a real implementation, this would be triggered by analysis results
         Ok(None)
@@ -1109,17 +1103,18 @@ server.start();
 impl Plugin for UniversalLSPPlugin {
     fn initialize(&mut self, _context: &PluginContext) -> Result<()> {
         info!("Initializing Universal LSP plugin");
-        
-        self.config = Some(crate::plugins::ide::IDEPluginFactory::get_recommended_config(IDEType::Universal));
-        
+
+        self.config =
+            Some(crate::plugins::ide::IDEPluginFactory::get_recommended_config(IDEType::Universal));
+
         debug!("Universal LSP plugin initialized successfully");
         Ok(())
     }
-    
+
     fn metadata(&self) -> &PluginMetadata {
         &self.metadata
     }
-    
+
     fn capabilities(&self) -> Vec<PluginCapability> {
         vec![
             PluginCapability::IDEIntegration,
@@ -1128,15 +1123,15 @@ impl Plugin for UniversalLSPPlugin {
             PluginCapability::NetworkAccess,
         ]
     }
-    
+
     fn execute(&self, command: &str, params: &HashMap<String, String>) -> Result<PluginResponse> {
         debug!("Executing Universal LSP command: {}", command);
-        
+
         match command {
             "generate_lsp_server" => {
                 let server_code = self.generate_lsp_server_code();
                 let config = self.generate_lsp_config();
-                
+
                 Ok(PluginResponse {
                     success: true,
                     data: Some(json!({
@@ -1152,31 +1147,29 @@ impl Plugin for UniversalLSPPlugin {
             "handle_lsp" => {
                 let message_str = params.get("message").unwrap_or("{}");
                 match serde_json::from_str::<LSPMessage>(message_str) {
-                    Ok(message) => {
-                        match self.handle_lsp_message(&message) {
-                            Ok(response) => Ok(PluginResponse {
-                                success: true,
-                                data: response,
-                                message: Some("LSP message handled successfully".to_string()),
-                                warnings: vec![],
-                                errors: vec![],
-                            }),
-                            Err(e) => Ok(PluginResponse {
-                                success: false,
-                                data: None,
-                                message: Some("LSP message handling failed".to_string()),
-                                warnings: vec![],
-                                errors: vec![e.to_string()],
-                            })
-                        }
-                    }
+                    Ok(message) => match self.handle_lsp_message(&message) {
+                        Ok(response) => Ok(PluginResponse {
+                            success: true,
+                            data: response,
+                            message: Some("LSP message handled successfully".to_string()),
+                            warnings: vec![],
+                            errors: vec![],
+                        }),
+                        Err(e) => Ok(PluginResponse {
+                            success: false,
+                            data: None,
+                            message: Some("LSP message handling failed".to_string()),
+                            warnings: vec![],
+                            errors: vec![e.to_string()],
+                        }),
+                    },
                     Err(e) => Ok(PluginResponse {
                         success: false,
                         data: None,
                         message: Some("Invalid LSP message format".to_string()),
                         warnings: vec![],
                         errors: vec![e.to_string()],
-                    })
+                    }),
                 }
             }
             _ => Ok(PluginResponse {
@@ -1184,11 +1177,14 @@ impl Plugin for UniversalLSPPlugin {
                 data: None,
                 message: Some(format!("Unknown command: {}", command)),
                 warnings: vec![],
-                errors: vec![format!("Command '{}' not supported by Universal LSP plugin", command)],
-            })
+                errors: vec![format!(
+                    "Command '{}' not supported by Universal LSP plugin",
+                    command
+                )],
+            }),
         }
     }
-    
+
     fn shutdown(&mut self) -> Result<()> {
         info!("Shutting down Universal LSP plugin");
         Ok(())
@@ -1199,70 +1195,82 @@ impl IDEIntegrationPlugin for UniversalLSPPlugin {
     fn ide_type(&self) -> IDEType {
         IDEType::Universal
     }
-    
+
     fn setup_ide_integration(&self, config: &IDEConfig) -> Result<()> {
-        info!("Setting up Universal LSP integration with config: {:?}", config);
+        info!(
+            "Setting up Universal LSP integration with config: {:?}",
+            config
+        );
         Ok(())
     }
-    
+
     fn handle_ide_event(&self, event: &IDEEvent) -> Result<IDEResponse> {
         debug!("Handling Universal LSP event: {:?}", event);
-        
+
         match event {
-            IDEEvent::FileOpened { path } => {
-                Ok(IDEResponse {
-                    handled: true,
-                    actions: vec![],
-                    diagnostics: vec![],
-                })
-            }
+            IDEEvent::FileOpened { path } => Ok(IDEResponse {
+                handled: true,
+                actions: vec![],
+                diagnostics: vec![],
+            }),
             _ => Ok(IDEResponse {
                 handled: false,
                 actions: vec![],
                 diagnostics: vec![],
-            })
+            }),
         }
     }
-    
+
     fn get_ide_config(&self) -> IDEConfig {
         self.config.clone().unwrap_or_else(|| {
             crate::plugins::ide::IDEPluginFactory::get_recommended_config(IDEType::Universal)
         })
     }
-    
+
     fn register_commands(&self) -> Vec<IDECommand> {
-        vec![
-            IDECommand {
-                id: "photondrift.analyzeFile".to_string(),
-                title: "Analyze ADR File".to_string(),
-                category: "PhotonDrift".to_string(),
-                description: Some("Analyze the current ADR file via LSP".to_string()),
-                arguments: vec![],
-            },
-        ]
+        vec![IDECommand {
+            id: "photondrift.analyzeFile".to_string(),
+            title: "Analyze ADR File".to_string(),
+            category: "PhotonDrift".to_string(),
+            description: Some("Analyze the current ADR file via LSP".to_string()),
+            arguments: vec![],
+        }]
     }
 }
 
 impl CommonIDEFeatures for UniversalLSPPlugin {
     fn show_notification(&self, message: &str, level: MessageLevel) -> Result<()> {
-        debug!("Universal LSP notification: {} (level: {:?})", message, level);
+        debug!(
+            "Universal LSP notification: {} (level: {:?})",
+            message, level
+        );
         Ok(())
     }
-    
+
     fn open_file(&self, path: &Path, line: Option<u32>) -> Result<()> {
-        debug!("Universal LSP open file: {} at line {:?}", path.display(), line);
+        debug!(
+            "Universal LSP open file: {} at line {:?}",
+            path.display(),
+            line
+        );
         Ok(())
     }
-    
+
     fn insert_text(&self, path: &Path, line: u32, column: u32, text: &str) -> Result<()> {
-        debug!("Universal LSP insert text at {}:{}:{}: {}", path.display(), line, column, text);
+        debug!(
+            "Universal LSP insert text at {}:{}:{}: {}",
+            path.display(),
+            line,
+            column,
+            text
+        );
         Ok(())
     }
-    
+
     fn get_selection(&self) -> Result<Option<TextSelection>> {
         Ok(None)
     }
-    
+
     fn set_status_message(&self, message: &str) -> Result<()> {
         debug!("Universal LSP status message: {}", message);
         Ok(())

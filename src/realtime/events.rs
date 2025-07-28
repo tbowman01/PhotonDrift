@@ -4,15 +4,15 @@
 //! for coordinating between different components of the real-time analysis system.
 
 use crate::error::AdrscanError;
-use crate::realtime::{RealtimeResult, RealtimeConfig};
 use crate::realtime::pipeline::MLAnalysisResult;
+use crate::realtime::{RealtimeConfig, RealtimeResult};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::{broadcast, RwLock};
 use std::time::{Instant, SystemTime};
+use tokio::sync::{broadcast, RwLock};
 
 /// Types of events that can be published through the event bus
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,10 +34,7 @@ pub enum PipelineEvent {
         result: MLAnalysisResult,
     },
     /// ML analysis failed
-    AnalysisError {
-        file_path: PathBuf,
-        error: String,
-    },
+    AnalysisError { file_path: PathBuf, error: String },
     /// System performance metrics update
     PerformanceMetrics {
         timestamp: SystemTime,
@@ -150,7 +147,7 @@ impl EventBus {
     /// Publish an event to all subscribers
     pub async fn publish(&self, event: PipelineEvent) -> RealtimeResult<()> {
         let start_time = Instant::now();
-        
+
         // Send to broadcast channel
         match self.sender.send(event.clone()) {
             Ok(subscriber_count) => {
@@ -208,9 +205,10 @@ impl EventBus {
             log::info!("Unregistered event handler {}", handler_id);
             Ok(())
         } else {
-            Err(AdrscanError::RealtimeError(
-                format!("Invalid handler ID: {}", handler_id)
-            ))
+            Err(AdrscanError::RealtimeError(format!(
+                "Invalid handler ID: {}",
+                handler_id
+            )))
         }
     }
 
@@ -227,7 +225,10 @@ impl EventBus {
     }
 
     /// Publish performance metrics periodically
-    pub async fn publish_performance_metrics(&self, metrics: PerformanceSnapshot) -> RealtimeResult<()> {
+    pub async fn publish_performance_metrics(
+        &self,
+        metrics: PerformanceSnapshot,
+    ) -> RealtimeResult<()> {
         let event = PipelineEvent::PerformanceMetrics {
             timestamp: SystemTime::now(),
             metrics,
@@ -236,7 +237,12 @@ impl EventBus {
     }
 
     /// Publish system alert
-    pub async fn publish_alert(&self, level: AlertLevel, message: String, component: String) -> RealtimeResult<()> {
+    pub async fn publish_alert(
+        &self,
+        level: AlertLevel,
+        message: String,
+        component: String,
+    ) -> RealtimeResult<()> {
         let event = PipelineEvent::SystemAlert {
             level,
             message,
@@ -256,54 +262,55 @@ impl EventBus {
         let stats = Arc::clone(&self.stats);
         let performance_tracker = Arc::clone(&self.performance_tracker);
         let sender = self.sender.clone();
-        
+
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
-            
+
             loop {
                 interval.tick().await;
-                
+
                 let (events_per_second, avg_delivery_time) = {
                     let mut tracker = performance_tracker.write().await;
                     let elapsed = tracker.last_performance_update.elapsed();
-                    let events_per_second = tracker.events_since_last_update as f64 / elapsed.as_secs_f64();
+                    let events_per_second =
+                        tracker.events_since_last_update as f64 / elapsed.as_secs_f64();
                     let avg_delivery_time = if tracker.delivery_count > 0 {
                         tracker.total_delivery_time_ms as f64 / tracker.delivery_count as f64
                     } else {
                         0.0
                     };
-                    
+
                     // Reset counters
                     tracker.last_performance_update = Instant::now();
                     tracker.events_since_last_update = 0;
                     tracker.total_delivery_time_ms = 0;
                     tracker.delivery_count = 0;
-                    
+
                     (events_per_second, avg_delivery_time)
                 };
-                
+
                 // Update stats
                 {
                     let mut stats = stats.write().await;
                     stats.average_delivery_time_ms = avg_delivery_time;
                 }
-                
+
                 // Publish performance metrics
                 let metrics = PerformanceSnapshot {
                     memory_usage_mb: get_memory_usage(),
                     cpu_usage_percent: get_cpu_usage(),
-                    active_watchers: 0, // Would be updated by actual watchers
-                    pending_analyses: 0, // Would be updated by pipeline
+                    active_watchers: 0,   // Would be updated by actual watchers
+                    pending_analyses: 0,  // Would be updated by pipeline
                     cache_hit_ratio: 0.0, // Would be updated by cache
                     average_processing_time_ms: avg_delivery_time,
                     events_per_second,
                 };
-                
+
                 let event = PipelineEvent::PerformanceMetrics {
                     timestamp: SystemTime::now(),
                     metrics,
                 };
-                
+
                 if let Err(e) = sender.send(event) {
                     log::debug!("No subscribers for performance metrics: {}", e);
                 }
@@ -322,7 +329,7 @@ impl EventBus {
             PipelineEvent::WebSocketEvent { .. } => "WebSocketEvent",
             PipelineEvent::SystemAlert { .. } => "SystemAlert",
         };
-        
+
         handler.event_types().contains(&event_type.to_string())
     }
 
@@ -357,19 +364,28 @@ impl EventHandler for LoggingEventHandler {
             log::Level::Debug => log::debug!("Event: {:?}", event),
             log::Level::Info => match &event {
                 PipelineEvent::AnalysisCompleted { file_path, result } => {
-                    log::info!("Analysis completed for {:?}: drift={:.2}, anomaly={:.2}", 
-                              file_path, result.drift_probability, result.anomaly_score);
+                    log::info!(
+                        "Analysis completed for {:?}: drift={:.2}, anomaly={:.2}",
+                        file_path,
+                        result.drift_probability,
+                        result.anomaly_score
+                    );
                 }
                 PipelineEvent::AnalysisError { file_path, error } => {
                     log::info!("Analysis failed for {:?}: {}", file_path, error);
                 }
-                PipelineEvent::SystemAlert { level, message, component, .. } => {
-                    match level {
-                        AlertLevel::Critical | AlertLevel::Error => log::error!("[{}] {}", component, message),
-                        AlertLevel::Warning => log::warn!("[{}] {}", component, message),
-                        AlertLevel::Info => log::info!("[{}] {}", component, message),
+                PipelineEvent::SystemAlert {
+                    level,
+                    message,
+                    component,
+                    ..
+                } => match level {
+                    AlertLevel::Critical | AlertLevel::Error => {
+                        log::error!("[{}] {}", component, message)
                     }
-                }
+                    AlertLevel::Warning => log::warn!("[{}] {}", component, message),
+                    AlertLevel::Info => log::info!("[{}] {}", component, message),
+                },
                 _ => {} // Don't log other events at info level
             },
             _ => {} // Other log levels not handled
@@ -403,29 +419,29 @@ fn get_cpu_usage() -> f64 {
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
-    
+
     struct TestHandler {
         event_count: AtomicUsize,
     }
-    
+
     impl TestHandler {
         fn new() -> Arc<Self> {
             Arc::new(Self {
                 event_count: AtomicUsize::new(0),
             })
         }
-        
+
         fn get_event_count(&self) -> usize {
             self.event_count.load(Ordering::SeqCst)
         }
     }
-    
+
     impl EventHandler for TestHandler {
         fn handle_event(&self, _event: PipelineEvent) -> RealtimeResult<()> {
             self.event_count.fetch_add(1, Ordering::SeqCst);
             Ok(())
         }
-        
+
         fn event_types(&self) -> Vec<String> {
             vec!["AnalysisCompleted".to_string()]
         }
@@ -441,15 +457,15 @@ mod tests {
     #[tokio::test]
     async fn test_event_publishing() {
         let bus = EventBus::new();
-        
+
         let event = PipelineEvent::FileChanged {
             path: PathBuf::from("test.txt"),
             change_type: "modified".to_string(),
             timestamp: SystemTime::now(),
         };
-        
+
         bus.publish(event).await.unwrap();
-        
+
         let stats = bus.get_stats().await;
         assert_eq!(stats.events_published, 1);
     }
@@ -458,9 +474,9 @@ mod tests {
     async fn test_event_handler_registration() {
         let bus = EventBus::new();
         let handler = TestHandler::new();
-        
+
         bus.register_handler(handler.clone()).await;
-        
+
         let event = PipelineEvent::AnalysisCompleted {
             file_path: PathBuf::from("test.txt"),
             result: MLAnalysisResult {
@@ -474,12 +490,12 @@ mod tests {
                 metadata: HashMap::new(),
             },
         };
-        
+
         bus.publish(event).await.unwrap();
-        
+
         // Small delay to allow handler to process
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-        
+
         assert_eq!(handler.get_event_count(), 1);
     }
 }
