@@ -13,6 +13,7 @@ ARG GIT_REF="unknown"
 ARG BRANCH="unknown"
 ARG BUILD_TYPE="unknown"
 ARG SEMVER="unknown"
+ARG GITHUB_RUN_ID="unknown"
 ARG TARGETPLATFORM
 ARG TARGETARCH
 
@@ -105,6 +106,7 @@ ARG GIT_REF
 ARG BRANCH
 ARG BUILD_TYPE
 ARG SEMVER
+ARG GITHUB_RUN_ID
 ARG TARGETPLATFORM
 ARG TARGETARCH
 
@@ -114,6 +116,7 @@ ENV ADRSCAN_VERSION="${VERSION}" \
     ADRSCAN_COMMIT="${GIT_SHA}" \
     ADRSCAN_BRANCH="${BRANCH}" \
     ADRSCAN_BUILD_TYPE="${BUILD_TYPE}" \
+    ADRSCAN_GITHUB_RUN_ID="${GITHUB_RUN_ID}" \
     ADRSCAN_PLATFORM="${TARGETPLATFORM}"
 
 # OCI Standard Labels
@@ -137,6 +140,7 @@ LABEL build.timestamp="${BUILD_DATE}" \
       build.branch="${BRANCH}" \
       build.type="${BUILD_TYPE}" \
       build.ref="${GIT_REF}" \
+      build.github_run_id="${GITHUB_RUN_ID}" \
       build.platform="${TARGETPLATFORM}" \
       build.arch="${TARGETARCH}"
 

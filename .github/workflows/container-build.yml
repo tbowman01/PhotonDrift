@@ -91,8 +91,13 @@ jobs:
           echo "BRANCH_NAME_CLEAN=${BRANCH_NAME//[^a-zA-Z0-9-]/-}" >> $GITHUB_ENV
           echo "BRANCH=${GITHUB_REF_NAME}" >> $GITHUB_ENV
           
-          # Extract version from Cargo.toml
+          # Extract version from Cargo.toml and append run ID for CI builds
           VERSION=$(grep '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)
+          if [[ "${{ github.event_name }}" != "pull_request" && "$BRANCH_NAME" == "develop" ]]; then
+            VERSION="${VERSION}.${GITHUB_RUN_ID}"
+          elif [[ "${{ github.event_name }}" != "pull_request" && "$BRANCH_NAME" == "main" ]]; then
+            VERSION="${VERSION}.${GITHUB_RUN_ID}"
+          fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           
@@ -245,6 +250,7 @@ jobs:
             BRANCH=${{ env.BRANCH }}
             BUILD_TYPE=${{ env.BUILD_TYPE }}
             GIT_REVISION=${{ env.GIT_SHA_FULL }}
+            GITHUB_RUN_ID=${{ github.run_id }}
             TARGETPLATFORM=$TARGETPLATFORM
             TARGETARCH=$TARGETARCH
           provenance: ${{ env.SHOULD_PUSH }}
