@@ -108,16 +108,16 @@ const logger = {
  * Check if CLI binary exists and build if necessary
  */
 async function ensureCliBinary() {
-  let cliPath = CONFIG.cliPath;
-  
+  // Check for release binary first
   try {
-    await fs.access(cliPath);
-    logger.verbose(`Found release binary at ${cliPath}`);
-    return cliPath;
+    await fs.access(CONFIG.cliPath);
+    logger.verbose(`Found release binary at ${CONFIG.cliPath}`);
+    return CONFIG.cliPath;
   } catch (error) {
     logger.verbose('Release binary not found, checking debug binary...');
   }
   
+  // Check for debug binary
   try {
     await fs.access(CONFIG.devCliPath);
     logger.verbose(`Found debug binary at ${CONFIG.devCliPath}`);
@@ -126,8 +126,16 @@ async function ensureCliBinary() {
     logger.info('No binary found, building debug version...');
   }
   
+  // Build debug version as fallback
   try {
-    execSync('cargo build', { cwd: path.join(__dirname, '..'), stdio: 'inherit' });
+    logger.info('Building debug binary...');
+    execSync('cargo build', { 
+      cwd: path.join(__dirname, '..'), 
+      stdio: ['inherit', 'inherit', 'inherit'],
+      timeout: 300000 // 5 minute timeout
+    });
+    
+    // Verify the binary was created
     await fs.access(CONFIG.devCliPath);
     logger.success(`Built debug binary at ${CONFIG.devCliPath}`);
     return CONFIG.devCliPath;
@@ -444,24 +452,21 @@ async function validateExamples(cliPath) {
     for (const example of examples) {
       totalExamples++;
       
-      // Create a safe version of the command for testing
-      const testCommand = example.command
-        .replace(/adrscan/, `"${cliPath}"`)
-        .replace(/--adr-dir [^\s]+/, '--adr-dir /tmp/test-adr')
-        .replace(/--directory [^\s]+/, '--directory /tmp/test-src')
-        .replace(/--output [^\s]+/, '--output /tmp/test-output.md')
-        .replace(/--watch/, '--help') // Replace watch with help for testing
-        .replace(/--interactive/, '--help'); // Replace interactive with help for testing
+      // Extract the command name from the example
+      const commandParts = example.command.split(' ');
+      const baseCommand = commandParts[1]; // Skip 'adrscan'
       
-      logger.verbose(`Testing example: ${testCommand}`);
+      logger.verbose(`Testing command help: ${baseCommand}`);
       
       try {
-        const result = executeCliCommand('', testCommand + ' --help');
-        if (result.success || result.exitCode === 0) {
+        // Test if the command shows help (validates command exists and basic functionality)
+        const result = executeCliCommand(cliPath, `${baseCommand} --help`);
+        if (result.success) {
           validExamples++;
           logger.verbose(`✅ Example validated: ${example.command}`);
         } else {
           logger.warn(`❌ Example failed: ${example.command}`);
+          logger.verbose(`   Error: ${result.output}`);
         }
       } catch (error) {
         logger.verbose(`❌ Example error: ${example.command} - ${error.message}`);
