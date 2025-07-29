@@ -2,10 +2,14 @@
 //!
 //! Provides different ML algorithms for detecting architectural drift
 //! with support for multiple model types and explainable AI.
+//!
+//! This module has been refactored into smaller, security-auditable components.
+//! See the `models/` subdirectory for individual implementations.
 
-use super::detector::Prediction;
-use super::features::DriftFeatures;
-use crate::drift::DriftResult;
+// Re-export the new modular structure
+pub use models::*;
+
+mod models;
 
 // ML framework imports (currently using custom implementations)
 // Future versions will integrate with smartcore or other ML libraries
