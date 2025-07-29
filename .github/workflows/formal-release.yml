@@ -639,7 +639,7 @@ jobs:
           wc -l comprehensive-release-notes.md
       
       - name: Create formal GitHub release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.validate-release.outputs.release_version }}
           name: PhotonDrift ${{ needs.validate-release.outputs.release_version }}
