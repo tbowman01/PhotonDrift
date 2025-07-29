@@ -30,6 +30,10 @@ RUN addgroup -g 1001 -S builder && \
 # Set working directory
 WORKDIR /usr/src/adrscan
 
+# Copy zscaler certificate
+COPY assets/zscaler.crt /usr/local/share/ca-certificates/zscaler.crt
+RUN update-ca-certificates
+
 # Copy dependency manifests first for better layer caching
 COPY Cargo.toml ./
 
@@ -58,6 +62,7 @@ RUN strip target/release/adrscan
 
 # Verify binary works
 RUN ./target/release/adrscan --version
+RUN pwd
 
 # Runtime stage - Use Alpine for minimal attack surface and musl compatibility
 FROM alpine:3.22 AS runtime
@@ -67,8 +72,12 @@ RUN apk add --no-cache ca-certificates && \
     addgroup -g 65532 -S nonroot && \
     adduser -u 65532 -S nonroot -G nonroot
 
-# Copy the binary from builder stage and verify it exists
-COPY --from=builder /usr/src/adrscan/target/release/adrscan /usr/local/bin/adrscan
+# Copy zscaler certificate
+COPY assets/zscaler.crt /usr/local/share/ca-certificates/zscaler.crt
+RUN update-ca-certificates
+
+# Copy the statically linked Rust binary from the builder stage to the runtime image
+COPY --from=builder target/release/adrscan /usr/local/bin/adrscan
 
 # Create metadata directory first
 RUN mkdir -p /etc/adrscan
