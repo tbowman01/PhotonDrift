@@ -34,14 +34,5 @@
       "date": "2025-07-28",
       "author": "tbowman01"
     }
-  },
-  "sidebar": "guidesSidebar",
-  "previous": {
-    "title": "ContAIner Versioning Strategy",
-    "permalink": "/docs/deployment/container-versioning-strategy"
-  },
-  "next": {
-    "title": "ContAIner Versioning Diagram",
-    "permalink": "/docs/deployment/container-versioning-diagram"
   }
 }

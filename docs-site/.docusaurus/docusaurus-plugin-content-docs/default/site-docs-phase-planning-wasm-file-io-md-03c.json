@@ -34,10 +34,5 @@
       "date": "2025-07-28",
       "author": "tbowman01"
     }
-  },
-  "sidebar": "guidesSidebar",
-  "previous": {
-    "title": "WASMTIME V35 UPDATE CHECKLIST",
-    "permalink": "/docs/phase-planning/wasmtime-v35-update-checklist"
   }
 }

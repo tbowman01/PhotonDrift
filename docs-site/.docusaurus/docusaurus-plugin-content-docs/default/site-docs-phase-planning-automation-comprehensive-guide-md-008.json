@@ -34,14 +34,5 @@
       "date": "2025-07-28",
       "author": "tbowman01"
     }
-  },
-  "sidebar": "guidesSidebar",
-  "previous": {
-    "title": "PHASE 3 ROADMAP",
-    "permalink": "/docs/phase-planning/phase-3-roadmap"
-  },
-  "next": {
-    "title": "BUILD SIMPLIFICATION SUMMARY",
-    "permalink": "/docs/phase-planning/build-simplification-summary"
   }
 }

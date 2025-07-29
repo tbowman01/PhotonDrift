@@ -34,14 +34,5 @@
       "date": "2025-07-28",
       "author": "tbowman01"
     }
-  },
-  "sidebar": "guidesSidebar",
-  "previous": {
-    "title": "DOCKER BUILD GUIDE",
-    "permalink": "/docs/deployment/docker-build-guide"
-  },
-  "next": {
-    "title": "ContAIner Versioning Strategy",
-    "permalink": "/docs/deployment/container-versioning-strategy"
   }
 }

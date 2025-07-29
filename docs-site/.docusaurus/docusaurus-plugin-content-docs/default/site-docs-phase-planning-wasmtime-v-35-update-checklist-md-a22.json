@@ -34,14 +34,5 @@
       "date": "2025-07-28",
       "author": "tbowman01"
     }
-  },
-  "sidebar": "guidesSidebar",
-  "previous": {
-    "title": "TEMPORAL ANALYSIS",
-    "permalink": "/docs/phase-planning/temporal-analysis"
-  },
-  "next": {
-    "title": "WASM FILE IO",
-    "permalink": "/docs/phase-planning/wasm-file-io"
   }
 }

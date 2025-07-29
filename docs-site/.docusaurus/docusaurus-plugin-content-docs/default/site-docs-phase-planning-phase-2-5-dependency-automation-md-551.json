@@ -34,14 +34,5 @@
       "date": "2025-07-28",
       "author": "tbowman01"
     }
-  },
-  "sidebar": "guidesSidebar",
-  "previous": {
-    "title": "REPOSITORY ANALYSIS AND ROADMAP",
-    "permalink": "/docs/phase-planning/repository-analysis-and-roadmap"
-  },
-  "next": {
-    "title": "PHASE 2.5 IMPLEMENTATION SUMMARY",
-    "permalink": "/docs/phase-planning/phase-2.5-implementation-summary"
   }
 }

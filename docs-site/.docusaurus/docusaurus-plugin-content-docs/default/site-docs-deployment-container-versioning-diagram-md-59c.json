@@ -34,14 +34,5 @@
       "date": "2025-07-28",
       "author": "tbowman01"
     }
-  },
-  "sidebar": "guidesSidebar",
-  "previous": {
-    "title": "ContAIner Versioning Implementation",
-    "permalink": "/docs/deployment/container-versioning-implementation"
-  },
-  "next": {
-    "title": "ContAIner Versioning Quickref",
-    "permalink": "/docs/deployment/container-versioning-quickref"
   }
 }

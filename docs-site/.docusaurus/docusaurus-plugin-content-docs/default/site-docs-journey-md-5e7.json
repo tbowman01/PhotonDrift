@@ -1,0 +1,56 @@
+{
+  "id": "journey",
+  "title": "PhotonDrift Project Journey Roadmap",
+  "description": "Complete development journey and evolution of PhotonDrift from initial concept to AI-powered ADR management system",
+  "source": "@site/docs/journey.md",
+  "sourceDirName": ".",
+  "slug": "/misc/journey",
+  "permalink": "/docs/misc/journey",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tbowman01/PhotonDrift/tree/main/docs/docs/journey.md",
+  "tags": [
+    {
+      "inline": true,
+      "label": "project",
+      "permalink": "/docs/tags/project"
+    },
+    {
+      "inline": true,
+      "label": "roadmap",
+      "permalink": "/docs/tags/roadmap"
+    },
+    {
+      "inline": true,
+      "label": "development",
+      "permalink": "/docs/tags/development"
+    },
+    {
+      "inline": true,
+      "label": "journey",
+      "permalink": "/docs/tags/journey"
+    }
+  ],
+  "version": "current",
+  "lastUpdatedBy": "tbowman01",
+  "lastUpdatedAt": 1753660800000,
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "id": "journey",
+    "title": "PhotonDrift Project Journey Roadmap",
+    "sidebar_label": "Project Journey",
+    "sidebar_position": 1,
+    "description": "Complete development journey and evolution of PhotonDrift from initial concept to AI-powered ADR management system",
+    "slug": "/misc/journey",
+    "tags": [
+      "project",
+      "roadmap",
+      "development",
+      "journey"
+    ],
+    "last_update": {
+      "date": "2025-07-28",
+      "author": "tbowman01"
+    }
+  }
+}

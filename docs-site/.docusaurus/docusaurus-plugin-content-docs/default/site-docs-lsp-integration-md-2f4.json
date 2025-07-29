@@ -1,0 +1,56 @@
+{
+  "id": "lsp-integration",
+  "title": "LSP Integration Guide",
+  "description": "Language Server Protocol implementation for IDE integration with real-time drift detection and ADR management",
+  "source": "@site/docs/lsp-integration.md",
+  "sourceDirName": ".",
+  "slug": "/misc/lsp-integration",
+  "permalink": "/docs/misc/lsp-integration",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tbowman01/PhotonDrift/tree/main/docs/docs/lsp-integration.md",
+  "tags": [
+    {
+      "inline": true,
+      "label": "lsp",
+      "permalink": "/docs/tags/lsp"
+    },
+    {
+      "inline": true,
+      "label": "ide",
+      "permalink": "/docs/tags/ide"
+    },
+    {
+      "inline": true,
+      "label": "integration",
+      "permalink": "/docs/tags/integration"
+    },
+    {
+      "inline": true,
+      "label": "development",
+      "permalink": "/docs/tags/development"
+    }
+  ],
+  "version": "current",
+  "lastUpdatedBy": "tbowman01",
+  "lastUpdatedAt": 1753142400000,
+  "sidebarPosition": 2,
+  "frontMatter": {
+    "id": "lsp-integration",
+    "title": "LSP Integration Guide",
+    "sidebar_label": "LSP Integration",
+    "sidebar_position": 2,
+    "description": "Language Server Protocol implementation for IDE integration with real-time drift detection and ADR management",
+    "slug": "/misc/lsp-integration",
+    "tags": [
+      "lsp",
+      "ide",
+      "integration",
+      "development"
+    ],
+    "last_update": {
+      "date": "2025-07-22",
+      "author": "tbowman01"
+    }
+  }
+}

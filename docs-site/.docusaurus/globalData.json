@@ -21,6 +21,10 @@
               "sidebar": "guidesSidebar"
             },
             {
+              "id": "api/cli-reference",
+              "path": "/docs/api/cli"
+            },
+            {
               "id": "architecture/architecture-enhancements",
               "path": "/docs/architecture/architecture-enhancements",
               "sidebar": "guidesSidebar"
@@ -31,6 +35,30 @@
               "sidebar": "guidesSidebar"
             },
             {
+              "id": "deployment/container-versioning-diagram",
+              "path": "/docs/deployment/container-versioning-diagram"
+            },
+            {
+              "id": "deployment/container-versioning-implementation",
+              "path": "/docs/deployment/container-versioning-implementation"
+            },
+            {
+              "id": "deployment/container-versioning-quickref",
+              "path": "/docs/deployment/container-versioning-quickref"
+            },
+            {
+              "id": "deployment/container-versioning-strategy",
+              "path": "/docs/deployment/container-versioning-strategy"
+            },
+            {
+              "id": "deployment/docker-build-guide",
+              "path": "/docs/deployment/docker-build-guide"
+            },
+            {
+              "id": "deployment/versioning-strategy",
+              "path": "/docs/deployment/versioning-strategy"
+            },
+            {
               "id": "development/development",
               "path": "/docs/development/development",
               "sidebar": "guidesSidebar"
@@ -39,6 +67,10 @@
               "id": "development/development-hooks",
               "path": "/docs/development/development-hooks",
               "sidebar": "apiSidebar"
+            },
+            {
+              "id": "development/documentation-style-guide",
+              "path": "/docs/development/documentation-style-guide"
             },
             {
               "id": "development/github-labels",
@@ -81,6 +113,14 @@
               "sidebar": "guidesSidebar"
             },
             {
+              "id": "journey",
+              "path": "/docs/misc/journey"
+            },
+            {
+              "id": "lsp-integration",
+              "path": "/docs/misc/lsp-integration"
+            },
+            {
               "id": "ml-features/ml-security-guide",
               "path": "/docs/ml-features/ml-security-guide",
               "sidebar": "guidesSidebar"
@@ -94,6 +134,54 @@
               "id": "ml-features/performance-analysis",
               "path": "/docs/ml-features/performance-analysis",
               "sidebar": "guidesSidebar"
+            },
+            {
+              "id": "phase-planning/automation-comprehensive-guide",
+              "path": "/docs/phase-planning/automation-comprehensive-guide"
+            },
+            {
+              "id": "phase-planning/build-simplification-summary",
+              "path": "/docs/phase-planning/build-simplification-summary"
+            },
+            {
+              "id": "phase-planning/dependency-analysis-report",
+              "path": "/docs/phase-planning/dependency-analysis-report"
+            },
+            {
+              "id": "phase-planning/phase-2.5-dependency-automation",
+              "path": "/docs/phase-planning/phase-2.5-dependency-automation"
+            },
+            {
+              "id": "phase-planning/phase-2.5-dependency-update-final",
+              "path": "/docs/phase-planning/phase-2.5-dependency-update-final"
+            },
+            {
+              "id": "phase-planning/phase-2.5-implementation-summary",
+              "path": "/docs/phase-planning/phase-2.5-implementation-summary"
+            },
+            {
+              "id": "phase-planning/phase-3-roadmap",
+              "path": "/docs/phase-planning/phase-3-roadmap"
+            },
+            {
+              "id": "phase-planning/phase-3-strategic-plan",
+              "path": "/docs/phase-planning/phase-3-strategic-plan"
+            },
+            {
+              "id": "phase-planning/repository-analysis-and-roadmap",
+              "path": "/docs/phase-planning/repository-analysis-and-roadmap"
+            },
+            {
+              "id": "phase-planning/temporal-analysis",
+              "path": "/docs/phase-planning/temporal-analysis"
+            },
+            {
+              "id": "phase-planning/wasm-file-io",
+              "path": "/docs/phase-planning/wasm-file-io"
+            },
+            {
+              "id": "phase-planning/wasmtime-v35-update-checklist",
+              "path": "/docs/phase-planning/wasmtime-v35-update-checklist"
             },
             {
               "id": "/getting-started",
@@ -140,15 +228,6 @@
         }
       ],
       "breadcrumbs": true
-    }
-  },
-  "docusaurus-plugin-google-gtag": {
-    "default": {
-      "trackingID": [
-        "G-PLACEHOLDER"
-      ],
-      "anonymizeIP": true,
-      "id": "default"
     }
   }
 }

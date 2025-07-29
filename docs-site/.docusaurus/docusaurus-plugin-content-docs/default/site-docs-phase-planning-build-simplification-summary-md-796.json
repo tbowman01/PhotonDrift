@@ -34,14 +34,5 @@
       "date": "2025-07-28",
       "author": "tbowman01"
     }
-  },
-  "sidebar": "guidesSidebar",
-  "previous": {
-    "title": "AUTOMATION COMPREHENSIVE GUIDE",
-    "permalink": "/docs/phase-planning/automation-comprehensive-guide"
-  },
-  "next": {
-    "title": "DEPENDENCY ANALYSIS REPORT",
-    "permalink": "/docs/phase-planning/dependency-analysis-report"
   }
 }

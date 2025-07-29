@@ -34,14 +34,5 @@
       "date": "2025-07-28",
       "author": "tbowman01"
     }
-  },
-  "sidebar": "guidesSidebar",
-  "previous": {
-    "title": "BUILD SIMPLIFICATION SUMMARY",
-    "permalink": "/docs/phase-planning/build-simplification-summary"
-  },
-  "next": {
-    "title": "TEMPORAL ANALYSIS",
-    "permalink": "/docs/phase-planning/temporal-analysis"
   }
 }
