@@ -1,0 +1,247 @@
+/**
+ * FeatureGrid Component Styles
+ */
+
+.featureGrid {
+  display: grid;
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+/* Grid column configurations */
+.columns1 {
+  grid-template-columns: 1fr;
+}
+
+.columns2 {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.columns3 {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.columns4 {
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+/* Feature card styling */
+.featureCard {
+  background: var(--ifm-card-background-color);
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: var(--ifm-global-radius);
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  text-decoration: none;
+  color: inherit;
+}
+
+.featureCard:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--ifm-global-shadow-tl);
+  border-color: var(--ifm-color-primary);
+  text-decoration: none;
+  color: inherit;
+}
+
+.featureCardLink {
+  cursor: pointer;
+}
+
+.featureCardLink:hover {
+  color: inherit;
+}
+
+/* Feature icon */
+.featureIcon {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  background: linear-gradient(135deg, var(--ifm-color-primary) 0%, var(--ifm-color-secondary) 100%);
+  border-radius: 50%;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Feature content */
+.featureContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.featureTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  color: var(--ifm-color-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.featureDescription {
+  color: var(--ifm-color-emphasis-700);
+  line-height: 1.6;
+  margin: 0;
+  flex: 1;
+}
+
+/* Status badges */
+.statusBadge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.statusCompleted {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.statusInProgress {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.statusPlanned {
+  background-color: rgba(99, 102, 241, 0.1);
+  color: var(--ifm-color-primary);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+/* Dark theme overrides */
+[data-theme='dark'] .featureCard {
+  background: var(--ifm-background-surface-color);
+  border-color: var(--ifm-color-emphasis-300);
+}
+
+[data-theme='dark'] .featureCard:hover {
+  border-color: var(--ifm-color-primary-light);
+}
+
+[data-theme='dark'] .featureDescription {
+  color: var(--ifm-color-emphasis-600);
+}
+
+[data-theme='dark'] .statusCompleted {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+[data-theme='dark'] .statusInProgress {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+
+[data-theme='dark'] .statusPlanned {
+  background-color: rgba(99, 102, 241, 0.2);
+  color: var(--ifm-color-primary-light);
+}
+
+/* Responsive design */
+@media (max-width: 996px) {
+  .featureGrid {
+    gap: 1rem;
+  }
+  
+  .columns3,
+  .columns4 {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .featureGrid {
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+  
+  .columns2,
+  .columns3,
+  .columns4 {
+    grid-template-columns: 1fr;
+  }
+  
+  .featureCard {
+    padding: 1rem;
+  }
+  
+  .featureIcon {
+    font-size: 2rem;
+    width: 3rem;
+    height: 3rem;
+  }
+  
+  .featureTitle {
+    font-size: 1.125rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+}
+
+/* Animation for status badges */
+@keyframes statusPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.statusInProgress {
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+/* Accessibility improvements */
+.featureCard:focus {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .featureCard {
+    transition: none;
+  }
+  
+  .featureCard:hover {
+    transform: none;
+  }
+  
+  .statusInProgress {
+    animation: none;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .featureCard {
+    border-width: 2px;
+  }
+  
+  .featureIcon {
+    background: var(--ifm-color-primary);
+  }
+  
+  .statusBadge {
+    border-width: 2px;
+    font-weight: 700;
+  }
+}

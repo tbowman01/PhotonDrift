@@ -1,3 +1,16 @@
+---
+id: "development"
+title: "DEVELOPMENT"
+sidebar_label: "DEVELOPMENT"
+sidebar_position: "1"
+description: "Development guides and contributing guidelines"
+slug: "/development/development"
+tags: ["development"]
+last_update:
+  date: "2025-07-28"
+  author: "tbowman01"
+---
+
 # PhotonDrift Development Guide
 
 This document outlines the development approach and coordination for PhotonDrift ADRScan, including the comprehensive documentation system.

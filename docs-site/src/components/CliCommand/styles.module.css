@@ -1,0 +1,101 @@
+/**
+ * CLI Command Component Styles
+ */
+
+.cliCommand {
+  margin: 1.5rem 0;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: var(--ifm-global-radius);
+  overflow: hidden;
+  box-shadow: var(--ifm-global-shadow-lw);
+}
+
+.description {
+  padding: 1rem;
+  background-color: var(--ifm-color-emphasis-100);
+  border-bottom: 1px solid var(--ifm-color-emphasis-300);
+  font-weight: 500;
+  color: var(--ifm-color-emphasis-800);
+}
+
+[data-theme='dark'] .description {
+  background-color: var(--ifm-color-emphasis-200);
+  color: var(--ifm-color-emphasis-100);
+}
+
+.commandContainer {
+  position: relative;
+}
+
+.commandBlock {
+  margin: 0 !important;
+  border-radius: 0 !important;
+  border: none !important;
+}
+
+.copyButton {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: var(--ifm-color-primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.copyButton:hover {
+  background: var(--ifm-color-primary-dark);
+  transform: scale(1.05);
+}
+
+.copyButton.copied {
+  background: var(--ifm-color-success);
+}
+
+.outputContainer {
+  border-top: 1px solid var(--ifm-color-emphasis-300);
+}
+
+.outputLabel {
+  padding: 0.5rem 1rem;
+  background-color: var(--ifm-color-emphasis-100);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ifm-color-emphasis-700);
+  border-bottom: 1px solid var(--ifm-color-emphasis-300);
+}
+
+[data-theme='dark'] .outputLabel {
+  background-color: var(--ifm-color-emphasis-200);
+  color: var(--ifm-color-emphasis-100);
+}
+
+.outputBlock {
+  margin: 0 !important;
+  border-radius: 0 !important;
+  border: none !important;
+  background-color: var(--ifm-color-emphasis-100) !important;
+}
+
+[data-theme='dark'] .outputBlock {
+  background-color: var(--ifm-color-emphasis-200) !important;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .cliCommand {
+    margin: 1rem 0;
+  }
+  
+  .copyButton {
+    top: 0.25rem;
+    right: 0.25rem;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.75rem;
+  }
+}

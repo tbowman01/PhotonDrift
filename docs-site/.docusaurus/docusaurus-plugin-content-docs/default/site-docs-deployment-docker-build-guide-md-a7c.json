@@ -1,0 +1,43 @@
+{
+  "id": "deployment/docker-build-guide",
+  "title": "DOCKER BUILD GUIDE",
+  "description": "Deploy and operate PhotonDrift in production",
+  "source": "@site/docs/deployment/docker-build-guide.md",
+  "sourceDirName": "deployment",
+  "slug": "/deployment/docker-build-guide",
+  "permalink": "/docs/deployment/docker-build-guide",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tbowman01/PhotonDrift/tree/main/docs/docs/deployment/docker-build-guide.md",
+  "tags": [
+    {
+      "inline": true,
+      "label": "deployment",
+      "permalink": "/docs/tags/deployment"
+    }
+  ],
+  "version": "current",
+  "lastUpdatedBy": "tbowman01",
+  "lastUpdatedAt": 1753660800000,
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "id": "docker-build-guide",
+    "title": "DOCKER BUILD GUIDE",
+    "sidebar_label": "DOCKER BUILD GUIDE",
+    "sidebar_position": 1,
+    "description": "Deploy and operate PhotonDrift in production",
+    "slug": "/deployment/docker-build-guide",
+    "tags": [
+      "deployment"
+    ],
+    "last_update": {
+      "date": "2025-07-28",
+      "author": "tbowman01"
+    }
+  },
+  "sidebar": "apiSidebar",
+  "previous": {
+    "title": "NEURAL TRAINING",
+    "permalink": "/docs/ml-features/neural-training"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "id": "phase-planning/phase-3-roadmap",
+  "title": "PHASE 3 ROADMAP",
+  "description": "Development phases and strategic planning",
+  "source": "@site/docs/phase-planning/phase-3-roadmap.md",
+  "sourceDirName": "phase-planning",
+  "slug": "/phase-planning/phase-3-roadmap",
+  "permalink": "/docs/phase-planning/phase-3-roadmap",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tbowman01/PhotonDrift/tree/main/docs/docs/phase-planning/phase-3-roadmap.md",
+  "tags": [
+    {
+      "inline": true,
+      "label": "phase-planning",
+      "permalink": "/docs/tags/phase-planning"
+    }
+  ],
+  "version": "current",
+  "lastUpdatedBy": "tbowman01",
+  "lastUpdatedAt": 1753660800000,
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "id": "phase-3-roadmap",
+    "title": "PHASE 3 ROADMAP",
+    "sidebar_label": "PHASE 3 ROADMAP",
+    "sidebar_position": 1,
+    "description": "Development phases and strategic planning",
+    "slug": "/phase-planning/phase-3-roadmap",
+    "tags": [
+      "phase-planning"
+    ],
+    "last_update": {
+      "date": "2025-07-28",
+      "author": "tbowman01"
+    }
+  },
+  "sidebar": "guidesSidebar",
+  "previous": {
+    "title": "PHASE 3 STRATEGIC PLAN",
+    "permalink": "/docs/phase-planning/phase-3-strategic-plan"
+  },
+  "next": {
+    "title": "AUTOMATION COMPREHENSIVE GUIDE",
+    "permalink": "/docs/phase-planning/automation-comprehensive-guide"
+  }
+}

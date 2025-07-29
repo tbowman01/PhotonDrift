@@ -1,0 +1,47 @@
+{
+  "id": "development/development-hooks",
+  "title": "DEVELOPMENT HOOKS",
+  "description": "Development guides and contributing guidelines",
+  "source": "@site/docs/development/development-hooks.md",
+  "sourceDirName": "development",
+  "slug": "/development/development-hooks",
+  "permalink": "/docs/development/development-hooks",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tbowman01/PhotonDrift/tree/main/docs/docs/development/development-hooks.md",
+  "tags": [
+    {
+      "inline": true,
+      "label": "development",
+      "permalink": "/docs/tags/development"
+    }
+  ],
+  "version": "current",
+  "lastUpdatedBy": "tbowman01",
+  "lastUpdatedAt": 1753660800000,
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "id": "development-hooks",
+    "title": "DEVELOPMENT HOOKS",
+    "sidebar_label": "DEVELOPMENT HOOKS",
+    "sidebar_position": 1,
+    "description": "Development guides and contributing guidelines",
+    "slug": "/development/development-hooks",
+    "tags": [
+      "development"
+    ],
+    "last_update": {
+      "date": "2025-07-28",
+      "author": "tbowman01"
+    }
+  },
+  "sidebar": "apiSidebar",
+  "previous": {
+    "title": "CONFIG",
+    "permalink": "/docs/getting-started/config"
+  },
+  "next": {
+    "title": "NEURAL TRAINING",
+    "permalink": "/docs/ml-features/neural-training"
+  }
+}
