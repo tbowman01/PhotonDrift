@@ -1,10 +1,16 @@
 ---
+id: "journey"
 title: "PhotonDrift Project Journey Roadmap"
 sidebar_label: "Project Journey"
-sidebar_position: 1
+sidebar_position: "1"
 description: "Complete development journey and evolution of PhotonDrift from initial concept to AI-powered ADR management system"
+slug: "/misc/journey"
 tags: ["project", "roadmap", "development", "journey"]
+last_update:
+  date: "2025-07-28"
+  author: "tbowman01"
 ---
+
 
 # How I Got Here: PhotonDrift Project Journey Roadmap
 

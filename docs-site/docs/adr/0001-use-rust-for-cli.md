@@ -5,10 +5,10 @@ sidebar_label: "0001 Use Rust For CLI"
 sidebar_position: "1"
 description: "Architecture Decision Records (ADRs)"
 slug: "/adr/0001-use-rust-for-cli"
-tags: "["language", "performance", "tooling"]"
+tags: ["language", "performance", "tooling"]
 status: "accepted"
 date: "2023-12-01"
-deciders: "["development team"]"
+deciders: ["development team"]
 last_update:
   date: "2025-07-28"
   author: "tbowman01"

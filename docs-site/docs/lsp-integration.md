@@ -1,10 +1,16 @@
 ---
+id: "lsp-integration"
 title: "LSP Integration Guide"
 sidebar_label: "LSP Integration"
-sidebar_position: 2
+sidebar_position: "2"
 description: "Language Server Protocol implementation for IDE integration with real-time drift detection and ADR management"
+slug: "/misc/lsp-integration"
 tags: ["lsp", "ide", "integration", "development"]
+last_update:
+  date: "2025-07-22"
+  author: "tbowman01"
 ---
+
 
 # PhotonDrift LSP Integration Guide
 

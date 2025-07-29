@@ -5,10 +5,10 @@ sidebar_label: "0003 ContAInerization Deployment Strategy"
 sidebar_position: "1"
 description: "Architecture Decision Records (ADRs)"
 slug: "/adr/0003-containerization-deployment-strategy"
-tags: "["deployment", "containerization", "security", "docker", "multi-platform", "infrastructure"]"
+tags: ["deployment", "containerization", "security", "docker", "multi-platform", "infrastructure"]
 status: "accepted"
 date: "2025-07-21"
-deciders: "["development team", "devops team"]"
+deciders: ["development team", "devops team"]
 last_update:
   date: "2025-07-28"
   author: "tbowman01"

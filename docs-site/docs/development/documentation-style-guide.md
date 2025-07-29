@@ -5,7 +5,10 @@ sidebar_label: "Style Guide"
 sidebar_position: "5"
 description: "Comprehensive style guide for PhotonDrift documentation"
 slug: "/development/documentation-style-guide"
-tags: "["documentation", "style", "contributing", "guidelines"]"
+tags: ["documentation", "style", "contributing", "guidelines"]
+last_update:
+  date: "2025-07-29"
+  author: "tbowman01"
 ---
 
 
