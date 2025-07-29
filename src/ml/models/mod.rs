@@ -29,6 +29,10 @@ pub use svm::OneClassSVM;
 pub use statistical::StatisticalModel;
 pub use ensemble::EnsembleModel;
 
+// Backwards compatibility aliases
+pub use isolation_forest::IsolationForest as IsolationForestModel;
+pub use svm::OneClassSVM as OneClassSVMModel;
+
 /// Convenience function to create models
 pub fn create_model(model_type: ModelType) -> DriftResult<Box<dyn AnomalyModel>> {
     ModelFactory::create(model_type)
