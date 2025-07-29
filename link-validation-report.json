@@ -1,11 +1,11 @@
 {
   "summary": {
-    "totalFiles": 24,
-    "totalLinks": 167,
-    "validLinks": 141,
+    "totalFiles": 28,
+    "totalLinks": 184,
+    "validLinks": 158,
     "invalidLinks": 26,
-    "externalLinks": 64,
-    "internalLinks": 103,
+    "externalLinks": 70,
+    "internalLinks": 114,
     "imageLinks": 4
   },
   "issues": [
@@ -351,8 +351,8 @@
   "statistics": {
     "byType": {
       "markdown": {
-        "total": 163,
-        "valid": 141,
+        "total": 180,
+        "valid": 158,
         "invalid": 22
       },
       "image": {
@@ -362,6 +362,11 @@
       }
     },
     "byFile": {
+      "index.md": {
+        "total": 8,
+        "valid": 8,
+        "invalid": 0
+      },
       "cli-reference.md": {
         "total": 3,
         "valid": 3,
@@ -423,8 +428,8 @@
         "invalid": 1
       },
       "README.md": {
-        "total": 56,
-        "valid": 56,
+        "total": 61,
+        "valid": 61,
         "invalid": 0
       },
       "DOCKER_BUILD_GUIDE.md": {
@@ -470,6 +475,11 @@
       "USER_GUIDE.md": {
         "total": 3,
         "valid": 3,
+        "invalid": 0
+      },
+      "PRODUCT_REQUIREMENTS_DOCUMENT.md": {
+        "total": 4,
+        "valid": 4,
         "invalid": 0
       }
     }

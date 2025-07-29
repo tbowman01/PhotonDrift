@@ -6,6 +6,9 @@ sidebar_position: "1"
 description: "Architecture Decision Records (ADRs)"
 slug: "/adr/index"
 tags: ["adr"]
+last_update:
+  date: "2025-07-29"
+  author: "tbowman01"
 ---
 
 # Architecture Decision Records (ADRs) Index

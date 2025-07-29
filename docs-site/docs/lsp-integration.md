@@ -7,7 +7,7 @@ description: "Language Server Protocol implementation for IDE integration with r
 slug: "/misc/lsp-integration"
 tags: ["lsp", "ide", "integration", "development"]
 last_update:
-  date: "2025-07-22"
+  date: "2025-07-29"
   author: "tbowman01"
 ---
 

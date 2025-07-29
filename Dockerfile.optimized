@@ -116,8 +116,8 @@ LABEL org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.description="AI-powered ADR management with ML-enhanced drift detection" \
       org.opencontainers.image.vendor="PhotonDrift" \
       org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.source="https://github.com/tbowman01/PhotonDrift" \
-      org.opencontainers.image.documentation="https://github.com/tbowman01/PhotonDrift/blob/main/README.md" \
+      org.opencontainers.image.source="https://github.com/tbowman01/photondrift" \
+      org.opencontainers.image.documentation="https://github.com/tbowman01/photondrift/blob/main/README.md" \
       org.opencontainers.image.ref.name="${BRANCH}" \
       org.opencontainers.image.authors="tbowman01"
 

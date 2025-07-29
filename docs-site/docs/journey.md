@@ -7,7 +7,7 @@ description: "Complete development journey and evolution of PhotonDrift from ini
 slug: "/misc/journey"
 tags: ["project", "roadmap", "development", "journey"]
 last_update:
-  date: "2025-07-28"
+  date: "2025-07-29"
   author: "tbowman01"
 ---
 

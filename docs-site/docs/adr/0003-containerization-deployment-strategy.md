@@ -10,7 +10,7 @@ status: "accepted"
 date: "2025-07-21"
 deciders: ["development team", "devops team"]
 last_update:
-  date: "2025-07-28"
+  date: "2025-07-21"
   author: "tbowman01"
 ---
 

@@ -7,7 +7,7 @@ description: "Deploy and operate PhotonDrift in production"
 slug: "/deployment/docker-build-guide"
 tags: ["deployment"]
 last_update:
-  date: "2025-07-28"
+  date: "2025-07-29"
   author: "tbowman01"
 ---
 
