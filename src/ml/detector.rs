@@ -211,7 +211,7 @@ impl MLDriftDetector {
             }
             _ => {
                 // Use factory for other model types
-                self.model = Some(ModelFactory::create_model(model_type));
+                self.model = Some(ModelFactory::create(model_type)?);
                 log::info!(
                     "Created {} model (no specific training implemented yet)",
                     format!("{:?}", model_type)
@@ -390,6 +390,9 @@ pub struct Prediction {
 
     /// Whether this is classified as an anomaly
     pub is_anomaly: bool,
+
+    /// Explanation of the prediction for explainable AI
+    pub explanation: Option<String>,
 }
 
 impl AnomalyModel for MockAnomalyModel {

@@ -17,7 +17,7 @@ impl ModelFactory {
             ModelType::Ensemble => Ok(Box::new(EnsembleModel::new())),
             ModelType::LocalOutlierFactor => {
                 // TODO: Implement LOF model
-                Err(crate::error::DriftError::Config(
+                Err(crate::AdrscanError::DriftError(
                     "LocalOutlierFactor not implemented yet".to_string()
                 ))
             }
