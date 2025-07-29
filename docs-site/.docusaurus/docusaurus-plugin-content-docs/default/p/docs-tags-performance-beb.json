@@ -1,0 +1,1 @@
+{"tag":{"label":"performance","permalink":"/docs/tags/performance","allTagsPath":"/docs/tags","count":1,"items":[{"id":"adr/0001-use-rust-for-cli","title":"Use Rust for CLI Implementation","description":"Architecture Decision Records (ADRs)","permalink":"/docs/adr/0001-use-rust-for-cli"}],"unlisted":false}}

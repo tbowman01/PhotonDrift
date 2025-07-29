@@ -1,0 +1,258 @@
+/**
+ * Homepage Styles for PhotonDrift Documentation
+ */
+
+/* Hero Banner */
+.heroBanner {
+  padding: 4rem 0;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #06b6d4 100%);
+}
+
+.heroBanner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+  opacity: 0.3;
+}
+
+.heroSubtext {
+  font-size: 1.125rem;
+  margin: 1.5rem auto 2rem;
+  max-width: 600px;
+  opacity: 0.9;
+  line-height: 1.6;
+}
+
+.buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 2rem;
+}
+
+/* Sections */
+.section {
+  padding: 4rem 0;
+}
+
+.sectionAlt {
+  background-color: var(--ifm-color-emphasis-100);
+}
+
+[data-theme='dark'] .sectionAlt {
+  background-color: var(--ifm-background-surface-color);
+}
+
+/* Stats Section */
+.statsSection {
+  padding: 3rem 0;
+  background: linear-gradient(135deg, var(--ifm-color-primary) 0%, var(--ifm-color-secondary) 100%);
+  color: white;
+}
+
+.statCard {
+  text-align: center;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--ifm-global-radius);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.statCard:hover {
+  transform: translateY(-4px);
+}
+
+.statIcon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.statValue {
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+  color: white;
+}
+
+.statLabel {
+  font-size: 0.875rem;
+  opacity: 0.9;
+  font-weight: 500;
+}
+
+/* CTA Section */
+.ctaSection {
+  background: linear-gradient(135deg, var(--ifm-background-color) 0%, var(--ifm-color-emphasis-100) 100%);
+  padding: 4rem 0;
+}
+
+.ctaButtons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin: 2rem 0;
+  flex-wrap: wrap;
+}
+
+.ctaNote {
+  margin-top: 2rem;
+  color: var(--ifm-color-emphasis-600);
+}
+
+.ctaNote a {
+  color: var(--ifm-color-primary);
+  text-decoration: none;
+}
+
+.ctaNote a:hover {
+  text-decoration: underline;
+}
+
+/* Responsive Design */
+@media (max-width: 996px) {
+  .heroBanner {
+    padding: 3rem 0;
+  }
+  
+  .section {
+    padding: 3rem 0;
+  }
+  
+  .statsSection {
+    padding: 2rem 0;
+  }
+  
+  .statValue {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .heroBanner {
+    padding: 2rem 0;
+  }
+  
+  .heroSubtext {
+    font-size: 1rem;
+    margin: 1rem auto 1.5rem;
+  }
+  
+  .buttons {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .section {
+    padding: 2rem 0;
+  }
+  
+  .statCard {
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .statValue {
+    font-size: 1.75rem;
+  }
+  
+  .ctaButtons {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
+/* Animation for hero section */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.heroBanner * {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.heroBanner .hero__title {
+  animation-delay: 0.1s;
+}
+
+.heroBanner .hero__subtitle {
+  animation-delay: 0.2s;
+}
+
+.heroBanner .heroSubtext {
+  animation-delay: 0.3s;
+}
+
+.heroBanner .buttons {
+  animation-delay: 0.4s;
+}
+
+/* Disable animations for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .heroBanner *,
+  .statCard {
+    animation: none;
+    transition: none;
+  }
+  
+  .statCard:hover {
+    transform: none;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .heroBanner {
+    background: var(--ifm-color-primary);
+  }
+  
+  .statCard {
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+  }
+  
+  .ctaNote a {
+    text-decoration: underline;
+  }
+}
+
+/* Print styles */
+@media print {
+  .heroBanner {
+    background: none !important;
+    color: black !important;
+    padding: 1rem 0 !important;
+  }
+  
+  .statsSection {
+    background: none !important;
+    color: black !important;
+  }
+  
+  .statCard {
+    background: none !important;
+    border: 1px solid black !important;
+  }
+  
+  .buttons,
+  .ctaButtons {
+    display: none !important;
+  }
+}

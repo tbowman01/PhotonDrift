@@ -1,0 +1,43 @@
+{
+  "id": "ml-features/neural-training",
+  "title": "NEURAL TRAINING",
+  "description": "Machine learning and AI capabilities",
+  "source": "@site/docs/ml-features/neural-training.md",
+  "sourceDirName": "ml-features",
+  "slug": "/ml-features/neural-training",
+  "permalink": "/docs/ml-features/neural-training",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tbowman01/PhotonDrift/tree/main/docs/docs/ml-features/neural-training.md",
+  "tags": [
+    {
+      "inline": true,
+      "label": "ml-features",
+      "permalink": "/docs/tags/ml-features"
+    }
+  ],
+  "version": "current",
+  "lastUpdatedBy": "tbowman01",
+  "lastUpdatedAt": 1753660800000,
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "id": "neural-training",
+    "title": "NEURAL TRAINING",
+    "sidebar_label": "NEURAL TRAINING",
+    "sidebar_position": 1,
+    "description": "Machine learning and AI capabilities",
+    "slug": "/ml-features/neural-training",
+    "tags": [
+      "ml-features"
+    ],
+    "last_update": {
+      "date": "2025-07-28",
+      "author": "tbowman01"
+    }
+  },
+  "sidebar": "apiSidebar",
+  "previous": {
+    "title": "DEVELOPMENT HOOKS",
+    "permalink": "/docs/development/development-hooks"
+  }
+}

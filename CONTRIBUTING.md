@@ -191,7 +191,86 @@ cargo tarpaulin --out Html
 - Ensure tests are deterministic
 - Include both positive and negative test cases
 
-## Documentation
+## 📚 Documentation
+
+PhotonDrift uses a modern, automated documentation system built with Docusaurus v3. We welcome and encourage documentation contributions!
+
+### 🛠️ Documentation Setup
+
+```bash
+# Navigate to documentation directory
+cd docs-site
+
+# Install Node.js dependencies
+npm install
+
+# Sync content from source docs
+npm run sync-docs
+
+# Generate CLI documentation
+npm run generate-cli-docs
+
+# Start development server
+npm start
+# Visit http://localhost:3000
+```
+
+### 📝 Documentation Workflow
+
+#### Quick Contributing Guide
+
+1. **Edit source files** in the `docs/` directory (not `docs-site/docs/`)
+2. **Use standard Markdown** with frontmatter for metadata
+3. **Test locally** by running sync and development server
+4. **Submit pull request** - auto-deployment to GitHub Pages
+
+#### Documentation Structure
+
+```
+docs/                           # 📝 Edit files here
+├── getting-started/           # User guides and setup
+├── development/              # Contributing and development
+├── architecture/            # Technical architecture
+├── deployment/             # Deployment guides
+├── ml-features/           # AI/ML capabilities
+├── phase-planning/       # Project roadmaps
+└── adr/                 # Architecture Decision Records
+
+docs-site/                     # 🚀 Generated site (don't edit)
+├── src/components/           # Custom React components
+├── static/                  # Static assets
+├── docs/                   # Auto-generated from docs/
+└── scripts/               # Build automation
+```
+
+#### Content Guidelines
+
+**Frontmatter Example:**
+```yaml
+---
+title: "Page Title"
+sidebar_label: "Short Label"
+sidebar_position: 1
+description: "Brief description for SEO and navigation"
+tags: ["relevant", "tags", "here"]
+---
+```
+
+**Writing Standards:**
+- Use **bold** for emphasis and important terms
+- Use `code blocks` for commands, file names, and code
+- Include practical, testable examples
+- Link to related documentation
+- Keep paragraphs concise and focused
+
+### 🔧 Advanced Documentation Features
+
+- **Automated Content Sync**: Changes in `docs/` auto-sync to site
+- **CLI Documentation Generation**: Extracts help from Rust binary
+- **Link Validation**: Automatic checking of internal/external links
+- **Progressive Web App**: Offline support and mobile optimization
+- **Search Ready**: Configured for Algolia DocSearch integration
+- **Performance Optimized**: Code splitting, image optimization, caching
 
 ### Code Documentation
 

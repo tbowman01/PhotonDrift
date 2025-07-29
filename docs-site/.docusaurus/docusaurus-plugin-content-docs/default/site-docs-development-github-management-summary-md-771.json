@@ -1,0 +1,47 @@
+{
+  "id": "development/github-management-summary",
+  "title": "GITHUB MANAGEMENT SUMMARY",
+  "description": "Development guides and contributing guidelines",
+  "source": "@site/docs/development/github-management-summary.md",
+  "sourceDirName": "development",
+  "slug": "/development/github-management-summary",
+  "permalink": "/docs/development/github-management-summary",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tbowman01/PhotonDrift/tree/main/docs/docs/development/github-management-summary.md",
+  "tags": [
+    {
+      "inline": true,
+      "label": "development",
+      "permalink": "/docs/tags/development"
+    }
+  ],
+  "version": "current",
+  "lastUpdatedBy": "tbowman01",
+  "lastUpdatedAt": 1753660800000,
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "id": "github-management-summary",
+    "title": "GITHUB MANAGEMENT SUMMARY",
+    "sidebar_label": "GITHUB MANAGEMENT SUMMARY",
+    "sidebar_position": 1,
+    "description": "Development guides and contributing guidelines",
+    "slug": "/development/github-management-summary",
+    "tags": [
+      "development"
+    ],
+    "last_update": {
+      "date": "2025-07-28",
+      "author": "tbowman01"
+    }
+  },
+  "sidebar": "guidesSidebar",
+  "previous": {
+    "title": "GITHUB LABELS",
+    "permalink": "/docs/development/github-labels"
+  },
+  "next": {
+    "title": "🏗️ Architecture",
+    "permalink": "/docs/architecture"
+  }
+}

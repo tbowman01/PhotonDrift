@@ -1,0 +1,43 @@
+{
+  "id": "ml-features/performance-analysis",
+  "title": "PERFORMANCE ANALYSIS",
+  "description": "Machine learning and AI capabilities",
+  "source": "@site/docs/ml-features/performance-analysis.md",
+  "sourceDirName": "ml-features",
+  "slug": "/ml-features/performance-analysis",
+  "permalink": "/docs/ml-features/performance-analysis",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/tbowman01/PhotonDrift/tree/main/docs/docs/ml-features/performance-analysis.md",
+  "tags": [
+    {
+      "inline": true,
+      "label": "ml-features",
+      "permalink": "/docs/tags/ml-features"
+    }
+  ],
+  "version": "current",
+  "lastUpdatedBy": "tbowman01",
+  "lastUpdatedAt": 1753660800000,
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "id": "performance-analysis",
+    "title": "PERFORMANCE ANALYSIS",
+    "sidebar_label": "PERFORMANCE ANALYSIS",
+    "sidebar_position": 1,
+    "description": "Machine learning and AI capabilities",
+    "slug": "/ml-features/performance-analysis",
+    "tags": [
+      "ml-features"
+    ],
+    "last_update": {
+      "date": "2025-07-28",
+      "author": "tbowman01"
+    }
+  },
+  "sidebar": "guidesSidebar",
+  "previous": {
+    "title": "NEURAL TRAINING",
+    "permalink": "/docs/ml-features/neural-training"
+  }
+}

@@ -251,33 +251,38 @@ drift:
 
 ## 📚 Documentation
 
-### Core Documentation
-- **[User Guide](docs/USER_GUIDE.md)** - Comprehensive usage guide
-- **[Quick Start](docs/QUICK_START.md)** - Get started quickly
-- **[Development Guide](docs/DEVELOPMENT.md)** - Contributing guidelines
-- **[Configuration](docs/CONFIGURATION.md)** - Configuration options
+### 📚 Documentation
+**[Complete Documentation Index](docs/README.md)** - Navigate all documentation by category
 
-### ML & Security Features ✨
-- **[ML Security Guide](docs/ML_SECURITY_GUIDE.md)** - AI-powered security analysis and secret detection
-- **[Neural Training](docs/NEURAL_TRAINING.md)** - Train models from operations and improve accuracy
-- **[Performance Analysis](docs/PERFORMANCE_ANALYSIS.md)** - Monitor performance and optimize bottlenecks
+### 🚀 Getting Started
+- **[Quick Start Guide](docs/getting-started/QUICK_START.md)** - Get up and running in minutes
+- **[User Guide](docs/getting-started/USER_GUIDE.md)** - Comprehensive usage guide
+- **[CLI Reference](docs/getting-started/CLI.md)** - Complete command-line interface documentation
+- **[Configuration Reference](docs/getting-started/CONFIG.md)** - All configuration options and examples
 
-### Integration & Automation
-- **[GitHub Integration](docs/GITHUB_LABELS.md)** - GitHub automation features
-- **[Development Hooks](docs/DEVELOPMENT_HOOKS.md)** - Pre-commit hooks and automation setup
-- **[Docker Build Guide](docs/DOCKER_BUILD_GUIDE.md)** - Comprehensive Docker build instructions
+### 🤖 ML & AI Features ✨
+- **[ML Security Guide](docs/ml-features/ML_SECURITY_GUIDE.md)** - AI-powered security analysis and secret detection
+- **[Neural Training](docs/ml-features/NEURAL_TRAINING.md)** - Train models from operations and improve accuracy
+- **[Performance Analysis](docs/ml-features/PERFORMANCE_ANALYSIS.md)** - Monitor performance and optimize bottlenecks
 
-### Technical Reference
+### 👥 Development & Contributing
+- **[Development Guide](docs/development/DEVELOPMENT.md)** - Contributing guidelines and setup
+- **[Development Hooks](docs/development/DEVELOPMENT_HOOKS.md)** - Pre-commit hooks and automation
+- **[GitHub Integration](docs/development/GITHUB_LABELS.md)** - GitHub automation features
+
+### 🚀 Deployment & Operations
+- **[Docker Build Guide](docs/deployment/DOCKER_BUILD_GUIDE.md)** - Comprehensive Docker build instructions
+- **[Versioning Strategy](docs/deployment/VERSIONING_STRATEGY.md)** - Semantic versioning and release management
+
+### 🏗️ Architecture & Technical Reference
+- **[Architecture Enhancements](docs/architecture/ARCHITECTURE_ENHANCEMENTS.md)** - System architecture improvements
+- **[Requirements Summary](docs/architecture/REQUIREMENTS_SUMMARY.md)** - Technical requirements and specifications
 - **[CHANGELOG.md](CHANGELOG.md)** - Complete version history and release notes
 - **[ROADMAP.md](ROADMAP.md)** - Development roadmap through 2025
-- **[Requirements & Architecture](docs/REQUIREMENTS_SUMMARY.md)** - Technical requirements and phases
-- **[Training & Optimization](src/ml/training.rs)** - Model training and hyperparameter tuning
 
-### Integration & Usage
-- **[GitHub Action Guide](.github/workflows/)** - CI/CD integration with ML features
-- **[WebAssembly Integration](src/wasm_simple.rs)** - Browser and Node.js usage
-- **[Configuration Reference](docs/CONFIG.md)** - Complete configuration options
-- **[CLI Reference](docs/CLI.md)** - All commands and parameters
+### 📋 Project Planning
+- **[Phase 3 Strategic Plan](docs/phase-planning/PHASE_3_STRATEGIC_PLAN.md)** - Future development roadmap
+- **[Repository Analysis](docs/phase-planning/REPOSITORY_ANALYSIS_AND_ROADMAP.md)** - Comprehensive project analysis
 
 ## 🚀 Implementation Status
 
@@ -369,6 +374,104 @@ See [Development Hooks Documentation](docs/DEVELOPMENT_HOOKS.md) for detailed in
 - **Memory Usage**: ~10MB for 1000 ML training samples
 - **Test Coverage**: 178/182 tests passing (97.8%)
 - **ML Test Coverage**: 26/26 tests passing (100%)
+
+## 📚 Documentation
+
+PhotonDrift features a comprehensive, interactive documentation website built with Docusaurus v3, featuring automated content synchronization and AI-enhanced CLI documentation.
+
+### 🌐 Online Documentation
+
+Visit **[docs.photondrift.dev](https://docs.photondrift.dev)** for the complete interactive documentation experience.
+
+### 🛠️ Building Documentation Locally
+
+```bash
+# Navigate to documentation directory
+cd docs-site
+
+# Install dependencies
+npm install
+
+# Sync content from source docs
+npm run sync-docs
+
+# Generate CLI documentation
+npm run generate-cli-docs
+
+# Start development server
+npm start
+# Visit http://localhost:3000
+
+# Build for production
+npm run build
+npm run serve
+```
+
+### 📝 Contributing to Documentation
+
+The documentation system automatically syncs content from the `docs/` directory:
+
+1. **Edit source files** in `docs/` using standard Markdown
+2. **Run sync** with `npm run sync-docs` in `docs-site/`
+3. **Test locally** with `npm start`
+4. **Submit PR** - GitHub Actions will automatically deploy to GitHub Pages
+
+#### Documentation Structure
+
+```
+docs/                           # Source documentation (edit here)
+├── getting-started/           # User guides and setup
+├── development/              # Contributing and development
+├── architecture/            # Technical architecture
+├── deployment/             # Deployment guides
+├── ml-features/           # AI/ML capabilities
+├── phase-planning/       # Project roadmaps
+└── adr/                 # Architecture Decision Records
+
+docs-site/                     # Docusaurus site (auto-generated)
+├── src/components/           # Custom React components
+├── static/                  # Static assets
+├── docs/                   # Processed documentation
+└── scripts/               # Build automation
+```
+
+#### Content Guidelines
+
+- Use **standard Markdown** with optional MDX for advanced features
+- Include **frontmatter** for proper categorization:
+  ```yaml
+  ---
+  title: "Page Title"
+  sidebar_label: "Short Label"
+  description: "Page description"
+  tags: ["tag1", "tag2"]
+  ---
+  ```
+- Follow **existing naming conventions** and folder structure
+- Test **links and code examples** before submitting
+
+### 🚀 Automated Deployment
+
+The documentation automatically deploys to GitHub Pages when:
+- Changes are pushed to `main` or `develop` branches
+- Pull requests are created (preview deployments)
+- Manual workflow dispatch is triggered
+
+#### Deployment Pipeline Features
+
+- **Content Validation**: Automatic link checking and syntax validation
+- **Performance Optimization**: Code splitting, image optimization, PWA support
+- **Search Integration**: Ready for Algolia DocSearch
+- **Analytics**: Google Analytics and performance monitoring
+- **Security**: Automated dependency scanning and updates
+
+### 🔧 Advanced Documentation Features
+
+- **Interactive CLI Examples**: Copy-to-clipboard command blocks
+- **Feature Status Tracking**: Visual indicators for feature completion
+- **Responsive Design**: Optimized for mobile, tablet, and desktop
+- **Progressive Web App**: Offline support and app-like experience
+- **Multi-platform**: Works across all browsers and devices
 
 ## 🔗 Related Projects
 
