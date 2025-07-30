@@ -36,3 +36,4 @@
     }
   },
   "postCreateCommand": "./bootstrap.sh"
+}
