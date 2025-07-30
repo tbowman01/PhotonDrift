@@ -185,7 +185,10 @@ get_build_config() {
 # Generate image tag
 get_image_tag() {
     local service=$1
-    local base_name="${REGISTRY}/${GITHUB_REPOSITORY:-tbowman01/photondrift}"
+    # Convert GITHUB_REPOSITORY to lowercase to avoid Docker registry errors
+    local repo_name="${GITHUB_REPOSITORY:-tbowman01/photondrift}"
+    repo_name=$(echo "$repo_name" | tr '[:upper:]' '[:lower:]')
+    local base_name="${REGISTRY}/${repo_name}"
     
     # Normalize service name
     case "$service" in
@@ -240,11 +243,18 @@ cmd_build() {
             SEMVER="$VERSION"
         fi
         
+        # Determine platform for build
+        local build_platforms="$PLATFORMS"
+        if [[ "$ENVIRONMENT" == "dev" && "$PLATFORMS" == *","* ]]; then
+            log_warning "Multi-platform builds not supported with --load, using linux/amd64 for dev"
+            build_platforms="linux/amd64"
+        fi
+
         # Build arguments with comprehensive versioning
         build_args=(
             --file "$PROJECT_ROOT/$dockerfile"
             --tag "$tag"
-            --platform "$PLATFORMS"
+            --platform "$build_platforms"
             --build-arg "BUILD_DATE=$BUILD_DATE"
             --build-arg "GIT_SHA=$GIT_SHA_FULL"
             --build-arg "GIT_SHA_SHORT=$GIT_SHA_SHORT"

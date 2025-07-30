@@ -12,10 +12,11 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-BASE_VERSION="0.2.0"
+BASE_VERSION="0.3.0"
 TIMESTAMP=$(date +%Y%m%d)
 COMMIT_SHORT=$(git rev-parse --short HEAD)
 BRANCH_NAME=$(git branch --show-current)
+GITHUB_RUN_ID=${GITHUB_RUN_ID:-$(date +%s | tail -c 4)}
 
 # Function to print colored output
 log() {
@@ -69,10 +70,10 @@ generate_version() {
     
     case $branch in
         develop)
-            echo "${new_base}-alpha.${TIMESTAMP}.${COMMIT_SHORT}"
+            echo "${new_base}-alpha.${GITHUB_RUN_ID}"
             ;;
         main)
-            echo "${new_base}-rc.${TIMESTAMP}.${COMMIT_SHORT}"
+            echo "${new_base}-rc.${GITHUB_RUN_ID}"
             ;;
         release/*)
             local release_version=$(echo "$branch" | sed 's|release/||')
@@ -81,10 +82,10 @@ generate_version() {
         hotfix/*)
             local hotfix_base=$(get_base_version "$base_version")
             local hotfix_version=$(increment_version "$hotfix_base" "patch")
-            echo "${hotfix_version}-hotfix.${TIMESTAMP}.${COMMIT_SHORT}"
+            echo "${hotfix_version}-hotfix.${GITHUB_RUN_ID}"
             ;;
         *)
-            echo "${new_base}-dev.${TIMESTAMP}.${COMMIT_SHORT}"
+            echo "${new_base}-dev.${GITHUB_RUN_ID}"
             ;;
     esac
 }
@@ -163,6 +164,7 @@ generate_version_info() {
   "branch": "$branch",
   "commit": "$COMMIT_SHORT",
   "timestamp": "$TIMESTAMP",
+  "github_run_id": "$GITHUB_RUN_ID",
   "build_date": "$(date -u '+%Y-%m-%d %H:%M:%S UTC')",
   "version_type": "$(echo "$version" | grep -oE '(alpha|rc|dev|hotfix)' || echo 'stable')",
   "base_version": "$(get_base_version "$version")",
@@ -239,11 +241,11 @@ OPTIONS:
     --help         Show this help message
 
 BRANCH VERSIONING:
-    develop    → X.Y.Z-alpha.YYYYMMDD.COMMIT
-    main       → X.Y.Z-rc.YYYYMMDD.COMMIT
+    develop    → X.Y.Z-alpha.RUN_ID
+    main       → X.Y.Z-rc.RUN_ID  
     release/*  → X.Y.Z (stable release)
-    hotfix/*   → X.Y.Z-hotfix.YYYYMMDD.COMMIT
-    other      → X.Y.Z-dev.YYYYMMDD.COMMIT
+    hotfix/*   → X.Y.Z-hotfix.RUN_ID
+    other      → X.Y.Z-dev.RUN_ID
 
 EXAMPLES:
     ./semantic-version.sh                    # patch increment

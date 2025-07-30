@@ -53,3 +53,9 @@ wasm-*
 .swarm/
 .hive-mind/
 hive-mind-**-fallback.txt
+
+# Docusaurus generated files
+docs-site/.docusaurus/
+docs-site/build/
+docs-site/node_modules/
+docs-site/.cache/

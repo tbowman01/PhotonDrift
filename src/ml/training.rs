@@ -272,7 +272,7 @@ impl ModelTrainer {
             training_data.train_validation_split(self.config.validation_split);
 
         // Create and train model
-        let model = super::models::ModelFactory::create_model(model_type);
+        let model = super::models::ModelFactory::create(model_type)?;
 
         // Calculate training metrics
         let metrics = self.calculate_training_metrics(&model, &train_data, &val_data)?;
@@ -328,7 +328,7 @@ impl ModelTrainer {
             }
 
             // Train model on this fold
-            let model = super::models::ModelFactory::create_model(model_type);
+            let model = super::models::ModelFactory::create(model_type)?;
             let metrics = self.calculate_training_metrics(&model, &train_data, &val_data)?;
 
             cv_results.push(metrics);

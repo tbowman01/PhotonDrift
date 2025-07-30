@@ -7,7 +7,7 @@ description: "Development guides and contributing guidelines"
 slug: "/development/development"
 tags: ["development"]
 last_update:
-  date: "2025-07-28"
+  date: "2025-07-29"
   author: "tbowman01"
 ---
 

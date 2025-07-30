@@ -1,6 +1,6 @@
 {
   "name": "photondrift-docs",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "PhotonDrift Documentation Site built with Docusaurus",
   "scripts": {
@@ -55,5 +55,11 @@
   },
   "engines": {
     "node": ">=18.0"
+  },
+  "overrides": {
+    "webpack-dev-server": "^5.2.2",
+    "glob": "^11.0.0",
+    "uuid": "^11.0.0",
+    "rimraf": "^4.0.0"
   }
 }

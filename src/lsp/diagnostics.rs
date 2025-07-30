@@ -2,43 +2,174 @@
 
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range, Url};
 use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use crate::{config::Config, drift::DriftDetector, Result};
+
+#[cfg(feature = "ml")]
+use crate::ml::{MLDriftDetector, MLConfig};
 
 /// Engine for creating LSP diagnostics from drift detection
 pub struct DiagnosticEngine {
     detector: DriftDetector,
+    #[cfg(feature = "ml")]
+    ml_detector: Option<Arc<Mutex<MLDriftDetector>>>,
     config: Config,
 }
 
 impl DiagnosticEngine {
     pub fn new() -> Self {
-        Self {
+        let mut engine = Self {
             detector: DriftDetector::new(),
+            #[cfg(feature = "ml")]
+            ml_detector: None,
             config: Config::default(),
+        };
+        
+        // Initialize ML detector if available
+        #[cfg(feature = "ml")]
+        {
+            let ml_config = MLConfig {
+                enabled: true,
+                model_type: crate::ml::ModelType::Ensemble,
+                confidence_threshold: 0.7,
+                model_path: None,
+                cache_ttl_seconds: 3600,
+                max_features: 50,
+            };
+            
+            match MLDriftDetector::new(ml_config) {
+                Ok(ml_detector) => {
+                    engine.ml_detector = Some(Arc::new(Mutex::new(ml_detector)));
+                    log::info!("ML-enhanced diagnostics enabled");
+                }
+                Err(e) => {
+                    log::warn!("Failed to initialize ML detector, using basic detection: {}", e);
+                }
+            }
         }
+        
+        engine
     }
 
     /// Analyze content and return LSP diagnostics
     pub async fn analyze_content(&self, content: &str, uri: &Url) -> Result<Vec<Diagnostic>> {
         let mut diagnostics = Vec::new();
 
-        // Basic structural validation
+        // Basic structural validation (always run - fast)
         diagnostics.extend(self.validate_adr_structure(content));
-
-        // Check for common ADR issues
         diagnostics.extend(self.check_adr_content_quality(content));
 
-        // Advanced drift detection (if available)
+        // Advanced drift detection with ML enhancement
         if let Ok(path) = uri.to_file_path() {
             if let Ok(drift_items) = self.detector.analyze_single_file(&path) {
-                for item in drift_items.items {
-                    diagnostics.push(create_drift_diagnostic(&item, content));
+                // Use ML enhancement if available
+                #[cfg(feature = "ml")]
+                {
+                    if let Some(ref ml_detector) = self.ml_detector {
+                        match self.enhance_with_ml(drift_items.items, content, ml_detector).await {
+                            Ok(ml_diagnostics) => {
+                                diagnostics.extend(ml_diagnostics);
+                            }
+                            Err(e) => {
+                                log::warn!("ML enhancement failed, using basic detection: {}", e);
+                                // Fallback to basic drift detection
+                                for item in drift_items.items {
+                                    diagnostics.push(create_drift_diagnostic(&item, content));
+                                }
+                            }
+                        }
+                    } else {
+                        // No ML available, use basic detection
+                        for item in drift_items.items {
+                            diagnostics.push(create_drift_diagnostic(&item, content));
+                        }
+                    }
+                }
+                
+                #[cfg(not(feature = "ml"))]
+                {
+                    // ML feature not enabled, use basic detection
+                    for item in drift_items.items {
+                        diagnostics.push(create_drift_diagnostic(&item, content));
+                    }
                 }
             }
         }
 
         Ok(diagnostics)
+    }
+
+    /// Enhance drift detection with ML analysis (async, non-blocking)
+    #[cfg(feature = "ml")]
+    async fn enhance_with_ml(
+        &self, 
+        drift_items: Vec<crate::drift::DriftItem>, 
+        content: &str,
+        ml_detector: &Arc<Mutex<MLDriftDetector>>
+    ) -> Result<Vec<Diagnostic>> {
+        let mut diagnostics = Vec::new();
+        
+        // Create a timeout for ML processing to prevent LSP blocking
+        let ml_future = tokio::time::timeout(
+            tokio::time::Duration::from_millis(500), // 500ms max for real-time responsiveness
+            async {
+                let mut detector = ml_detector.lock().await;
+                
+                for item in drift_items {
+                    // Extract features for ML analysis
+                    let features = self.extract_lsp_features(content, &item).await?;
+                    
+                    // Get ML prediction with confidence scoring
+                    match detector.predict_anomaly(&features).await {
+                        Ok(ml_result) => {
+                            // Only report if confidence is above threshold
+                            if ml_result.confidence >= 0.7 {
+                                diagnostics.push(create_ml_enhanced_diagnostic(&item, &ml_result, content));
+                            }
+                        }
+                        Err(_) => {
+                            // ML failed for this item, use basic detection
+                            diagnostics.push(create_drift_diagnostic(&item, content));
+                        }
+                    }
+                }
+                
+                Ok::<Vec<Diagnostic>, crate::error::AdrscanError>(diagnostics)
+            }
+        );
+        
+        match ml_future.await {
+            Ok(Ok(ml_diagnostics)) => Ok(ml_diagnostics),
+            Ok(Err(e)) => Err(e),
+            Err(_) => {
+                log::warn!("ML analysis timed out, falling back to basic detection");
+                // Timeout occurred, return basic diagnostics
+                let mut basic_diagnostics = Vec::new();
+                for item in drift_items {
+                    basic_diagnostics.push(create_drift_diagnostic(&item, content));
+                }
+                Ok(basic_diagnostics)
+            }
+        }
+    }
+
+    /// Extract ML features specifically for LSP context
+    #[cfg(feature = "ml")]
+    async fn extract_lsp_features(&self, content: &str, drift_item: &crate::drift::DriftItem) -> Result<crate::ml::DriftFeatures> {
+        // This would use the existing feature extractor but focus on LSP-relevant features
+        let extractor = crate::ml::FeatureExtractor::new();
+        
+        // Create a minimal file representation for feature extraction
+        let temp_file_data = crate::drift::FileData {
+            path: std::path::PathBuf::from(&drift_item.file_path),
+            content: content.to_string(),
+            size: content.len() as u64,
+            modified: std::time::SystemTime::now(),
+        };
+        
+        extractor.extract_features(&[temp_file_data]).await
     }
 
     /// Validate basic ADR structure
@@ -286,6 +417,63 @@ pub fn create_drift_diagnostic(drift_item: &crate::drift::DriftItem, content: &s
         )),
         source: Some("photondrift".to_string()),
         message: format!("{}: {}", drift_item.summary, drift_item.description),
+        related_information: None,
+        tags: None,
+        data: None,
+    }
+}
+
+/// Create ML-enhanced diagnostic with confidence scoring
+#[cfg(feature = "ml")]
+pub fn create_ml_enhanced_diagnostic(
+    drift_item: &crate::drift::DriftItem,
+    ml_result: &crate::ml::detector::Prediction,
+    content: &str,
+) -> Diagnostic {
+    // Find the line number for this drift item
+    let line_number = content
+        .lines()
+        .position(|line| line.contains(&drift_item.pattern))
+        .unwrap_or(0) as u32;
+
+    // Use ML confidence to determine severity
+    let severity = if ml_result.confidence >= 0.9 {
+        DiagnosticSeverity::ERROR
+    } else if ml_result.confidence >= 0.7 {
+        DiagnosticSeverity::WARNING
+    } else {
+        DiagnosticSeverity::HINT
+    };
+
+    // Enhanced message with ML confidence
+    let message = format!(
+        "{}: {} (ML Confidence: {:.1}%)",
+        drift_item.summary,
+        drift_item.description,
+        ml_result.confidence * 100.0
+    );
+
+    Diagnostic {
+        range: Range {
+            start: Position {
+                line: line_number,
+                character: 0,
+            },
+            end: Position {
+                line: line_number,
+                character: content
+                    .lines()
+                    .nth(line_number as usize)
+                    .map(|l| l.len())
+                    .unwrap_or(0) as u32,
+            },
+        },
+        severity: Some(severity),
+        code: Some(lsp_types::NumberOrString::String(
+            "ml-drift-detected".to_string(),
+        )),
+        source: Some("photondrift-ml".to_string()),
+        message,
         related_information: None,
         tags: None,
         data: None,

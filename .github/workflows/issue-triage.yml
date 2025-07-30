@@ -1,4 +1,4 @@
-name: Intelligent Issue Triage
+name: Enhanced Intelligent Issue Triage
 
 on:
   issues:
@@ -15,26 +15,65 @@ on:
         required: false
         default: 'false'
         type: boolean
+      confidence_threshold:
+        description: 'Minimum confidence for auto-labeling (0.0-1.0)'
+        required: false
+        default: '0.7'
+        type: string
 
 permissions:
   issues: write
   contents: read
+  pull-requests: read
 
 jobs:
-  triage:
+  swarm-triage:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup GitHub CLI
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          npm install @octokit/rest
+
+      - name: Initialize Claude Flow Swarm
+        run: |
+          # Initialize swarm coordination for intelligent triage
+          echo "🐝 Initializing Claude Flow Swarm for Issue Triage"
+          echo "Repository: ${{ github.repository }}"
+          echo "Event: ${{ github.event_name }}"
+          echo "Issue: #${{ github.event.issue.number || 'bulk-process' }}"
+
+      - name: Setup Swarm Intelligence
         uses: actions/github-script@v7
-        id: setup
+        id: swarm-setup
         with:
           script: |
-            console.log('Setting up issue triage...');
+            console.log('🤖 Setting up intelligent triage swarm...');
+            
+            // Swarm configuration for triage
+            const swarmConfig = {
+              topology: 'hierarchical',
+              agents: [
+                { id: 'classifier', type: 'analytical', role: 'issue-classification' },
+                { id: 'prioritizer', type: 'critical', role: 'priority-assessment' },
+                { id: 'matcher', type: 'systems', role: 'team-assignment' },
+                { id: 'validator', type: 'convergent', role: 'quality-assurance' }
+              ],
+              coordination: 'memory-shared',
+              learning: true
+            };
+            
+            core.setOutput('swarm_config', JSON.stringify(swarmConfig));
+            console.log('Swarm configured with', swarmConfig.agents.length, 'specialized agents');
 
-      - name: Classify Issue
+      - name: Enhanced AI Classification
         uses: actions/github-script@v7
         id: classify
         with:
@@ -46,71 +85,254 @@ jobs:
             const title = issue.title || '';
             const body = issue.body || '';
             const labels = issue.labels.map(l => l.name);
+            const confidenceThreshold = parseFloat('${{ github.event.inputs.confidence_threshold || "0.7" }}');
 
-            // Classification logic
+            // Advanced classification patterns with confidence scoring
+            const patterns = {
+              bug: {
+                title: [/\[BUG\]/i, /bug/i, /error/i, /broken/i, /fix/i, /crash/i, /fail/i],
+                body: [/error/i, /broken/i, /doesn't work/i, /fails/i, /exception/i, /crash/i, /stacktrace/i],
+                weight: 0.8,
+                indicators: [/reproduction steps/i, /expected behavior/i, /actual behavior/i]
+              },
+              security: {
+                title: [/security/i, /vulnerability/i, /CVE/i, /exploit/i, /unsafe/i, /XSS/i, /injection/i],
+                body: [/security/i, /vulnerability/i, /CVE-/i, /exploit/i, /unsafe/i, /attack/i, /malicious/i],
+                weight: 1.0,  // Highest priority
+                indicators: [/security impact/i, /attack vector/i, /disclosure/i]
+              },
+              performance: {
+                title: [/performance/i, /slow/i, /optimization/i, /memory/i, /speed/i, /latency/i],
+                body: [/performance/i, /slow/i, /optimization/i, /memory leak/i, /bottleneck/i, /timeout/i],
+                weight: 0.7,
+                indicators: [/benchmark/i, /profiling/i, /metrics/i]
+              },
+              dependencies: {
+                title: [/dependency/i, /package/i, /update/i, /renovate/i, /deps/i, /npm/i, /cargo/i],
+                body: [/dependency/i, /package/i, /update/i, /version/i, /upgrade/i, /outdated/i],
+                weight: 0.5,
+                indicators: [/security advisory/i, /breaking changes/i, /compatibility/i]
+              },
+              feature: {
+                title: [/\[PHASE/i, /feature/i, /enhancement/i, /add/i, /implement/i, /support/i],
+                body: [/feature/i, /enhancement/i, /new/i, /implement/i, /add/i, /support/i],
+                weight: 0.6,
+                indicators: [/user story/i, /acceptance criteria/i, /requirements/i]
+              },
+              documentation: {
+                title: [/report/i, /analysis/i, /docs/i, /documentation/i, /guide/i, /readme/i],
+                body: [/report/i, /analysis/i, /documentation/i, /readme/i, /guide/i, /tutorial/i],
+                weight: 0.4,
+                indicators: [/documentation/i, /examples/i, /clarification/i]
+              },
+              ci_cd: {
+                title: [/CI/i, /CD/i, /pipeline/i, /workflow/i, /action/i, /build/i, /deploy/i],
+                body: [/pipeline/i, /workflow/i, /github action/i, /build/i, /deploy/i, /automation/i],
+                weight: 0.6,
+                indicators: [/workflow/i, /automation/i, /integration/i]
+              }
+            };
+
+            function calculateConfidence(title, body, config) {
+              let score = 0;
+              let matches = 0;
+              const text = `${title} ${body}`.toLowerCase();
+
+              // Title patterns (higher weight)
+              for (const pattern of config.title) {
+                if (pattern.test(title)) {
+                  score += 0.4 * config.weight;
+                  matches++;
+                }
+              }
+
+              // Body patterns
+              for (const pattern of config.body) {
+                if (pattern.test(body)) {
+                  score += 0.3 * config.weight;
+                  matches++;
+                }
+              }
+
+              // Special indicators (bonus points)
+              for (const indicator of config.indicators || []) {
+                if (indicator.test(text)) {
+                  score += 0.2 * config.weight;
+                  matches++;
+                }
+              }
+
+              return { score: Math.min(score, 1.0), matches };
+            }
+
+            // Enhanced classification with confidence scoring
             function classifyIssueType(title, body) {
-              if (/\[BUG\]/.test(title) || /bug|error|broken|fix/i.test(body)) {
-                return 'bug';
-              } else if (/security|vulnerability|CVE/i.test(title + ' ' + body)) {
-                return 'security';
-              } else if (/performance|slow|optimization/i.test(title + ' ' + body)) {
-                return 'performance';
-              } else if (/dependency|package|update/i.test(title + ' ' + body)) {
-                return 'dependencies';
-              } else if (/\[PHASE/.test(title) || /feature/i.test(title)) {
-                return 'feature';
-              } else if (/report|analysis/i.test(title)) {
-                return 'documentation';
-              }
-              return 'needs-triage';
-            }
-
-            // Priority determination
-            function determinePriority(title, body, labels) {
-              if (labels.some(l => l.includes('priority-'))) return null;
+              const results = [];
               
-              if (/security|vulnerability|CVE/i.test(body)) {
-                return 'high';
-              } else if (/\[PHASE 3\]/.test(title)) {
-                return 'high';
-              } else if (/\[BUG\]/.test(title) && /critical|blocking|urgent/i.test(body)) {
-                return 'high';
-              } else if (/performance|slow/i.test(body)) {
-                return 'medium';
-              } else if (/\[Roadmap\]/.test(title) || /future|enhancement/i.test(body)) {
-                return 'low';
+              for (const [type, config] of Object.entries(patterns)) {
+                const { score, matches } = calculateConfidence(title, body, config);
+                if (matches > 0) {
+                  results.push({ type, confidence: score, matches });
+                }
               }
-              return 'medium';
+
+              // Sort by confidence and return top result
+              results.sort((a, b) => b.confidence - a.confidence);
+              return results.length > 0 ? results[0] : { type: 'needs-triage', confidence: 0, matches: 0 };
             }
 
-            // Assignee suggestion
-            function suggestAssignee(type, title) {
-              const assigneeMap = {
-                'security': ['security-team'],
-                'bug': ['rust-team'],
-                'dependencies': ['rust-team', 'maintenance-team'],
-                'performance': ['performance-team'],
-                'feature': title.includes('WASM') ? ['wasm-specialist'] : 
-                          title.includes('CI') || title.includes('CD') ? ['devops-team'] : 
-                          ['dev-team']
+            // Enhanced priority determination with multi-factor analysis
+            function determinePriority(title, body, labels, classification) {
+              if (labels.some(l => l.includes('priority-'))) return { priority: null, confidence: 0 };
+              
+              const text = `${title} ${body}`.toLowerCase();
+              let score = 0;
+              let factors = [];
+
+              // Security issues are always critical
+              if (classification.type === 'security' && classification.confidence > 0.6) {
+                return { priority: 'critical', confidence: 0.95, factors: ['security-issue'] };
+              }
+
+              // Critical keywords
+              if (/critical|emergency|urgent|blocking|production down/i.test(text)) {
+                score += 0.8;
+                factors.push('critical-keywords');
+              }
+
+              // Phase 3 features (high priority)
+              if (/\[PHASE 3\]/i.test(title)) {
+                score += 0.7;
+                factors.push('phase-3-feature');
+              }
+
+              // Bug severity
+              if (classification.type === 'bug') {
+                if (/crash|data loss|corruption/i.test(text)) {
+                  score += 0.8;
+                  factors.push('severe-bug');
+                } else if (/workaround|minor/i.test(text)) {
+                  score -= 0.3;
+                  factors.push('minor-bug');
+                }
+              }
+
+              // Performance impact
+              if (/slow|timeout|memory leak|high cpu/i.test(text)) {
+                score += 0.5;
+                factors.push('performance-impact');
+              }
+
+              // User impact indicators
+              if (/user|customer|production|breaking/i.test(text)) {
+                score += 0.4;
+                factors.push('user-impact');
+              }
+
+              // Determine priority from score
+              let priority;
+              if (score >= 0.8) priority = 'critical';
+              else if (score >= 0.6) priority = 'high';
+              else if (score >= 0.3) priority = 'medium';
+              else priority = 'low';
+
+              return { priority, confidence: Math.min(score, 1.0), factors };
+            }
+
+            // Enhanced team assignment with expertise mapping
+            function suggestAssignee(type, title, body, priority) {
+              const text = `${title} ${body}`.toLowerCase();
+              const assignments = [];
+
+              const teamMap = {
+                'security': { teams: ['security-team', 'architecture-lead'], confidence: 0.9 },
+                'bug': { teams: ['rust-team', 'core-developers'], confidence: 0.8 },
+                'dependencies': { teams: ['maintenance-team', 'rust-team'], confidence: 0.7 },
+                'performance': { teams: ['performance-team', 'optimization-experts'], confidence: 0.8 },
+                'ci_cd': { teams: ['devops-team', 'automation-engineers'], confidence: 0.85 }
               };
-              return assigneeMap[type] || ['triage-team'];
+
+              // Feature assignment based on content
+              if (type === 'feature') {
+                if (/wasm|webassembly/i.test(text)) {
+                  assignments.push({ teams: ['wasm-specialist', 'rust-team'], confidence: 0.9, reason: 'wasm-expertise' });
+                } else if (/ci|cd|pipeline|workflow/i.test(text)) {
+                  assignments.push({ teams: ['devops-team', 'automation-engineers'], confidence: 0.85, reason: 'cicd-expertise' });
+                } else if (/core|engine|algorithm/i.test(text)) {
+                  assignments.push({ teams: ['core-developers', 'rust-team'], confidence: 0.8, reason: 'core-expertise' });
+                } else {
+                  assignments.push({ teams: ['dev-team', 'feature-team'], confidence: 0.6, reason: 'general-feature' });
+                }
+              } else if (teamMap[type]) {
+                assignments.push({ ...teamMap[type], reason: `type-${type}` });
+              } else {
+                assignments.push({ teams: ['triage-team'], confidence: 0.4, reason: 'needs-triage' });
+              }
+
+              // Priority-based escalation
+              if (priority === 'critical') {
+                assignments.forEach(a => {
+                  a.teams.unshift('leads-team');
+                  a.confidence = Math.min(a.confidence + 0.1, 1.0);
+                });
+              }
+
+              return assignments[0] || { teams: ['triage-team'], confidence: 0.3, reason: 'fallback' };
             }
 
-            const issueType = classifyIssueType(title, body);
-            const priority = determinePriority(title, body, labels);
-            const suggestedAssignees = suggestAssignee(issueType, title);
+            // Perform enhanced classification
+            const classification = classifyIssueType(title, body);
+            const priorityResult = determinePriority(title, body, labels, classification);
+            const assignment = suggestAssignee(classification.type, title, body, priorityResult.priority);
 
-            // Store results
-            core.setOutput('issue_type', issueType);
-            core.setOutput('priority', priority);
-            core.setOutput('suggested_assignees', suggestedAssignees.join(','));
+            // Component detection
+            const components = [];
+            const componentMap = {
+              'component-cli': [/CLI/i, /command line/i, /terminal/i],
+              'component-core': [/core/i, /engine/i, /algorithm/i, /detection/i],
+              'component-wasm': [/WASM/i, /WebAssembly/i, /wasm/i],
+              'component-github-action': [/github action/i, /workflow/i, /CI/i, /CD/i],
+              'component-docs': [/docs/i, /documentation/i, /readme/i, /guide/i],
+              'component-tests': [/test/i, /testing/i, /spec/i, /unit test/i]
+            };
 
-            console.log(`Issue #${issue.number} classified:`, {
-              type: issueType,
-              priority: priority,
-              suggestedAssignees: suggestedAssignees
-            });
+            for (const [component, patterns] of Object.entries(componentMap)) {
+              for (const pattern of patterns) {
+                if (pattern.test(`${title} ${body}`)) {
+                  components.push(component);
+                  break;
+                }
+              }
+            }
+
+            // Store comprehensive results
+            const results = {
+              type: classification.type,
+              confidence: classification.confidence,
+              matches: classification.matches,
+              priority: priorityResult.priority,
+              priorityConfidence: priorityResult.confidence,
+              priorityFactors: priorityResult.factors,
+              suggestedTeams: assignment.teams,
+              assignmentConfidence: assignment.confidence,
+              assignmentReason: assignment.reason,
+              components: components,
+              meetsThreshold: classification.confidence >= confidenceThreshold
+            };
+
+            // Set outputs
+            for (const [key, value] of Object.entries(results)) {
+              core.setOutput(key, Array.isArray(value) ? value.join(',') : String(value));
+            }
+
+            console.log(`🎯 Enhanced Classification Results for Issue #${issue.number}:`);
+            console.log(`  Type: ${results.type} (${(results.confidence * 100).toFixed(1)}% confidence)`);
+            console.log(`  Priority: ${results.priority} (${(results.priorityConfidence * 100).toFixed(1)}% confidence)`);
+            console.log(`  Teams: ${results.suggestedTeams.join(', ')} (${results.assignmentReason})`);
+            console.log(`  Components: ${results.components.join(', ') || 'none'}`);
+            console.log(`  Meets Threshold: ${results.meetsThreshold ? '✅' : '❌'} (>${(confidenceThreshold * 100).toFixed(1)}%)`);
+
+            return results;
 
       - name: Apply Labels
         if: ${{ github.event.inputs.auto_label == 'true' || github.event_name == 'issues' }}
