@@ -109,12 +109,27 @@ function parseFrontmatter(content) {
     const [key, ...valueParts] = line.split(':');
     if (key && valueParts.length > 0) {
       let value = valueParts.join(':').trim();
-      // Remove quotes if present
-      if ((value.startsWith('"') && value.endsWith('"')) || 
-          (value.startsWith("'") && value.endsWith("'"))) {
-        value = value.slice(1, -1);
+      // Handle arrays first
+      if (value.startsWith('[') && value.endsWith(']')) {
+        try {
+          // Parse as JSON array
+          frontmatter[key.trim()] = JSON.parse(value);
+        } catch (e) {
+          // If JSON parsing fails, keep as string without quotes
+          if ((value.startsWith('"') && value.endsWith('"')) ||
+              (value.startsWith("'") && value.endsWith("'"))) {
+            value = value.slice(1, -1);
+          }
+          frontmatter[key.trim()] = value;
+        }
+      } else {
+        // Remove quotes if present
+        if ((value.startsWith('"') && value.endsWith('"')) || 
+            (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1);
+        }
+        frontmatter[key.trim()] = value;
       }
-      frontmatter[key.trim()] = value;
     }
   }
   

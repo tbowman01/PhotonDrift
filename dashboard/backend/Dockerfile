@@ -73,7 +73,7 @@ CMD ["node", "dist/server.js"]
 LABEL org.opencontainers.image.title="PhotonDrift Dashboard Backend" \
       org.opencontainers.image.description="Express API server with WebSocket support for PhotonDrift Visual Analytics Dashboard" \
       org.opencontainers.image.vendor="PhotonDrift" \
-      org.opencontainers.image.version="0.2.0-alpha" \
+      org.opencontainers.image.version="0.3.0-alpha" \
       org.opencontainers.image.created="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
       org.opencontainers.image.source="https://github.com/tbowman01/PhotonDrift" \
       org.opencontainers.image.documentation="https://github.com/tbowman01/PhotonDrift/tree/main/dashboard/backend"

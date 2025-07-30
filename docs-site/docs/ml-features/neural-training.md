@@ -7,7 +7,7 @@ description: "Machine learning and AI capabilities"
 slug: "/ml-features/neural-training"
 tags: ["ml-features"]
 last_update:
-  date: "2025-07-28"
+  date: "2025-07-29"
   author: "tbowman01"
 ---
 

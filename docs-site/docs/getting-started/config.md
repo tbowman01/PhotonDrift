@@ -7,7 +7,7 @@ description: "Get up and running with PhotonDrift quickly"
 slug: "/getting-started/config"
 tags: ["getting-started"]
 last_update:
-  date: "2025-07-28"
+  date: "2025-07-29"
   author: "tbowman01"
 ---
 

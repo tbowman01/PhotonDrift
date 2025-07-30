@@ -7,7 +7,7 @@ description: "System architecture and design decisions"
 slug: "/architecture/architecture-enhancements"
 tags: ["architecture"]
 last_update:
-  date: "2025-07-28"
+  date: "2025-07-29"
   author: "tbowman01"
 ---
 
