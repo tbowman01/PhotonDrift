@@ -76,7 +76,7 @@ sha2 = "0.10"
 smartcore = { version = "0.3", optional = true }
 ndarray = { version = "0.15", optional = true }
 rand = { version = "0.8", optional = true }
-nalgebra = { version = "0.33", optional = true }
+nalgebra = { version = "0.34", optional = true }
 
 # Plugin system dependencies
 libloading = { version = "0.8", optional = true }
