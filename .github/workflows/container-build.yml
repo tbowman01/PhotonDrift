@@ -91,8 +91,31 @@ jobs:
           echo "BRANCH_NAME_CLEAN=${BRANCH_NAME//[^a-zA-Z0-9-]/-}" >> $GITHUB_ENV
           echo "BRANCH=${GITHUB_REF_NAME}" >> $GITHUB_ENV
           
+<<<<<<< HEAD
           # Extract version from Cargo.toml
           VERSION=$(grep '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Extract semantic version
+          if [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]]; then
+            SEMVER="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+            echo "SEMVER=$SEMVER" >> $GITHUB_ENV
+            echo "MAJOR=${BASH_REMATCH[1]}" >> $GITHUB_ENV
+            echo "MINOR=${BASH_REMATCH[2]}" >> $GITHUB_ENV
+            echo "PATCH=${BASH_REMATCH[3]}" >> $GITHUB_ENV
+            echo "PRERELEASE=${BASH_REMATCH[4]}" >> $GITHUB_ENV
+          else
+            echo "SEMVER=$VERSION" >> $GITHUB_ENV
+          fi
+=======
+          # Extract version from Cargo.toml and append run ID for CI builds
+          VERSION=$(grep '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)
+          if [[ "${{ github.event_name }}" != "pull_request" && "$BRANCH_NAME" == "develop" ]]; then
+            VERSION="${VERSION}.${GITHUB_RUN_ID}"
+          elif [[ "${{ github.event_name }}" != "pull_request" && "$BRANCH_NAME" == "main" ]]; then
+            VERSION="${VERSION}.${GITHUB_RUN_ID}"
+          fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           
@@ -245,6 +268,7 @@ jobs:
             BRANCH=${{ env.BRANCH }}
             BUILD_TYPE=${{ env.BUILD_TYPE }}
             GIT_REVISION=${{ env.GIT_SHA_FULL }}
+            GITHUB_RUN_ID=${{ github.run_id }}
             TARGETPLATFORM=$TARGETPLATFORM
             TARGETARCH=$TARGETARCH
           provenance: ${{ env.SHOULD_PUSH }}
@@ -267,8 +291,62 @@ jobs:
           
           echo "🔍 Testing container: $IMAGE"
           
+<<<<<<< HEAD
           # Basic functionality tests
           echo "Testing adrscan binary functionality..."
+=======
+          # Issue #87 - Explicit Docker Binary Verification Tests
+          echo "=== Issue #87: Docker Binary Verification ==="
+          
+          # Acceptance Criteria 1: Does the ADRScan binary exist in the container?
+          echo "1️⃣ Verifying ADRScan binary exists in container..."
+          if docker run --rm "$IMAGE" test -f /usr/local/bin/adrscan; then
+            echo "✅ PASS: ADRScan binary exists at /usr/local/bin/adrscan"
+          else
+            echo "❌ FAIL: ADRScan binary does not exist in container"
+            exit 1
+          fi
+          
+          # Additional verification that binary is executable
+          if docker run --rm "$IMAGE" test -x /usr/local/bin/adrscan; then
+            echo "✅ PASS: ADRScan binary is executable"
+          else
+            echo "❌ FAIL: ADRScan binary is not executable"
+            exit 1
+          fi
+          
+          # Acceptance Criteria 2: Does the ADRScan binary return the help menu when executed?
+          echo "2️⃣ Verifying ADRScan binary returns help menu..."
+          HELP_OUTPUT=$(docker run --rm "$IMAGE" adrscan --help 2>&1)
+          if [[ $? -eq 0 ]]; then
+            echo "✅ PASS: ADRScan --help command executed successfully"
+            
+            # Verify help output contains expected content
+            if echo "$HELP_OUTPUT" | grep -q "Usage:"; then
+              echo "✅ PASS: Help output contains 'Usage:' section"
+            else
+              echo "❌ FAIL: Help output missing 'Usage:' section"
+              echo "Help output was: $HELP_OUTPUT"
+              exit 1
+            fi
+            
+            if echo "$HELP_OUTPUT" | grep -q "Commands:"; then
+              echo "✅ PASS: Help output contains 'Commands:' section"
+            else
+              echo "⚠️ WARNING: Help output missing 'Commands:' section (may be expected)"
+            fi
+            
+          else
+            echo "❌ FAIL: ADRScan --help command failed"
+            echo "Help output was: $HELP_OUTPUT"
+            exit 1
+          fi
+          
+          echo "✅ Issue #87 Acceptance Criteria: BOTH TESTS PASSED"
+          echo ""
+          
+          # Additional comprehensive functionality tests
+          echo "=== Additional Comprehensive Tests ==="
           echo "Version test:"
           docker run --rm "$IMAGE" --version || {
             echo "❌ Version command failed"
@@ -280,7 +358,6 @@ jobs:
             echo "❌ Help command failed"
             exit 1
           }
-          
           # Verify binary location
           echo "Verifying binary exists at /usr/local/bin/adrscan..."
           BINARY_PATH=$(docker run --rm "$IMAGE" which adrscan)

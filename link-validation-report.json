@@ -1,0 +1,487 @@
+{
+  "summary": {
+    "totalFiles": 28,
+    "totalLinks": 184,
+    "validLinks": 158,
+    "invalidLinks": 26,
+    "externalLinks": 70,
+    "internalLinks": 114,
+    "imageLinks": 4
+  },
+  "issues": [
+    {
+      "type": "markdown",
+      "text": "Build Automation Script Documentation",
+      "url": "../scripts/build-automation.sh",
+      "line": 298,
+      "column": 2,
+      "raw": "[Build Automation Script Documentation](../scripts/build-automation.sh)",
+      "file": "/workspaces/PhotonDrift/docs-site/docs/deployment/docker-build-guide.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs-site/docs/scripts/build-automation.sh"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "GitHub Actions Workflows",
+      "url": "../.github/workflows/",
+      "line": 299,
+      "column": 2,
+      "raw": "[GitHub Actions Workflows](../.github/workflows/)",
+      "file": "/workspaces/PhotonDrift/docs-site/docs/deployment/docker-build-guide.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs-site/docs/.github/workflows"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "Reusable Docker Action",
+      "url": "../.github/actions/docker-build/",
+      "line": 300,
+      "column": 2,
+      "raw": "[Reusable Docker Action](../.github/actions/docker-build/)",
+      "file": "/workspaces/PhotonDrift/docs-site/docs/deployment/docker-build-guide.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs-site/docs/.github/actions/docker-build"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "`src/parser.rs:45`",
+      "url": "../../../src/parser.rs#L45",
+      "line": 314,
+      "column": 36,
+      "raw": "[`src/parser.rs:45`](../../../src/parser.rs#L45)",
+      "file": "/workspaces/PhotonDrift/docs-site/docs/development/documentation-style-guide.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/src/parser.rs#L45"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "Alt text for accessibility",
+      "url": "./img/screenshot.png",
+      "line": 351,
+      "column": 1,
+      "raw": "[Alt text for accessibility](./img/screenshot.png)",
+      "file": "/workspaces/PhotonDrift/docs-site/docs/development/documentation-style-guide.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs-site/docs/development/img/screenshot.png"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "PhotonDrift CLI in action",
+      "url": "./img/cli-example.png",
+      "line": 356,
+      "column": 1,
+      "raw": "[PhotonDrift CLI in action](./img/cli-example.png)",
+      "file": "/workspaces/PhotonDrift/docs-site/docs/development/documentation-style-guide.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs-site/docs/development/img/cli-example.png"
+      }
+    },
+    {
+      "type": "image",
+      "text": "Alt text for accessibility",
+      "url": "./img/screenshot.png",
+      "line": 351,
+      "column": 0,
+      "raw": "![Alt text for accessibility](./img/screenshot.png)",
+      "file": "/workspaces/PhotonDrift/docs-site/docs/development/documentation-style-guide.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs-site/docs/development/img/screenshot.png"
+      }
+    },
+    {
+      "type": "image",
+      "text": "PhotonDrift CLI in action",
+      "url": "./img/cli-example.png",
+      "line": 356,
+      "column": 0,
+      "raw": "![PhotonDrift CLI in action](./img/cli-example.png)",
+      "file": "/workspaces/PhotonDrift/docs-site/docs/development/documentation-style-guide.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs-site/docs/development/img/cli-example.png"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "GitHub Labels Guide",
+      "url": "/docs/github-labels",
+      "line": 147,
+      "column": 4,
+      "raw": "[GitHub Labels Guide](/docs/github-labels)",
+      "file": "/workspaces/PhotonDrift/docs-site/docs/development/github-management-summary.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs-site/docs/github-labels.md"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "Issue Management Guide",
+      "url": "/docs/issue-management",
+      "line": 148,
+      "column": 4,
+      "raw": "[Issue Management Guide](/docs/issue-management)",
+      "file": "/workspaces/PhotonDrift/docs-site/docs/development/github-management-summary.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs-site/docs/issue-management.md"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "Development Guide",
+      "url": "/docs/development",
+      "line": 149,
+      "column": 4,
+      "raw": "[Development Guide](/docs/development)",
+      "file": "/workspaces/PhotonDrift/docs-site/docs/development/github-management-summary.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs-site/docs/development.md"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "User Guide",
+      "url": "/docs/user-guide",
+      "line": 630,
+      "column": 24,
+      "raw": "[User Guide](/docs/user-guide)",
+      "file": "/workspaces/PhotonDrift/docs-site/docs/getting-started/user-guide.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs-site/docs/user-guide.md"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "Build Automation Script Documentation",
+      "url": "../scripts/build-automation.sh",
+      "line": 285,
+      "column": 2,
+      "raw": "[Build Automation Script Documentation](../scripts/build-automation.sh)",
+      "file": "/workspaces/PhotonDrift/docs/deployment/DOCKER_BUILD_GUIDE.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs/scripts/build-automation.sh"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "GitHub Actions Workflows",
+      "url": "../.github/workflows/",
+      "line": 286,
+      "column": 2,
+      "raw": "[GitHub Actions Workflows](../.github/workflows/)",
+      "file": "/workspaces/PhotonDrift/docs/deployment/DOCKER_BUILD_GUIDE.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs/.github/workflows"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "Reusable Docker Action",
+      "url": "../.github/actions/docker-build/",
+      "line": 287,
+      "column": 2,
+      "raw": "[Reusable Docker Action](../.github/actions/docker-build/)",
+      "file": "/workspaces/PhotonDrift/docs/deployment/DOCKER_BUILD_GUIDE.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs/.github/actions/docker-build"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "Label Management Guide",
+      "url": "./LABELS.md",
+      "line": 242,
+      "column": 2,
+      "raw": "[Label Management Guide](./LABELS.md)",
+      "file": "/workspaces/PhotonDrift/docs/development/ISSUE_TRIAGE_GUIDE.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs/development/LABELS.md"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "Team Responsibilities",
+      "url": "./TEAMS.md",
+      "line": 243,
+      "column": 2,
+      "raw": "[Team Responsibilities](./TEAMS.md)",
+      "file": "/workspaces/PhotonDrift/docs/development/ISSUE_TRIAGE_GUIDE.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs/development/TEAMS.md"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "Security Policy",
+      "url": "../SECURITY.md",
+      "line": 244,
+      "column": 2,
+      "raw": "[Security Policy](../SECURITY.md)",
+      "file": "/workspaces/PhotonDrift/docs/development/ISSUE_TRIAGE_GUIDE.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs/SECURITY.md"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "Quick Start Guide",
+      "url": "./quick-start.md",
+      "line": 283,
+      "column": 0,
+      "raw": "[Quick Start Guide](./quick-start.md)",
+      "file": "/workspaces/PhotonDrift/docs/development/documentation-style-guide.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs/development/quick-start.md"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "Configuration",
+      "url": "../getting-started/config.md",
+      "line": 284,
+      "column": 0,
+      "raw": "[Configuration](../getting-started/config.md)",
+      "file": "/workspaces/PhotonDrift/docs/development/documentation-style-guide.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs/getting-started/config.md"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "CLI reference",
+      "url": "./cli.md",
+      "line": 289,
+      "column": 8,
+      "raw": "[CLI reference](./cli.md)",
+      "file": "/workspaces/PhotonDrift/docs/development/documentation-style-guide.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs/development/cli.md"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "`src/parser.rs:45`",
+      "url": "../../../src/parser.rs#L45",
+      "line": 308,
+      "column": 36,
+      "raw": "[`src/parser.rs:45`](../../../src/parser.rs#L45)",
+      "file": "/workspaces/PhotonDrift/docs/development/documentation-style-guide.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/src/parser.rs#L45"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "Alt text for accessibility",
+      "url": "./img/screenshot.png",
+      "line": 345,
+      "column": 1,
+      "raw": "[Alt text for accessibility](./img/screenshot.png)",
+      "file": "/workspaces/PhotonDrift/docs/development/documentation-style-guide.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs/development/img/screenshot.png"
+      }
+    },
+    {
+      "type": "markdown",
+      "text": "PhotonDrift CLI in action",
+      "url": "./img/cli-example.png",
+      "line": 350,
+      "column": 1,
+      "raw": "[PhotonDrift CLI in action](./img/cli-example.png)",
+      "file": "/workspaces/PhotonDrift/docs/development/documentation-style-guide.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs/development/img/cli-example.png"
+      }
+    },
+    {
+      "type": "image",
+      "text": "Alt text for accessibility",
+      "url": "./img/screenshot.png",
+      "line": 345,
+      "column": 0,
+      "raw": "![Alt text for accessibility](./img/screenshot.png)",
+      "file": "/workspaces/PhotonDrift/docs/development/documentation-style-guide.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs/development/img/screenshot.png"
+      }
+    },
+    {
+      "type": "image",
+      "text": "PhotonDrift CLI in action",
+      "url": "./img/cli-example.png",
+      "line": 350,
+      "column": 0,
+      "raw": "![PhotonDrift CLI in action](./img/cli-example.png)",
+      "file": "/workspaces/PhotonDrift/docs/development/documentation-style-guide.md",
+      "validation": {
+        "valid": false,
+        "message": "File not found: /workspaces/PhotonDrift/docs/development/img/cli-example.png"
+      }
+    }
+  ],
+  "statistics": {
+    "byType": {
+      "markdown": {
+        "total": 180,
+        "valid": 158,
+        "invalid": 22
+      },
+      "image": {
+        "total": 4,
+        "valid": 0,
+        "invalid": 4
+      }
+    },
+    "byFile": {
+      "index.md": {
+        "total": 8,
+        "valid": 8,
+        "invalid": 0
+      },
+      "cli-reference.md": {
+        "total": 3,
+        "valid": 3,
+        "invalid": 0
+      },
+      "container-versioning-strategy.md": {
+        "total": 2,
+        "valid": 2,
+        "invalid": 0
+      },
+      "docker-build-guide.md": {
+        "total": 5,
+        "valid": 2,
+        "invalid": 3
+      },
+      "versioning-strategy.md": {
+        "total": 6,
+        "valid": 6,
+        "invalid": 0
+      },
+      "development.md": {
+        "total": 13,
+        "valid": 13,
+        "invalid": 0
+      },
+      "documentation-style-guide.md": {
+        "total": 24,
+        "valid": 11,
+        "invalid": 13
+      },
+      "github-management-summary.md": {
+        "total": 3,
+        "valid": 0,
+        "invalid": 3
+      },
+      "issue-triage-guide.md": {
+        "total": 4,
+        "valid": 4,
+        "invalid": 0
+      },
+      "cli.md": {
+        "total": 1,
+        "valid": 1,
+        "invalid": 0
+      },
+      "config.md": {
+        "total": 2,
+        "valid": 2,
+        "invalid": 0
+      },
+      "quick-start.md": {
+        "total": 4,
+        "valid": 4,
+        "invalid": 0
+      },
+      "user-guide.md": {
+        "total": 3,
+        "valid": 2,
+        "invalid": 1
+      },
+      "README.md": {
+        "total": 61,
+        "valid": 61,
+        "invalid": 0
+      },
+      "DOCKER_BUILD_GUIDE.md": {
+        "total": 5,
+        "valid": 2,
+        "invalid": 3
+      },
+      "VERSIONING_STRATEGY.md": {
+        "total": 6,
+        "valid": 6,
+        "invalid": 0
+      },
+      "DEVELOPMENT.md": {
+        "total": 13,
+        "valid": 13,
+        "invalid": 0
+      },
+      "GITHUB_MANAGEMENT_SUMMARY.md": {
+        "total": 3,
+        "valid": 3,
+        "invalid": 0
+      },
+      "ISSUE_TRIAGE_GUIDE.md": {
+        "total": 4,
+        "valid": 1,
+        "invalid": 3
+      },
+      "CLI.md": {
+        "total": 1,
+        "valid": 1,
+        "invalid": 0
+      },
+      "CONFIG.md": {
+        "total": 2,
+        "valid": 2,
+        "invalid": 0
+      },
+      "QUICK_START.md": {
+        "total": 4,
+        "valid": 4,
+        "invalid": 0
+      },
+      "USER_GUIDE.md": {
+        "total": 3,
+        "valid": 3,
+        "invalid": 0
+      },
+      "PRODUCT_REQUIREMENTS_DOCUMENT.md": {
+        "total": 4,
+        "valid": 4,
+        "invalid": 0
+      }
+    }
+  }
+}

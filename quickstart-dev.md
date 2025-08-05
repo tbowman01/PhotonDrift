@@ -1,3 +1,6 @@
+# install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
 use this command to resume development using claude-flow hive-mind
 
 # sample workflow
@@ -14,3 +17,5 @@ npx claude-flow@alpha hive-mind init
 npx claude-flow@alpha  hive-mind spawn "review and continue development in the next phase" --auto-spawn --claude --monitor --ui
 
 uvx claude-monitor --plan max5 --timezone America/New_York
+
+npx claude-flow@alpha hive-mind spawn "refine the dockerbuild and publish, verify the adrscan binary ends up in the container, and the container is versioned, published to github" --claude --auto-spawn

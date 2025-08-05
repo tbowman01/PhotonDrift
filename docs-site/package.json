@@ -1,0 +1,65 @@
+{
+  "name": "photondrift-docs",
+  "version": "0.3.0",
+  "private": true,
+  "description": "PhotonDrift Documentation Site built with Docusaurus",
+  "scripts": {
+    "docusaurus": "docusaurus",
+    "start": "docusaurus start",
+    "build": "docusaurus build",
+    "swizzle": "docusaurus swizzle",
+    "deploy": "docusaurus deploy",
+    "clear": "docusaurus clear",
+    "serve": "docusaurus serve",
+    "write-translations": "docusaurus write-translations",
+    "write-heading-ids": "docusaurus write-heading-ids",
+    "typecheck": "tsc",
+    "sync-docs": "node ../scripts/docs-sync.js",
+    "generate-cli-docs": "node ../scripts/cli-docs-generator.js",
+    "validate-links": "node ../scripts/link-validator.js",
+    "prebuild": "npm run sync-docs && npm run generate-cli-docs && npm run validate-links",
+    "dev": "npm run sync-docs && npm start",
+    "build-and-validate": "npm run prebuild && npm run build"
+  },
+  "dependencies": {
+    "@docusaurus/core": "^3.0.1",
+    "@docusaurus/preset-classic": "^3.0.1",
+    "@docusaurus/plugin-ideal-image": "^3.0.1",
+    "@docusaurus/plugin-pwa": "^3.0.1",
+    "@docusaurus/plugin-google-analytics": "^3.0.1",
+    "@docusaurus/theme-mermaid": "^3.0.1",
+    "@mdx-js/react": "^3.0.0",
+    "clsx": "^1.2.1",
+    "plugin-image-zoom": "^1.0.1",
+    "prism-react-renderer": "^2.1.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@docusaurus/module-type-aliases": "^3.0.1",
+    "@docusaurus/types": "^3.0.1",
+    "@types/react": "^18.2.29",
+    "typescript": "^5.2.2"
+  },
+  "browserslist": {
+    "production": [
+      ">0.5%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 3 chrome version",
+      "last 3 firefox version",
+      "last 5 safari version"
+    ]
+  },
+  "engines": {
+    "node": ">=18.0"
+  },
+  "overrides": {
+    "webpack-dev-server": "^5.2.2",
+    "glob": "^11.0.0",
+    "uuid": "^11.0.0",
+    "rimraf": "^4.0.0"
+  }
+}

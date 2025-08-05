@@ -13,6 +13,7 @@ ARG GIT_REF="unknown"
 ARG BRANCH="unknown"
 ARG BUILD_TYPE="unknown"
 ARG SEMVER="unknown"
+ARG GITHUB_RUN_ID="unknown"
 ARG TARGETPLATFORM
 ARG TARGETARCH
 
@@ -29,6 +30,10 @@ RUN addgroup -g 1001 -S builder && \
 
 # Set working directory
 WORKDIR /usr/src/adrscan
+
+# Copy zscaler certificate
+COPY assets/zscaler.crt /usr/local/share/ca-certificates/zscaler.crt
+RUN update-ca-certificates
 
 # Copy dependency manifests first for better layer caching
 COPY Cargo.toml ./
@@ -58,6 +63,7 @@ RUN strip target/release/adrscan
 
 # Verify binary works
 RUN ./target/release/adrscan --version
+RUN pwd
 
 # Runtime stage - Use Alpine for minimal attack surface and musl compatibility
 FROM alpine:3.22 AS runtime
@@ -67,8 +73,30 @@ RUN apk add --no-cache ca-certificates && \
     addgroup -g 65532 -S nonroot && \
     adduser -u 65532 -S nonroot -G nonroot
 
+<<<<<<< HEAD
 # Copy the binary from builder stage and verify it exists
 COPY --from=builder /usr/src/adrscan/target/release/adrscan /usr/local/bin/adrscan
+=======
+# Copy zscaler certificate
+COPY assets/zscaler.crt /usr/local/share/ca-certificates/zscaler.crt
+RUN update-ca-certificates
+
+# Copy the statically linked Rust binary from the builder stage to the runtime image
+COPY --from=builder target/release/adrscan /usr/local/bin/adrscan
+
+# Create metadata directory first
+RUN mkdir -p /etc/adrscan
+
+# Copy version metadata files
+COPY --from=builder /tmp/version.txt /etc/adrscan/version
+COPY --from=builder /tmp/build_date.txt /etc/adrscan/build_date
+COPY --from=builder /tmp/git_sha.txt /etc/adrscan/git_sha
+
+
+# Set permissions after files are copied
+RUN chmod 755 /etc/adrscan && \
+    chmod 644 /etc/adrscan/* && \
+    chmod +x /usr/local/bin/adrscan
 
 # Create metadata directory first
 RUN mkdir -p /etc/adrscan
@@ -105,6 +133,9 @@ ARG GIT_REF
 ARG BRANCH
 ARG BUILD_TYPE
 ARG SEMVER
+<<<<<<< HEAD
+=======
+ARG GITHUB_RUN_ID
 ARG TARGETPLATFORM
 ARG TARGETARCH
 
@@ -114,6 +145,9 @@ ENV ADRSCAN_VERSION="${VERSION}" \
     ADRSCAN_COMMIT="${GIT_SHA}" \
     ADRSCAN_BRANCH="${BRANCH}" \
     ADRSCAN_BUILD_TYPE="${BUILD_TYPE}" \
+<<<<<<< HEAD
+=======
+    ADRSCAN_GITHUB_RUN_ID="${GITHUB_RUN_ID}" \
     ADRSCAN_PLATFORM="${TARGETPLATFORM}"
 
 # OCI Standard Labels
@@ -137,6 +171,9 @@ LABEL build.timestamp="${BUILD_DATE}" \
       build.branch="${BRANCH}" \
       build.type="${BUILD_TYPE}" \
       build.ref="${GIT_REF}" \
+<<<<<<< HEAD
+=======
+      build.github_run_id="${GITHUB_RUN_ID}" \
       build.platform="${TARGETPLATFORM}" \
       build.arch="${TARGETARCH}"
 

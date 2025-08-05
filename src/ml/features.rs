@@ -24,6 +24,18 @@ pub struct DriftFeatures {
     /// Pattern frequency (how often this pattern appears)
     pub pattern_frequency: f64,
 
+    /// Number of lines in the file (for ML models)
+    pub line_count: usize,
+
+    /// Number of decision points (for ML models)
+    pub decision_count: usize,
+
+    /// Frequency of changes (for ML models)
+    pub change_frequency: f64,
+
+    /// Coupling score (for ML models)
+    pub coupling_score: f64,
+
     /// Temporal features (time-based patterns)
     pub temporal_features: TemporalFeatures,
 
@@ -158,6 +170,12 @@ impl FeatureExtractor {
         features.tech_diversity = self.calculate_tech_diversity(drift_item);
         features.complexity_score = self.calculate_complexity_score(drift_item);
         features.pattern_frequency = self.calculate_pattern_frequency(drift_item);
+        
+        // Additional ML features
+        features.line_count = features.lines_changed; // Use lines_changed as line_count
+        features.decision_count = self.estimate_decision_count(drift_item);
+        features.change_frequency = features.pattern_frequency; // Use pattern_frequency
+        features.coupling_score = features.structural_features.coupling_strength;
 
         // Temporal features
         if self.config.enable_temporal {
@@ -174,7 +192,42 @@ impl FeatureExtractor {
             features.structural_features = self.extract_structural_features(drift_item);
         }
 
+        // Update coupling_score from structural features if available
+        if self.config.enable_structural {
+            features.coupling_score = features.structural_features.coupling_strength;
+        }
+
         Ok(features)
+    }
+
+    /// Estimate decision count based on drift complexity
+    fn estimate_decision_count(&self, drift_item: &DriftItem) -> usize {
+        use crate::drift::{DriftCategory, DriftSeverity};
+
+        let base_decisions = match drift_item.category {
+            DriftCategory::NewTechnology => 10,
+            DriftCategory::PatternViolation => 5,
+            DriftCategory::Configuration => 2,
+            DriftCategory::Other => 1,
+            DriftCategory::ConflictingTechnology => 8,
+            DriftCategory::DeprecatedTechnology => 6,
+            DriftCategory::MissingComponent => 4,
+            DriftCategory::Security => 12,
+            DriftCategory::Performance => 7,
+            DriftCategory::Database => 5,
+            DriftCategory::Infrastructure => 8,
+            DriftCategory::Framework => 6,
+        };
+
+        let severity_multiplier = match drift_item.severity {
+            DriftSeverity::Low => 0.5,
+            DriftSeverity::Medium => 1.0,
+            DriftSeverity::High => 1.5,
+            DriftSeverity::Critical => 2.0,
+            DriftSeverity::Info => 0.2,
+        };
+
+        (base_decisions as f64 * severity_multiplier) as usize
     }
 
     /// Add historical data for temporal analysis

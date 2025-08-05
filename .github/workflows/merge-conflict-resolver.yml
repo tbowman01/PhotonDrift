@@ -1,0 +1,613 @@
+name: Merge Conflict Resolution
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [ develop ]
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: 'Target branch for conflict resolution'
+        required: true
+        default: 'main'
+        type: string
+      auto_resolve:
+        description: 'Attempt automatic conflict resolution'
+        required: false
+        default: 'false'
+        type: boolean
+
+concurrency:
+  group: merge-conflict-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Detect merge conflicts early
+  conflict-detection:
+    name: Conflict Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      has-conflicts: ${{ steps.check-conflicts.outputs.has-conflicts }}
+      conflict-files: ${{ steps.check-conflicts.outputs.conflict-files }}
+      conflict-count: ${{ steps.check-conflicts.outputs.conflict-count }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Git configuration
+      run: |
+        git config --global user.name "GitHub Actions Bot"
+        git config --global user.email "actions@github.com"
+
+    - name: Check for merge conflicts
+      id: check-conflicts
+      run: |
+        echo "Checking for merge conflicts..."
+        
+        # Determine target branch
+        if [ "${{ github.event_name }}" == "pull_request" ]; then
+          TARGET_BRANCH="${{ github.base_ref }}"
+          SOURCE_BRANCH="${{ github.head_ref }}"
+        elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          TARGET_BRANCH="${{ github.event.inputs.target_branch }}"
+          SOURCE_BRANCH="${{ github.ref_name }}"
+        else
+          TARGET_BRANCH="main"
+          SOURCE_BRANCH="${{ github.ref_name }}"
+        fi
+        
+        echo "Source branch: $SOURCE_BRANCH"
+        echo "Target branch: $TARGET_BRANCH"
+        
+        # Fetch latest changes
+        git fetch origin $TARGET_BRANCH
+        git fetch origin $SOURCE_BRANCH
+        
+        # Attempt merge to detect conflicts
+        git checkout $SOURCE_BRANCH
+        
+        if git merge origin/$TARGET_BRANCH --no-commit --no-ff 2> merge-output.log; then
+          echo "No merge conflicts detected"
+          echo "has-conflicts=false" >> $GITHUB_OUTPUT
+          echo "conflict-files=" >> $GITHUB_OUTPUT
+          echo "conflict-count=0" >> $GITHUB_OUTPUT
+        else
+          echo "Merge conflicts detected"
+          
+          # Get list of conflicted files
+          conflict_files=$(git diff --name-only --diff-filter=U | tr '\n' ',' | sed 's/,$//')
+          conflict_count=$(git diff --name-only --diff-filter=U | wc -l)
+          
+          echo "has-conflicts=true" >> $GITHUB_OUTPUT
+          echo "conflict-files=$conflict_files" >> $GITHUB_OUTPUT
+          echo "conflict-count=$conflict_count" >> $GITHUB_OUTPUT
+          
+          echo "Conflicted files: $conflict_files"
+          echo "Total conflicts: $conflict_count"
+          
+          # Reset to clean state
+          git merge --abort
+        fi
+
+    - name: Generate conflict report
+      if: steps.check-conflicts.outputs.has-conflicts == 'true'
+      run: |
+        echo "# Merge Conflict Detection Report" > conflict-report.md
+        echo "Generated at: $(date)" >> conflict-report.md
+        echo "" >> conflict-report.md
+        echo "## Conflict Summary" >> conflict-report.md
+        echo "- Total conflicted files: ${{ steps.check-conflicts.outputs.conflict-count }}" >> conflict-report.md
+        echo "- Conflicted files: ${{ steps.check-conflicts.outputs.conflict-files }}" >> conflict-report.md
+        echo "" >> conflict-report.md
+        
+        # Get detailed conflict information
+        git checkout ${{ github.head_ref || github.ref_name }}
+        if ! git merge origin/${{ github.base_ref || 'main' }} --no-commit --no-ff; then
+          echo "## Detailed Conflict Analysis" >> conflict-report.md
+          
+          # Analyze each conflicted file
+          for file in $(git diff --name-only --diff-filter=U); do
+            echo "### $file" >> conflict-report.md
+            echo "\`\`\`" >> conflict-report.md
+            git diff $file | head -50 >> conflict-report.md
+            echo "\`\`\`" >> conflict-report.md
+            echo "" >> conflict-report.md
+          done
+          
+          git merge --abort
+        fi
+
+    - name: Upload conflict report
+      if: steps.check-conflicts.outputs.has-conflicts == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: merge-conflict-report
+        path: conflict-report.md
+        retention-days: 14
+
+  # Analyze conflict types and suggest resolution strategies
+  conflict-analysis:
+    name: Conflict Analysis & Strategy
+    needs: conflict-detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: needs.conflict-detection.outputs.has-conflicts == 'true'
+    outputs:
+      resolution-strategy: ${{ steps.analyze.outputs.resolution-strategy }}
+      auto-resolvable: ${{ steps.analyze.outputs.auto-resolvable }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Git configuration
+      run: |
+        git config --global user.name "GitHub Actions Bot"
+        git config --global user.email "actions@github.com"
+
+    - name: Analyze conflict types
+      id: analyze
+      run: |
+        echo "Analyzing conflict types and resolution strategies..."
+        
+        TARGET_BRANCH="${{ github.base_ref || 'main' }}"
+        SOURCE_BRANCH="${{ github.head_ref || github.ref_name }}"
+        
+        # Fetch and attempt merge for analysis
+        git fetch origin $TARGET_BRANCH
+        git checkout $SOURCE_BRANCH
+        
+        # Create analysis report
+        echo "# Conflict Analysis Report" > conflict-analysis.md
+        echo "Generated at: $(date)" >> conflict-analysis.md
+        echo "" >> conflict-analysis.md
+        
+        auto_resolvable="false"
+        resolution_strategy="manual"
+        
+        if ! git merge origin/$TARGET_BRANCH --no-commit --no-ff; then
+          # Analyze each conflict
+          echo "## Conflict Analysis by File" >> conflict-analysis.md
+          
+          cargo_conflicts=0
+          rust_conflicts=0
+          doc_conflicts=0
+          config_conflicts=0
+          
+          for file in $(git diff --name-only --diff-filter=U); do
+            echo "### $file" >> conflict-analysis.md
+            
+            # Categorize conflicts
+            case "$file" in
+              "Cargo.toml"|"Cargo.lock")
+                cargo_conflicts=$((cargo_conflicts + 1))
+                echo "- Type: Cargo dependency conflict" >> conflict-analysis.md
+                echo "- Strategy: Merge dependencies, update versions" >> conflict-analysis.md
+                ;;
+              "src/"*.rs)
+                rust_conflicts=$((rust_conflicts + 1))
+                echo "- Type: Rust source code conflict" >> conflict-analysis.md
+                echo "- Strategy: Manual code review and merge" >> conflict-analysis.md
+                ;;
+              "docs/"*|"*.md")
+                doc_conflicts=$((doc_conflicts + 1))
+                echo "- Type: Documentation conflict" >> conflict-analysis.md
+                echo "- Strategy: Merge documentation, prefer latest" >> conflict-analysis.md
+                ;;
+              ".*"|"*.yml"|"*.yaml"|"*.json")
+                config_conflicts=$((config_conflicts + 1))
+                echo "- Type: Configuration conflict" >> conflict-analysis.md
+                echo "- Strategy: Merge configurations carefully" >> conflict-analysis.md
+                ;;
+            esac
+            
+            # Check if conflict looks auto-resolvable
+            conflict_markers=$(git show :1:$file 2>/dev/null | grep -c "^<<<<<<<\|^=======\|^>>>>>>>" || echo 0)
+            if [ $conflict_markers -lt 3 ]; then
+              echo "- Auto-resolvable: Potentially yes" >> conflict-analysis.md
+            else
+              echo "- Auto-resolvable: No (complex conflict)" >> conflict-analysis.md
+            fi
+            
+            echo "" >> conflict-analysis.md
+          done
+          
+          # Determine overall strategy
+          echo "## Resolution Strategy Recommendation" >> conflict-analysis.md
+          
+          if [ $cargo_conflicts -gt 0 ] && [ $rust_conflicts -eq 0 ]; then
+            resolution_strategy="cargo-focused"
+            auto_resolvable="true"
+            echo "- **Primary Strategy**: Cargo dependency resolution" >> conflict-analysis.md
+            echo "- **Auto-resolvable**: Yes (dependency conflicts only)" >> conflict-analysis.md
+          elif [ $doc_conflicts -gt 0 ] && [ $rust_conflicts -eq 0 ] && [ $cargo_conflicts -eq 0 ]; then
+            resolution_strategy="docs-focused"
+            auto_resolvable="true"
+            echo "- **Primary Strategy**: Documentation merge" >> conflict-analysis.md
+            echo "- **Auto-resolvable**: Yes (documentation only)" >> conflict-analysis.md
+          elif [ $rust_conflicts -gt 0 ]; then
+            resolution_strategy="manual"
+            auto_resolvable="false"
+            echo "- **Primary Strategy**: Manual code review required" >> conflict-analysis.md
+            echo "- **Auto-resolvable**: No (code conflicts require human review)" >> conflict-analysis.md
+          else
+            resolution_strategy="mixed"
+            auto_resolvable="partial"
+            echo "- **Primary Strategy**: Mixed approach needed" >> conflict-analysis.md
+            echo "- **Auto-resolvable**: Partially (some conflicts may be automated)" >> conflict-analysis.md
+          fi
+          
+          git merge --abort
+        fi
+        
+        echo "resolution-strategy=$resolution_strategy" >> $GITHUB_OUTPUT
+        echo "auto-resolvable=$auto_resolvable" >> $GITHUB_OUTPUT
+
+    - name: Upload conflict analysis
+      uses: actions/upload-artifact@v4
+      with:
+        name: conflict-analysis-report
+        path: conflict-analysis.md
+        retention-days: 14
+
+  # Attempt automatic conflict resolution
+  auto-resolve-conflicts:
+    name: Auto-Resolve Conflicts
+    needs: [conflict-detection, conflict-analysis]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: needs.conflict-analysis.outputs.auto-resolvable == 'true' || github.event.inputs.auto_resolve == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Setup Git configuration
+      run: |
+        git config --global user.name "GitHub Actions Bot"
+        git config --global user.email "actions@github.com"
+
+    - name: Setup Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.75.0
+        override: true
+
+    - name: Attempt automatic resolution
+      run: |
+        echo "Attempting automatic conflict resolution..."
+        
+        TARGET_BRANCH="${{ github.base_ref || 'main' }}"
+        SOURCE_BRANCH="${{ github.head_ref || github.ref_name }}"
+        
+        git fetch origin $TARGET_BRANCH
+        git checkout $SOURCE_BRANCH
+        
+        # Create resolution report
+        echo "# Automatic Conflict Resolution Report" > auto-resolution-report.md
+        echo "Generated at: $(date)" >> auto-resolution-report.md
+        echo "Strategy: ${{ needs.conflict-analysis.outputs.resolution-strategy }}" >> auto-resolution-report.md
+        echo "" >> auto-resolution-report.md
+        
+        if ! git merge origin/$TARGET_BRANCH --no-commit --no-ff; then
+          echo "## Auto-Resolution Attempts" >> auto-resolution-report.md
+          
+          # Try to resolve conflicts automatically
+          for file in $(git diff --name-only --diff-filter=U); do
+            echo "Processing $file..." >> auto-resolution-report.md
+            
+            case "$file" in
+              "Cargo.lock")
+                echo "- Cargo.lock: Regenerating..." >> auto-resolution-report.md
+                # Remove conflict markers and regenerate
+                git rm Cargo.lock
+                cargo generate-lockfile
+                git add Cargo.lock
+                echo "  ✅ Regenerated Cargo.lock" >> auto-resolution-report.md
+                ;;
+              "Cargo.toml")
+                echo "- Cargo.toml: Attempting dependency merge..." >> auto-resolution-report.md
+                # This would need more sophisticated merging logic
+                # For now, mark as needs manual review
+                echo "  ⚠️ Needs manual review" >> auto-resolution-report.md
+                ;;
+              "*.md")
+                echo "- $file: Attempting documentation merge..." >> auto-resolution-report.md
+                # Simple strategy: accept both versions with markers
+                if grep -q "^<<<<<<<" "$file"; then
+                  # Create a merged version that includes both changes
+                  python3 -c "
+import sys
+with open('$file', 'r') as f:
+    content = f.read()
+# Simple merge strategy for docs - combine both versions
+content = content.replace('<<<<<<< HEAD', '<!-- MERGED CONTENT START -->')
+content = content.replace('=======', '<!-- ORIGINAL VERSION -->')
+content = content.replace('>>>>>>> ', '<!-- NEW VERSION END: ')
+content = content + ' -->'
+with open('$file', 'w') as f:
+    f.write(content)
+"
+                  git add "$file"
+                  echo "  ✅ Merged documentation" >> auto-resolution-report.md
+                fi
+                ;;
+              *)
+                echo "- $file: Cannot auto-resolve, needs manual review" >> auto-resolution-report.md
+                ;;
+            esac
+          done
+          
+          # Check if all conflicts are resolved
+          remaining_conflicts=$(git diff --name-only --diff-filter=U | wc -l)
+          
+          if [ $remaining_conflicts -eq 0 ]; then
+            echo "## ✅ All conflicts auto-resolved!" >> auto-resolution-report.md
+            
+            # Verify build still works
+            if cargo check --all-features; then
+              echo "✅ Build verification passed" >> auto-resolution-report.md
+              
+              # Commit the resolution
+              git commit -m "Auto-resolve merge conflicts
+              
+              - Regenerated Cargo.lock
+              - Merged documentation changes
+              - Verified build passes
+              
+              Co-authored-by: GitHub Actions <actions@github.com>"
+              
+              echo "## ✅ Auto-resolution committed" >> auto-resolution-report.md
+            else
+              echo "❌ Build failed after auto-resolution" >> auto-resolution-report.md
+              git reset --hard HEAD
+            fi
+          else
+            echo "## ⚠️ Some conflicts remain unresolved" >> auto-resolution-report.md
+            echo "Remaining conflicts: $remaining_conflicts" >> auto-resolution-report.md
+            git merge --abort
+          fi
+        fi
+
+    - name: Upload auto-resolution report
+      uses: actions/upload-artifact@v4
+      with:
+        name: auto-resolution-report
+        path: auto-resolution-report.md
+        retention-days: 14
+
+  # Validate merged result
+  validate-resolution:
+    name: Validate Merge Resolution
+    needs: [conflict-detection, auto-resolve-conflicts]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    if: always() && (needs.auto-resolve-conflicts.result == 'success' || needs.conflict-detection.outputs.has-conflicts == 'false')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.75.0
+        override: true
+        components: rustfmt, clippy
+
+    - name: Validate compilation
+      run: |
+        echo "Validating compilation after merge resolution..."
+        
+        if cargo check --all-features; then
+          echo "✅ Compilation successful"
+          echo "compilation-status=success" >> $GITHUB_ENV
+        else
+          echo "❌ Compilation failed"
+          echo "compilation-status=failed" >> $GITHUB_ENV
+        fi
+
+    - name: Run tests
+      if: env.compilation-status == 'success'
+      run: |
+        echo "Running tests to validate merge..."
+        cargo test --all-features --verbose
+
+    - name: Check formatting
+      if: env.compilation-status == 'success'
+      run: |
+        echo "Checking code formatting..."
+        cargo fmt --all -- --check
+
+    - name: Run clippy
+      if: env.compilation-status == 'success'
+      run: |
+        echo "Running clippy checks..."
+        cargo clippy --all-features -- -D warnings
+
+    - name: Generate validation report
+      run: |
+        echo "# Merge Validation Report" > merge-validation-report.md
+        echo "Generated at: $(date)" >> merge-validation-report.md
+        echo "" >> merge-validation-report.md
+        echo "## Validation Results" >> merge-validation-report.md
+        
+        if [ "$compilation-status" == "success" ]; then
+          echo "- ✅ Compilation: PASSED" >> merge-validation-report.md
+          echo "- ✅ Tests: PASSED" >> merge-validation-report.md
+          echo "- ✅ Formatting: PASSED" >> merge-validation-report.md
+          echo "- ✅ Clippy: PASSED" >> merge-validation-report.md
+          echo "" >> merge-validation-report.md
+          echo "## 🎉 Merge resolution successful!" >> merge-validation-report.md
+          echo "The branch can be safely merged." >> merge-validation-report.md
+        else
+          echo "- ❌ Compilation: FAILED" >> merge-validation-report.md
+          echo "" >> merge-validation-report.md
+          echo "## ⚠️ Manual intervention required" >> merge-validation-report.md
+          echo "Compilation issues detected after merge resolution." >> merge-validation-report.md
+        fi
+
+    - name: Upload validation report
+      uses: actions/upload-artifact@v4
+      with:
+        name: merge-validation-report
+        path: merge-validation-report.md
+        retention-days: 30
+
+  # Create detailed resolution guide
+  resolution-guide:
+    name: Create Resolution Guide
+    needs: [conflict-detection, conflict-analysis]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: needs.conflict-detection.outputs.has-conflicts == 'true'
+    
+    steps:
+    - name: Create resolution guide
+      run: |
+        echo "# Merge Conflict Resolution Guide" > resolution-guide.md
+        echo "Generated for PR: ${{ github.event.pull_request.html_url || github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}" >> resolution-guide.md
+        echo "" >> resolution-guide.md
+        
+        echo "## Conflict Summary" >> resolution-guide.md
+        echo "- Files in conflict: ${{ needs.conflict-detection.outputs.conflict-count }}" >> resolution-guide.md
+        echo "- Conflicted files: \`${{ needs.conflict-detection.outputs.conflict-files }}\`" >> resolution-guide.md
+        echo "- Resolution strategy: ${{ needs.conflict-analysis.outputs.resolution-strategy }}" >> resolution-guide.md
+        echo "- Auto-resolvable: ${{ needs.conflict-analysis.outputs.auto-resolvable }}" >> resolution-guide.md
+        echo "" >> resolution-guide.md
+        
+        echo "## Manual Resolution Steps" >> resolution-guide.md
+        echo "" >> resolution-guide.md
+        echo "### 1. Checkout the branch" >> resolution-guide.md
+        echo "\`\`\`bash" >> resolution-guide.md
+        echo "git checkout ${{ github.head_ref || github.ref_name }}" >> resolution-guide.md
+        echo "git pull origin ${{ github.head_ref || github.ref_name }}" >> resolution-guide.md
+        echo "\`\`\`" >> resolution-guide.md
+        echo "" >> resolution-guide.md
+        
+        echo "### 2. Attempt merge" >> resolution-guide.md
+        echo "\`\`\`bash" >> resolution-guide.md
+        echo "git merge origin/${{ github.base_ref || 'main' }}" >> resolution-guide.md
+        echo "\`\`\`" >> resolution-guide.md
+        echo "" >> resolution-guide.md
+        
+        echo "### 3. Resolve conflicts manually" >> resolution-guide.md
+        echo "Edit the conflicted files and remove conflict markers:" >> resolution-guide.md
+        echo "\`\`\`" >> resolution-guide.md
+        echo "<<<<<<< HEAD" >> resolution-guide.md
+        echo "Your changes" >> resolution-guide.md
+        echo "=======" >> resolution-guide.md
+        echo "Incoming changes" >> resolution-guide.md
+        echo ">>>>>>> branch-name" >> resolution-guide.md
+        echo "\`\`\`" >> resolution-guide.md
+        echo "" >> resolution-guide.md
+        
+        echo "### 4. Validate the resolution" >> resolution-guide.md
+        echo "\`\`\`bash" >> resolution-guide.md
+        echo "cargo check --all-features" >> resolution-guide.md
+        echo "cargo test --all-features" >> resolution-guide.md
+        echo "cargo fmt --all" >> resolution-guide.md
+        echo "cargo clippy --all-features" >> resolution-guide.md
+        echo "\`\`\`" >> resolution-guide.md
+        echo "" >> resolution-guide.md
+        
+        echo "### 5. Commit the resolution" >> resolution-guide.md
+        echo "\`\`\`bash" >> resolution-guide.md
+        echo "git add ." >> resolution-guide.md
+        echo "git commit -m \"Resolve merge conflicts\"" >> resolution-guide.md
+        echo "git push origin ${{ github.head_ref || github.ref_name }}" >> resolution-guide.md
+        echo "\`\`\`" >> resolution-guide.md
+        echo "" >> resolution-guide.md
+        
+        echo "## File-Specific Guidance" >> resolution-guide.md
+        echo "" >> resolution-guide.md
+        
+        IFS=',' read -ra FILES <<< "${{ needs.conflict-detection.outputs.conflict-files }}"
+        for file in "${FILES[@]}"; do
+          if [ -n "$file" ]; then
+            echo "### $file" >> resolution-guide.md
+            case "$file" in
+              "Cargo.toml")
+                echo "- **Type**: Dependency configuration" >> resolution-guide.md
+                echo "- **Strategy**: Merge dependencies, update versions to latest compatible" >> resolution-guide.md
+                echo "- **Validation**: Run \`cargo check\` after resolution" >> resolution-guide.md
+                ;;
+              "Cargo.lock")
+                echo "- **Type**: Dependency lock file" >> resolution-guide.md
+                echo "- **Strategy**: Delete file and regenerate with \`cargo generate-lockfile\`" >> resolution-guide.md
+                echo "- **Validation**: Ensure \`cargo build\` works" >> resolution-guide.md
+                ;;
+              *.rs)
+                echo "- **Type**: Rust source code" >> resolution-guide.md
+                echo "- **Strategy**: Carefully merge code changes, test functionality" >> resolution-guide.md
+                echo "- **Validation**: Run \`cargo test\` and verify affected features" >> resolution-guide.md
+                ;;
+              *.md)
+                echo "- **Type**: Documentation" >> resolution-guide.md
+                echo "- **Strategy**: Merge content, prefer most recent/comprehensive version" >> resolution-guide.md
+                echo "- **Validation**: Check links and formatting" >> resolution-guide.md
+                ;;
+              *)
+                echo "- **Type**: Configuration/Other" >> resolution-guide.md
+                echo "- **Strategy**: Review changes carefully and merge appropriately" >> resolution-guide.md
+                echo "- **Validation**: Test affected functionality" >> resolution-guide.md
+                ;;
+            esac
+            echo "" >> resolution-guide.md
+          fi
+        done
+        
+        echo "## Need Help?" >> resolution-guide.md
+        echo "- Check the conflict analysis report in the workflow artifacts" >> resolution-guide.md
+        echo "- Review the specific conflict details for each file" >> resolution-guide.md
+        echo "- Ask for help in the PR comments if resolution is complex" >> resolution-guide.md
+
+    - name: Upload resolution guide
+      uses: actions/upload-artifact@v4
+      with:
+        name: resolution-guide
+        path: resolution-guide.md
+        retention-days: 30
+
+    - name: Comment on PR with guide
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const guideContent = fs.readFileSync('resolution-guide.md', 'utf8');
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `🔀 **Merge Conflicts Detected**
+            
+            This PR has merge conflicts that need to be resolved. I've created a detailed resolution guide for you.
+            
+            **Quick Summary:**
+            - Conflicted files: ${{ needs.conflict-detection.outputs.conflict-count }}
+            - Auto-resolvable: ${{ needs.conflict-analysis.outputs.auto-resolvable }}
+            
+            <details>
+            <summary>📖 Click here for the complete resolution guide</summary>
+            
+            ${guideContent}
+            </details>
+            
+            You can also download the detailed reports from the [workflow artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).`
+          });

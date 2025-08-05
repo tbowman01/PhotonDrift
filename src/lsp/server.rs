@@ -1,6 +1,9 @@
 //! Core LSP server implementation for PhotonDrift
 
 use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tokio::signal;
 
 use lsp_types::{
     CompletionOptions, CompletionParams, CompletionResponse, DidChangeTextDocumentParams,
@@ -17,7 +20,7 @@ use crate::lsp::{CompletionProvider, DiagnosticEngine, DocumentStore, HoverProvi
 pub struct PhotonDriftLspServer {
     client: Client,
     documents: DocumentStore,
-    config: LspConfig,
+    config: Arc<RwLock<LspConfig>>,
     diagnostic_engine: DiagnosticEngine,
     completion_provider: CompletionProvider,
     hover_provider: HoverProvider,
@@ -28,7 +31,7 @@ impl PhotonDriftLspServer {
         Self {
             client,
             documents: DocumentStore::default(),
-            config: LspConfig::default(),
+            config: Arc::new(RwLock::new(LspConfig::default())),
             diagnostic_engine: DiagnosticEngine::new(),
             completion_provider: CompletionProvider::new(),
             hover_provider: HoverProvider::new(),
@@ -48,7 +51,7 @@ impl LanguageServer for PhotonDriftLspServer {
         if let Some(workspace_folders) = params.workspace_folders {
             if let Some(folder) = workspace_folders.first() {
                 if let Ok(path) = folder.uri.to_file_path() {
-                    let mut config = self.config.clone();
+                    let mut config = self.config.write().await;
                     config.workspace_root = Some(path);
                 }
             }
@@ -101,7 +104,9 @@ impl LanguageServer for PhotonDriftLspServer {
             .insert(uri.clone(), content.clone());
 
         // Run diagnostics if enabled
-        if self.config.diagnostics_enabled {
+        let config = self.config.read().await;
+        if config.diagnostics_enabled {
+            drop(config);
             if let Ok(diagnostics) = self.diagnostic_engine.analyze_content(&content, &uri).await {
                 self.client
                     .publish_diagnostics(uri, diagnostics, None)
@@ -121,7 +126,9 @@ impl LanguageServer for PhotonDriftLspServer {
                 .insert(uri.clone(), change.text.clone());
 
             // Run diagnostics if enabled
-            if self.config.diagnostics_enabled {
+            let config = self.config.read().await;
+            if config.diagnostics_enabled {
+                drop(config);
                 if let Ok(diagnostics) = self
                     .diagnostic_engine
                     .analyze_content(&change.text, &uri)
@@ -149,9 +156,11 @@ impl LanguageServer for PhotonDriftLspServer {
     }
 
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
-        if !self.config.completion_enabled {
+        let config = self.config.read().await;
+        if !config.completion_enabled {
             return Ok(None);
         }
+        drop(config);
 
         let uri = params.text_document_position.text_document.uri;
         let position = params.text_document_position.position;
@@ -170,9 +179,11 @@ impl LanguageServer for PhotonDriftLspServer {
     }
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
-        if !self.config.hover_enabled {
+        let config = self.config.read().await;
+        if !config.hover_enabled {
             return Ok(None);
         }
+        drop(config);
 
         let uri = params.text_document_position_params.text_document.uri;
         let position = params.text_document_position_params.position;
@@ -187,15 +198,96 @@ impl LanguageServer for PhotonDriftLspServer {
     }
 }
 
-/// Start the LSP server
+/// Start the LSP server with proper error handling and graceful shutdown
 pub async fn start_lsp_server() -> crate::Result<()> {
+    // Initialize logging
+    eprintln!("Starting PhotonDrift LSP server...");
+    
+    // Setup async I/O
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
 
+    // Create LSP service
     let (service, socket) = LspService::new(PhotonDriftLspServer::new);
-    Server::new(stdin, stdout, socket).serve(service).await;
-
-    Ok(())
+    let server = Server::new(stdin, stdout, socket);
+    
+    eprintln!("LSP server initialized, waiting for connections...");
+    
+    // Run server with graceful shutdown handling
+    let server_task = tokio::spawn(async move {
+        if let Err(e) = server.serve(service).await {
+            eprintln!("LSP server error: {}", e);
+            return Err(crate::AdrscanError::RealtimeError(format!("LSP server failed: {}", e)));
+        }
+        Ok(())
+    });
+    
+    // Handle shutdown signals
+    let shutdown_task = tokio::spawn(async {
+        #[cfg(unix)]
+        {
+            use tokio::signal::unix::{signal, SignalKind};
+            let mut sigterm = signal(SignalKind::terminate())
+                .map_err(|e| crate::AdrscanError::RealtimeError(format!("Failed to setup SIGTERM handler: {}", e)))?;
+            let mut sigint = signal(SignalKind::interrupt())
+                .map_err(|e| crate::AdrscanError::RealtimeError(format!("Failed to setup SIGINT handler: {}", e)))?;
+            
+            tokio::select! {
+                _ = sigterm.recv() => {
+                    eprintln!("Received SIGTERM, shutting down LSP server...");
+                }
+                _ = sigint.recv() => {
+                    eprintln!("Received SIGINT, shutting down LSP server...");
+                }
+            }
+        }
+        
+        #[cfg(not(unix))]
+        {
+            if let Err(e) = signal::ctrl_c().await {
+                return Err(crate::AdrscanError::RealtimeError(format!("Failed to setup Ctrl+C handler: {}", e)));
+            }
+            eprintln!("Received Ctrl+C, shutting down LSP server...");
+        }
+        
+        Ok(())
+    });
+    
+    // Wait for either server completion or shutdown signal
+    tokio::select! {
+        result = server_task => {
+            match result {
+                Ok(Ok(())) => {
+                    eprintln!("LSP server completed successfully");
+                    Ok(())
+                }
+                Ok(Err(e)) => {
+                    eprintln!("LSP server failed: {}", e);
+                    Err(e)
+                }
+                Err(e) => {
+                    eprintln!("LSP server task panicked: {}", e);
+                    Err(crate::AdrscanError::RealtimeError(format!("Server task failed: {}", e)))
+                }
+            }
+        }
+        result = shutdown_task => {
+            match result {
+                Ok(Ok(())) => {
+                    eprintln!("LSP server shutdown gracefully");
+                    Ok(())
+                }
+                Ok(Err(e)) => {
+                    eprintln!("Shutdown handler failed: {}", e);
+                    Err(e)
+                }
+                Err(e) => {
+                    eprintln!("Shutdown task panicked: {}", e);
+                    Err(crate::AdrscanError::RealtimeError(format!("Shutdown task failed: {}", e)))
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -223,7 +315,7 @@ mod tests {
     #[tokio::test]
     async fn test_server_initialization() {
         let client = MockClient;
-        let server = PhotonDriftLspServer::new(Box::new(client));
+        let server = PhotonDriftLspServer::new(client);
 
         let params = InitializeParams {
             process_id: None,
@@ -247,7 +339,7 @@ mod tests {
     #[tokio::test]
     async fn test_document_lifecycle() {
         let client = MockClient;
-        let server = PhotonDriftLspServer::new(Box::new(client));
+        let server = PhotonDriftLspServer::new(client);
 
         let uri = Url::parse("file:///test.md").unwrap();
         let content = "# ADR-001: Test Decision\n\n## Status\nProposed";
