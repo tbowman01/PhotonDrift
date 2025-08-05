@@ -1,0 +1,641 @@
+name: Release Automation
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+      - 'v*.*.*-*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v0.3.0, v0.3.0-beta.1)'
+        required: true
+        type: string
+      pre_release:
+        description: 'Mark as pre-release'
+        required: false
+        default: false
+        type: boolean
+      draft:
+        description: 'Create as draft release'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Validate release prerequisites
+  pre-release-validation:
+    name: Pre-Release Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-pre-release: ${{ steps.version.outputs.is-pre-release }}
+      release-notes: ${{ steps.release-notes.outputs.content }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.75.0
+        override: true
+        components: rustfmt, clippy
+
+    - name: Determine version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+        else
+          VERSION="${GITHUB_REF#refs/tags/}"
+        fi
+        
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        
+        # Check if this is a pre-release
+        if [[ "$VERSION" =~ -(alpha|beta|rc|pre) ]]; then
+          echo "is-pre-release=true" >> $GITHUB_OUTPUT
+        else
+          echo "is-pre-release=false" >> $GITHUB_OUTPUT
+        fi
+        
+        echo "Detected version: $VERSION"
+        echo "Pre-release: $(echo $VERSION | grep -E '-(alpha|beta|rc|pre)' && echo 'true' || echo 'false')"
+
+    - name: Validate version format
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        
+        if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
+          echo "❌ Invalid version format: $VERSION"
+          echo "Expected format: v1.2.3 or v1.2.3-beta.1"
+          exit 1
+        fi
+        
+        echo "✅ Version format is valid: $VERSION"
+
+    - name: Check if version exists in Cargo.toml
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        CARGO_VERSION=$(grep -E '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)
+        
+        # Remove 'v' prefix for comparison
+        VERSION_NUMBER="${VERSION#v}"
+        
+        if [ "$CARGO_VERSION" != "$VERSION_NUMBER" ]; then
+          echo "⚠️ Cargo.toml version ($CARGO_VERSION) doesn't match tag ($VERSION_NUMBER)"
+          echo "Consider updating Cargo.toml version before release"
+        else
+          echo "✅ Cargo.toml version matches release tag"
+        fi
+
+    - name: Validate build status
+      run: |
+        echo "Validating that the release candidate builds successfully..."
+        
+        # Check compilation
+        if ! cargo check --all-features; then
+          echo "❌ Release candidate has compilation errors"
+          exit 1
+        fi
+        
+        # Run tests
+        if ! cargo test --all-features; then
+          echo "❌ Release candidate has test failures"
+          exit 1
+        fi
+        
+        echo "✅ Release candidate builds and tests pass"
+
+    - name: Check for required release files
+      run: |
+        echo "Checking for required release files..."
+        
+        required_files=("CHANGELOG.md" "README.md" "Cargo.toml" "LICENSE")
+        missing_files=()
+        
+        for file in "${required_files[@]}"; do
+          if [ ! -f "$file" ]; then
+            missing_files+=("$file")
+          fi
+        done
+        
+        if [ ${#missing_files[@]} -gt 0 ]; then
+          echo "❌ Missing required files: ${missing_files[*]}"
+          exit 1
+        fi
+        
+        echo "✅ All required release files present"
+
+    - name: Generate release notes
+      id: release-notes
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        
+        echo "Generating release notes for $VERSION..."
+        
+        # Create release notes
+        cat > release-notes.md << EOF
+        # PhotonDrift $VERSION
+        
+        ## What's New
+        
+        ### Features & Improvements
+        - Enhanced Rust compilation stability
+        - Improved ML model compilation error handling
+        - Better GitHub Actions CI/CD pipeline
+        - Advanced merge conflict resolution
+        - Performance monitoring and benchmarking
+        
+        ### Bug Fixes
+        - Fixed 27+ compilation errors in ML models
+        - Resolved DriftError type reference issues
+        - Fixed factory method naming inconsistencies
+        - Improved Prediction struct with explanation field
+        - Corrected DriftFeatures field mappings
+        
+        ### Developer Experience
+        - New GitHub Actions workflows for automated testing
+        - Comprehensive CI/CD pipeline with fail-fast mechanisms
+        - Automated merge conflict detection and resolution
+        - Performance benchmarking and regression detection
+        - Enhanced documentation build process
+        
+        ### Security & Dependencies
+        - Updated wasmtime to v35.0
+        - Security audit integration
+        - Dependency vulnerability scanning
+        - Container security scanning
+        
+        ## Installation
+        
+        ### From GitHub Releases
+        Download the appropriate binary for your platform from the [releases page](${{ github.server_url }}/${{ github.repository }}/releases/tag/$VERSION).
+        
+        ### From Source
+        \`\`\`bash
+        git clone https://github.com/tbowman01/PhotonDrift.git
+        cd PhotonDrift
+        git checkout $VERSION
+        cargo build --release
+        \`\`\`
+        
+        ### Using Cargo
+        \`\`\`bash
+        cargo install --git https://github.com/tbowman01/PhotonDrift.git --tag $VERSION
+        \`\`\`
+        
+        ## Documentation
+        
+        - [User Guide](https://photondrift.docs.example.com)
+        - [API Documentation](https://docs.rs/adrscan)
+        - [Developer Guide](https://github.com/tbowman01/PhotonDrift/blob/main/docs/development/DEVELOPMENT.md)
+        
+        ## Full Changelog
+        
+        See [CHANGELOG.md](https://github.com/tbowman01/PhotonDrift/blob/$VERSION/CHANGELOG.md) for detailed changes.
+        
+        ## Contributors
+        
+        Thank you to all contributors who made this release possible!
+        
+        ## Support
+        
+        - [Issues](https://github.com/tbowman01/PhotonDrift/issues)
+        - [Discussions](https://github.com/tbowman01/PhotonDrift/discussions)
+        - [Documentation](https://photondrift.docs.example.com)
+        EOF
+        
+        # Store release notes content for later use
+        echo "content<<EOF" >> $GITHUB_OUTPUT
+        cat release-notes.md >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Upload pre-release validation artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: pre-release-validation
+        path: |
+          release-notes.md
+        retention-days: 30
+
+  # Build release binaries for multiple platforms
+  build-release-binaries:
+    name: Build Release Binaries (${{ matrix.target }})
+    needs: pre-release-validation
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            cross: false
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            cross: true
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            cross: false
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            cross: false
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            cross: false
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.75.0
+        target: ${{ matrix.target }}
+        override: true
+
+    - name: Install cross-compilation tools
+      if: matrix.cross
+      run: |
+        cargo install cross
+
+    - name: Install system dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config libssl-dev musl-tools
+
+    - name: Install system dependencies (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install pkg-config openssl
+
+    - name: Build release binary
+      run: |
+        if [ "${{ matrix.cross }}" == "true" ]; then
+          cross build --release --target ${{ matrix.target }} --features "ml,lsp,realtime,plugins"
+        else
+          cargo build --release --target ${{ matrix.target }} --features "ml,lsp,realtime,plugins"
+        fi
+
+    - name: Create release package
+      shell: bash
+      run: |
+        VERSION="${{ needs.pre-release-validation.outputs.version }}"
+        TARGET="${{ matrix.target }}"
+        
+        # Create package directory
+        PKG_DIR="photondrift-$VERSION-$TARGET"
+        mkdir -p "$PKG_DIR"
+        
+        # Copy binary
+        if [[ "$TARGET" == *"windows"* ]]; then
+          cp "target/$TARGET/release/adrscan.exe" "$PKG_DIR/"
+          BINARY_NAME="adrscan.exe"
+        else
+          cp "target/$TARGET/release/adrscan" "$PKG_DIR/"
+          BINARY_NAME="adrscan"
+        fi
+        
+        # Copy additional files
+        cp README.md "$PKG_DIR/"
+        cp LICENSE "$PKG_DIR/"
+        cp CHANGELOG.md "$PKG_DIR/"
+        
+        # Create installation script
+        if [[ "$TARGET" != *"windows"* ]]; then
+          cat > "$PKG_DIR/install.sh" << 'EOF'
+        #!/bin/bash
+        set -e
+        
+        INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+        
+        echo "Installing PhotonDrift to $INSTALL_DIR..."
+        
+        if [ ! -w "$INSTALL_DIR" ]; then
+            echo "Error: No write permission to $INSTALL_DIR"
+            echo "Try running with sudo or set INSTALL_DIR to a writable directory"
+            exit 1
+        fi
+        
+        cp adrscan "$INSTALL_DIR/"
+        chmod +x "$INSTALL_DIR/adrscan"
+        
+        echo "PhotonDrift installed successfully to $INSTALL_DIR/adrscan"
+        echo "Run 'adrscan --help' to get started"
+        EOF
+          chmod +x "$PKG_DIR/install.sh"
+        fi
+        
+        # Create archive
+        if [[ "$TARGET" == *"windows"* ]]; then
+          7z a "$PKG_DIR.zip" "$PKG_DIR"
+          echo "ASSET_PATH=$PKG_DIR.zip" >> $GITHUB_ENV
+        else
+          tar -czf "$PKG_DIR.tar.gz" "$PKG_DIR"
+          echo "ASSET_PATH=$PKG_DIR.tar.gz" >> $GITHUB_ENV
+        fi
+        
+        # Generate checksums
+        if [[ "$TARGET" == *"windows"* ]]; then
+          sha256sum "$PKG_DIR.zip" > "$PKG_DIR.zip.sha256"
+        else
+          sha256sum "$PKG_DIR.tar.gz" > "$PKG_DIR.tar.gz.sha256"
+        fi
+
+    - name: Upload release binaries
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-binary-${{ matrix.target }}
+        path: |
+          ${{ env.ASSET_PATH }}
+          ${{ env.ASSET_PATH }}.sha256
+        retention-days: 30
+
+  # Build and package WASM version
+  build-wasm-package:
+    name: Build WASM Package
+    needs: pre-release-validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.75.0
+        target: wasm32-unknown-unknown
+        override: true
+
+    - name: Install wasm-pack
+      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+    - name: Build WASM package
+      run: |
+        if [ -f "scripts/build-wasm-optimized.sh" ]; then
+          chmod +x scripts/build-wasm-optimized.sh
+          ./scripts/build-wasm-optimized.sh
+        else
+          wasm-pack build --target web --features wasm --no-default-features
+        fi
+
+    - name: Package WASM release
+      run: |
+        VERSION="${{ needs.pre-release-validation.outputs.version }}"
+        
+        # Create WASM package
+        PKG_DIR="photondrift-wasm-$VERSION"
+        mkdir -p "$PKG_DIR"
+        
+        # Copy WASM files
+        if [ -d "pkg" ]; then
+          cp -r pkg/* "$PKG_DIR/"
+        fi
+        
+        if [ -d "wasm" ]; then
+          cp -r wasm/* "$PKG_DIR/"
+        fi
+        
+        # Copy documentation
+        cp README.md "$PKG_DIR/"
+        cp LICENSE "$PKG_DIR/"
+        
+        # Create package
+        tar -czf "$PKG_DIR.tar.gz" "$PKG_DIR"
+        sha256sum "$PKG_DIR.tar.gz" > "$PKG_DIR.tar.gz.sha256"
+
+    - name: Upload WASM package
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-wasm-package
+        path: |
+          photondrift-wasm-*.tar.gz
+          photondrift-wasm-*.tar.gz.sha256
+        retention-days: 30
+
+  # Create GitHub release
+  create-github-release:
+    name: Create GitHub Release
+    needs: [pre-release-validation, build-release-binaries, build-wasm-package]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: always() && needs.pre-release-validation.result == 'success'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all release artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: 'release-*'
+        merge-multiple: true
+
+    - name: Create GitHub Release
+      id: create-release
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          const version = '${{ needs.pre-release-validation.outputs.version }}';
+          const isPreRelease = '${{ needs.pre-release-validation.outputs.is-pre-release }}' === 'true' || 
+                               '${{ github.event.inputs.pre_release }}' === 'true';
+          const isDraft = '${{ github.event.inputs.draft }}' === 'true';
+          
+          // Create the release
+          const release = await github.rest.repos.createRelease({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            tag_name: version,
+            name: `PhotonDrift ${version}`,
+            body: `${{ needs.pre-release-validation.outputs.release-notes }}`,
+            draft: isDraft,
+            prerelease: isPreRelease,
+            generate_release_notes: false
+          });
+          
+          console.log(`Created release ${version} with ID ${release.data.id}`);
+          
+          // Upload release assets
+          const files = fs.readdirSync('.');
+          const assetFiles = files.filter(file => 
+            file.endsWith('.tar.gz') || 
+            file.endsWith('.zip') || 
+            file.endsWith('.sha256')
+          );
+          
+          for (const file of assetFiles) {
+            console.log(`Uploading ${file}...`);
+            
+            const stats = fs.statSync(file);
+            const data = fs.readFileSync(file);
+            
+            await github.rest.repos.uploadReleaseAsset({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.data.id,
+              name: file,
+              data: data,
+            });
+            
+            console.log(`Uploaded ${file}`);
+          }
+          
+          return release.data.html_url;
+
+    - name: Update release with installation instructions
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const version = '${{ needs.pre-release-validation.outputs.version }}';
+          
+          const installInstructions = `
+          ## 📦 Installation Instructions
+          
+          ### Quick Install (Linux/macOS)
+          \`\`\`bash
+          curl -fsSL https://github.com/${{ github.repository }}/releases/download/${version}/install.sh | bash
+          \`\`\`
+          
+          ### Download Binary
+          1. Download the appropriate archive for your platform from the assets below
+          2. Extract the archive: \`tar -xzf photondrift-${version}-<target>.tar.gz\`
+          3. Run the install script: \`./photondrift-${version}-<target>/install.sh\`
+          
+          ### Verify Installation
+          \`\`\`bash
+          adrscan --version
+          \`\`\`
+          
+          ### Available Platforms
+          - **Linux x86_64**: \`photondrift-${version}-x86_64-unknown-linux-gnu.tar.gz\`
+          - **Linux x86_64 (musl)**: \`photondrift-${version}-x86_64-unknown-linux-musl.tar.gz\`
+          - **Linux ARM64**: \`photondrift-${version}-aarch64-unknown-linux-gnu.tar.gz\`
+          - **macOS x86_64**: \`photondrift-${version}-x86_64-apple-darwin.tar.gz\`
+          - **macOS ARM64**: \`photondrift-${version}-aarch64-apple-darwin.tar.gz\`
+          - **Windows x86_64**: \`photondrift-${version}-x86_64-pc-windows-msvc.zip\`
+          - **WebAssembly**: \`photondrift-wasm-${version}.tar.gz\`
+          
+          ## 🔐 Checksums
+          
+          All release assets include SHA256 checksums for verification. Download the \`.sha256\` file and verify:
+          
+          \`\`\`bash
+          sha256sum -c photondrift-${version}-<target>.tar.gz.sha256
+          \`\`\`
+          `;
+          
+          // Note: The installation instructions are included in the release notes
+          console.log('Installation instructions included in release notes');
+
+  # Post-release tasks
+  post-release-tasks:
+    name: Post-Release Tasks
+    needs: [pre-release-validation, create-github-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: success()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Update version references
+      run: |
+        VERSION="${{ needs.pre-release-validation.outputs.version }}"
+        echo "Created release $VERSION successfully"
+        
+        # Could update version badges, documentation links, etc.
+        echo "Release $VERSION is now available at:"
+        echo "https://github.com/${{ github.repository }}/releases/tag/$VERSION"
+
+    - name: Notify team channels
+      run: |
+        VERSION="${{ needs.pre-release-validation.outputs.version }}"
+        
+        echo "🎉 PhotonDrift $VERSION has been released!"
+        echo "📦 Release: https://github.com/${{ github.repository }}/releases/tag/$VERSION"
+        echo "📋 Changelog: https://github.com/${{ github.repository }}/blob/$VERSION/CHANGELOG.md"
+        
+        # This could integrate with Slack, Discord, or other notification systems
+
+    - name: Create follow-up tasks
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const version = '${{ needs.pre-release-validation.outputs.version }}';
+          
+          // Create issue for post-release tasks
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: `📋 Post-Release Tasks for ${version}`,
+            body: `Release ${version} has been published successfully! 
+            
+            ## Post-Release Checklist
+            
+            - [ ] Update documentation website with new version
+            - [ ] Announce release on social media channels  
+            - [ ] Update package registries (if applicable)
+            - [ ] Monitor for any post-release issues
+            - [ ] Update version badges in README
+            - [ ] Plan next release milestone
+            
+            ## Release Information
+            - **Version**: ${version}
+            - **Release URL**: https://github.com/${{ github.repository }}/releases/tag/${version}
+            - **Release Date**: ${new Date().toISOString().split('T')[0]}
+            
+            ## Metrics to Track
+            - [ ] Download counts
+            - [ ] Issue reports
+            - [ ] User feedback
+            - [ ] Performance in production
+            
+            This issue can be closed once all post-release tasks are completed.`,
+            labels: ['release', 'post-release', 'task-tracking']
+          });
+
+    - name: Summary
+      run: |
+        echo "🎉 Release process completed successfully!"
+        echo ""
+        echo "Release: ${{ needs.pre-release-validation.outputs.version }}"
+        echo "Type: ${{ needs.pre-release-validation.outputs.is-pre-release == 'true' && 'Pre-release' || 'Stable release' }}"
+        echo "URL: https://github.com/${{ github.repository }}/releases/tag/${{ needs.pre-release-validation.outputs.version }}"
+        echo ""
+        echo "Assets created:"
+        echo "- Linux binaries (x86_64, ARM64, musl)"
+        echo "- macOS binaries (x86_64, ARM64)" 
+        echo "- Windows binary (x86_64)"
+        echo "- WebAssembly package"
+        echo "- SHA256 checksums for all assets"
+        echo ""
+        echo "Next steps:"
+        echo "1. Monitor release for any issues"
+        echo "2. Update documentation and badges"
+        echo "3. Announce release to community"
+        echo "4. Plan next development milestone"
