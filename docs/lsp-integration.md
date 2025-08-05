@@ -1,3 +1,11 @@
+---
+title: "LSP Integration Guide"
+sidebar_label: "LSP Integration"
+sidebar_position: 2
+description: "Language Server Protocol implementation for IDE integration with real-time drift detection and ADR management"
+tags: ["lsp", "ide", "integration", "development"]
+---
+
 # PhotonDrift LSP Integration Guide
 
 PhotonDrift provides a Language Server Protocol (LSP) implementation that enables IDE integration for Architecture Decision Record (ADR) management with real-time drift detection.

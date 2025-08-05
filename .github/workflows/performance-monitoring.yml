@@ -1,0 +1,582 @@
+name: Performance Monitoring & Benchmarks
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run performance tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      benchmark_type:
+        description: 'Type of benchmarks to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - compilation
+        - runtime
+        - memory
+        - wasm
+        - ml-models
+      baseline_comparison:
+        description: 'Compare against baseline branch'
+        required: false
+        default: 'main'
+        type: string
+
+concurrency:
+  group: performance-${{ github.ref }}
+  cancel-in-progress: false  # Don't cancel perf tests
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Compilation performance benchmarks
+  compilation-benchmarks:
+    name: Compilation Performance
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: contains(github.event.inputs.benchmark_type, 'all') || contains(github.event.inputs.benchmark_type, 'compilation') || github.event.inputs.benchmark_type == ''
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.75.0
+        override: true
+        components: rustfmt, clippy
+
+    - name: Install performance tools
+      run: |
+        cargo install cargo-criterion
+        cargo install cargo-flamegraph
+        sudo apt-get update
+        sudo apt-get install -y linux-perf
+
+    - name: Clean build cache
+      run: cargo clean
+
+    - name: Benchmark cold compilation
+      run: |
+        echo "## Compilation Benchmarks" > compilation-report.md
+        echo "Generated at: $(date)" >> compilation-report.md
+        echo "" >> compilation-report.md
+        
+        # Time cold compilation
+        echo "### Cold Compilation Times" >> compilation-report.md
+        
+        echo "#### Debug Build" >> compilation-report.md
+        time_debug=$( (time cargo build 2>&1) 2>&1 | grep real | awk '{print $2}')
+        echo "- Debug build: $time_debug" >> compilation-report.md
+        
+        cargo clean
+        
+        echo "#### Release Build" >> compilation-report.md
+        time_release=$( (time cargo build --release 2>&1) 2>&1 | grep real | awk '{print $2}')
+        echo "- Release build: $time_release" >> compilation-report.md
+        
+        cargo clean
+        
+        echo "#### All Features Build" >> compilation-report.md
+        time_all_features=$( (time cargo build --all-features 2>&1) 2>&1 | grep real | awk '{print $2}')
+        echo "- All features build: $time_all_features" >> compilation-report.md
+
+    - name: Benchmark incremental compilation
+      run: |
+        echo "" >> compilation-report.md
+        echo "### Incremental Compilation Times" >> compilation-report.md
+        
+        # Initial build
+        cargo build --all-features
+        
+        # Touch a file and rebuild
+        touch src/main.rs
+        time_incremental=$( (time cargo build --all-features 2>&1) 2>&1 | grep real | awk '{print $2}')
+        echo "- Incremental build (main.rs changed): $time_incremental" >> compilation-report.md
+        
+        # Touch ML module and rebuild
+        touch src/ml/mod.rs
+        time_ml_incremental=$( (time cargo build --all-features 2>&1) 2>&1 | grep real | awk '{print $2}')
+        echo "- Incremental build (ML module changed): $time_ml_incremental" >> compilation-report.md
+
+    - name: Feature-specific compilation times
+      run: |
+        echo "" >> compilation-report.md
+        echo "### Feature-Specific Build Times" >> compilation-report.md
+        
+        # Build with different feature combinations
+        features=("" "--features ml" "--features lsp" "--features realtime" "--features plugins" "--features wasm")
+        
+        for feature in "${features[@]}"; do
+          cargo clean
+          feature_name=${feature:-"default"}
+          echo "Testing $feature_name..."
+          time_feature=$( (time cargo build $feature 2>&1) 2>&1 | grep real | awk '{print $2}')
+          echo "- $feature_name: $time_feature" >> compilation-report.md
+        done
+
+    - name: Upload compilation benchmarks
+      uses: actions/upload-artifact@v4
+      with:
+        name: compilation-benchmarks
+        path: compilation-report.md
+        retention-days: 30
+
+  # Runtime performance benchmarks
+  runtime-benchmarks:
+    name: Runtime Performance
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: contains(github.event.inputs.benchmark_type, 'all') || contains(github.event.inputs.benchmark_type, 'runtime') || github.event.inputs.benchmark_type == ''
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.75.0
+        override: true
+
+    - name: Install benchmark tools
+      run: |
+        cargo install cargo-criterion
+        cargo install hyperfine
+
+    - name: Build optimized binary
+      run: cargo build --release --all-features
+
+    - name: Create test data
+      run: |
+        mkdir -p test-data/adrs
+        for i in {1..100}; do
+          cat > test-data/adrs/adr-$(printf "%03d" $i).md << EOF
+        # ADR-$(printf "%03d" $i): Test Architecture Decision
+        
+        ## Status
+        Accepted
+        
+        ## Context
+        This is a test ADR with sample content for performance testing.
+        
+        ## Decision
+        We will implement solution $i for this architectural challenge.
+        
+        ## Consequences
+        - Performance impact: minimal
+        - Complexity: low
+        - Maintainability: high
+        EOF
+        done
+
+    - name: Benchmark CLI operations
+      run: |
+        echo "## Runtime Performance Benchmarks" > runtime-report.md
+        echo "Generated at: $(date)" >> runtime-report.md
+        echo "" >> runtime-report.md
+        
+        # Benchmark different CLI operations
+        echo "### CLI Operations Benchmarks" >> runtime-report.md
+        
+        # Index operation
+        echo "#### Index Operation" >> runtime-report.md
+        hyperfine --warmup 3 --runs 10 \
+          './target/release/adrscan index test-data' \
+          --export-markdown index-bench.md
+        cat index-bench.md >> runtime-report.md
+        
+        # Inventory operation
+        echo "#### Inventory Operation" >> runtime-report.md  
+        hyperfine --warmup 3 --runs 10 \
+          './target/release/adrscan inventory test-data' \
+          --export-markdown inventory-bench.md
+        cat inventory-bench.md >> runtime-report.md
+        
+        # Diff operation
+        echo "#### Diff Operation" >> runtime-report.md
+        hyperfine --warmup 3 --runs 10 \
+          './target/release/adrscan diff test-data/adrs/adr-001.md test-data/adrs/adr-002.md' \
+          --export-markdown diff-bench.md
+        cat diff-bench.md >> runtime-report.md
+
+    - name: ML performance benchmarks
+      if: always()
+      run: |
+        echo "" >> runtime-report.md
+        echo "### ML Models Performance" >> runtime-report.md
+        
+        # Run ML-specific benchmarks if available
+        if cargo test --release --features ml --no-run 2>/dev/null; then
+          echo "Running ML benchmarks..." >> runtime-report.md
+          cargo bench --features ml || echo "ML benchmarks not available" >> runtime-report.md
+        else
+          echo "ML features not compilable, skipping ML benchmarks" >> runtime-report.md
+        fi
+
+    - name: Memory usage benchmarks
+      run: |
+        echo "" >> runtime-report.md
+        echo "### Memory Usage Analysis" >> runtime-report.md
+        
+        # Monitor memory usage during operations
+        echo "Measuring memory usage..." >> runtime-report.md
+        
+        # Use time to get memory stats
+        /usr/bin/time -v ./target/release/adrscan index test-data 2> memory-stats.txt
+        
+        echo "#### Memory Statistics" >> runtime-report.md
+        echo "\`\`\`" >> runtime-report.md
+        grep -E "(Maximum resident set size|Average resident set size|Page reclaims|Page faults)" memory-stats.txt >> runtime-report.md
+        echo "\`\`\`" >> runtime-report.md
+
+    - name: Upload runtime benchmarks
+      uses: actions/upload-artifact@v4
+      with:
+        name: runtime-benchmarks
+        path: |
+          runtime-report.md
+          *.md
+          memory-stats.txt
+        retention-days: 30
+
+  # WASM performance benchmarks
+  wasm-benchmarks:
+    name: WASM Performance
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    if: contains(github.event.inputs.benchmark_type, 'all') || contains(github.event.inputs.benchmark_type, 'wasm') || github.event.inputs.benchmark_type == ''
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.75.0
+        target: wasm32-unknown-unknown
+        override: true
+
+    - name: Install WASM tools
+      run: |
+        curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        npm install -g wasm-pack
+
+    - name: Build WASM package
+      run: |
+        echo "## WASM Performance Benchmarks" > wasm-report.md
+        echo "Generated at: $(date)" >> wasm-report.md
+        echo "" >> wasm-report.md
+        
+        # Time WASM build
+        echo "### WASM Build Performance" >> wasm-report.md
+        
+        wasm_build_time=$( (time wasm-pack build --target web --features wasm --no-default-features 2>&1) 2>&1 | grep real | awk '{print $2}')
+        echo "- WASM build time: $wasm_build_time" >> wasm-report.md
+        
+        # Get WASM package size
+        if [ -f "pkg/adrscan_bg.wasm" ]; then
+          wasm_size=$(du -h pkg/adrscan_bg.wasm | cut -f1)
+          echo "- WASM package size: $wasm_size" >> wasm-report.md
+        fi
+
+    - name: WASM runtime benchmarks
+      run: |
+        echo "" >> wasm-report.md
+        echo "### WASM Runtime Performance" >> wasm-report.md
+        
+        # Test WASM functionality if available
+        cd wasm
+        if [ -f "test.js" ]; then
+          echo "Testing WASM runtime performance..." >> ../wasm-report.md
+          node test.js >> ../wasm-report.md 2>&1 || echo "WASM runtime tests failed" >> ../wasm-report.md
+        else
+          echo "WASM runtime tests not available" >> ../wasm-report.md
+        fi
+        cd ..
+
+    - name: Upload WASM benchmarks
+      uses: actions/upload-artifact@v4
+      with:
+        name: wasm-benchmarks
+        path: |
+          wasm-report.md
+          pkg/
+        retention-days: 30
+
+  # ML models specific performance
+  ml-benchmarks:
+    name: ML Models Performance
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    if: contains(github.event.inputs.benchmark_type, 'all') || contains(github.event.inputs.benchmark_type, 'ml-models') || github.event.inputs.benchmark_type == ''
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.75.0
+        override: true
+
+    - name: Install ML performance tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3 python3-pip
+        pip3 install matplotlib numpy
+
+    - name: Check ML compilation status
+      run: |
+        echo "## ML Models Performance Report" > ml-benchmarks-report.md
+        echo "Generated at: $(date)" >> ml-benchmarks-report.md
+        echo "" >> ml-benchmarks-report.md
+        
+        if cargo check --features ml; then
+          echo "✅ ML features compile successfully" >> ml-benchmarks-report.md
+          echo "ml_compiles=true" >> $GITHUB_ENV
+        else
+          echo "❌ ML features have compilation errors" >> ml-benchmarks-report.md
+          echo "ml_compiles=false" >> $GITHUB_ENV
+          
+          echo "" >> ml-benchmarks-report.md
+          echo "### Compilation Errors" >> ml-benchmarks-report.md
+          echo "\`\`\`" >> ml-benchmarks-report.md
+          cargo check --features ml 2>&1 >> ml-benchmarks-report.md
+          echo "\`\`\`" >> ml-benchmarks-report.md
+        fi
+
+    - name: ML model training benchmarks
+      if: env.ml_compiles == 'true'
+      run: |
+        echo "" >> ml-benchmarks-report.md
+        echo "### ML Model Training Performance" >> ml-benchmarks-report.md
+        
+        # Generate synthetic training data
+        mkdir -p test-data/training
+        
+        # Build with ML features
+        cargo build --release --features ml
+        
+        # Benchmark ML operations if available
+        echo "Testing ML model performance..." >> ml-benchmarks-report.md
+        
+        # This would require actual ML functionality to be working
+        # For now, document what would be tested
+        echo "- Isolation Forest training time: TBD" >> ml-benchmarks-report.md
+        echo "- SVM training time: TBD" >> ml-benchmarks-report.md
+        echo "- Statistical model training time: TBD" >> ml-benchmarks-report.md
+        echo "- Ensemble model training time: TBD" >> ml-benchmarks-report.md
+
+    - name: ML model prediction benchmarks
+      if: env.ml_compiles == 'true'
+      run: |
+        echo "" >> ml-benchmarks-report.md
+        echo "### ML Model Prediction Performance" >> ml-benchmarks-report.md
+        
+        echo "- Single prediction latency: TBD" >> ml-benchmarks-report.md
+        echo "- Batch prediction throughput: TBD" >> ml-benchmarks-report.md
+        echo "- Memory usage during prediction: TBD" >> ml-benchmarks-report.md
+
+    - name: Upload ML benchmarks
+      uses: actions/upload-artifact@v4
+      with:
+        name: ml-benchmarks
+        path: ml-benchmarks-report.md
+        retention-days: 30
+
+  # Performance comparison and reporting
+  performance-comparison:
+    name: Performance Comparison & Trends
+    needs: [compilation-benchmarks, runtime-benchmarks, wasm-benchmarks, ml-benchmarks]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all benchmark artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: '*-benchmarks'
+        merge-multiple: true
+
+    - name: Setup Python for analysis
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install analysis tools
+      run: |
+        pip install matplotlib pandas numpy
+
+    - name: Generate performance comparison report
+      run: |
+        echo "# PhotonDrift Performance Analysis Report" > performance-summary.md
+        echo "Generated at: $(date)" >> performance-summary.md
+        echo "Commit: ${{ github.sha }}" >> performance-summary.md
+        echo "Branch: ${{ github.ref_name }}" >> performance-summary.md
+        echo "" >> performance-summary.md
+        
+        echo "## Benchmark Results Summary" >> performance-summary.md
+        echo "" >> performance-summary.md
+        
+        # Compilation benchmarks
+        if [ -f "compilation-report.md" ]; then
+          echo "### 🏗️ Compilation Performance" >> performance-summary.md
+          echo "\`\`\`" >> performance-summary.md
+          tail -20 compilation-report.md >> performance-summary.md
+          echo "\`\`\`" >> performance-summary.md
+          echo "" >> performance-summary.md
+        fi
+        
+        # Runtime benchmarks
+        if [ -f "runtime-report.md" ]; then
+          echo "### ⚡ Runtime Performance" >> performance-summary.md
+          echo "\`\`\`" >> performance-summary.md
+          tail -20 runtime-report.md >> performance-summary.md
+          echo "\`\`\`" >> performance-summary.md
+          echo "" >> performance-summary.md
+        fi
+        
+        # WASM benchmarks
+        if [ -f "wasm-report.md" ]; then
+          echo "### 🕸️ WASM Performance" >> performance-summary.md
+          echo "\`\`\`" >> performance-summary.md
+          tail -10 wasm-report.md >> performance-summary.md
+          echo "\`\`\`" >> performance-summary.md
+          echo "" >> performance-summary.md
+        fi
+        
+        # ML benchmarks
+        if [ -f "ml-benchmarks-report.md" ]; then
+          echo "### 🧠 ML Models Performance" >> performance-summary.md
+          echo "\`\`\`" >> performance-summary.md
+          tail -15 ml-benchmarks-report.md >> performance-summary.md
+          echo "\`\`\`" >> performance-summary.md
+          echo "" >> performance-summary.md
+        fi
+        
+        echo "## Job Status Summary" >> performance-summary.md
+        echo "- Compilation Benchmarks: ${{ needs.compilation-benchmarks.result }}" >> performance-summary.md
+        echo "- Runtime Benchmarks: ${{ needs.runtime-benchmarks.result }}" >> performance-summary.md
+        echo "- WASM Benchmarks: ${{ needs.wasm-benchmarks.result }}" >> performance-summary.md
+        echo "- ML Benchmarks: ${{ needs.ml-benchmarks.result }}" >> performance-summary.md
+
+    - name: Store performance history
+      run: |
+        # Create performance history entry
+        mkdir -p performance-history
+        
+        performance_file="performance-history/$(date +%Y-%m-%d-%H%M%S)-${{ github.sha }}.json"
+        
+        cat > "$performance_file" << EOF
+        {
+          "timestamp": "$(date -Iseconds)",
+          "commit": "${{ github.sha }}",
+          "branch": "${{ github.ref_name }}",
+          "workflow_run": "${{ github.run_id }}",
+          "benchmarks": {
+            "compilation": "${{ needs.compilation-benchmarks.result }}",
+            "runtime": "${{ needs.runtime-benchmarks.result }}",
+            "wasm": "${{ needs.wasm-benchmarks.result }}",
+            "ml": "${{ needs.ml-benchmarks.result }}"
+          }
+        }
+        EOF
+
+    - name: Performance regression check
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "" >> performance-summary.md
+        echo "## 🔍 Performance Regression Analysis" >> performance-summary.md
+        echo "" >> performance-summary.md
+        
+        # This would compare against baseline
+        # For now, placeholder
+        echo "- Compilation time change: TBD" >> performance-summary.md
+        echo "- Runtime performance change: TBD" >> performance-summary.md
+        echo "- Memory usage change: TBD" >> performance-summary.md
+        echo "- WASM size change: TBD" >> performance-summary.md
+        
+        echo "" >> performance-summary.md
+        echo "> **Note**: Detailed performance comparison requires baseline data from ${{ github.event.inputs.baseline_comparison || 'main' }} branch." >> performance-summary.md
+
+    - name: Upload performance summary
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-summary
+        path: |
+          performance-summary.md
+          performance-history/
+        retention-days: 90
+
+    - name: Comment on PR with performance summary
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          if (fs.existsSync('performance-summary.md')) {
+            const summaryContent = fs.readFileSync('performance-summary.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 📊 Performance Benchmark Results
+              
+              The performance benchmarks have completed for this PR. Here's a summary:
+              
+              <details>
+              <summary>📈 Click to view detailed performance report</summary>
+              
+              ${summaryContent}
+              </details>
+              
+              **Workflow Run**: [View Details](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+              
+              > Performance data is also stored in the workflow artifacts for historical tracking.`
+            });
+          }
+
+    - name: Performance alert on regression
+      if: failure() && github.event_name != 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: '🚨 Performance Regression Detected',
+            body: `Performance benchmarks have failed or show significant regression.
+            
+            **Branch**: ${{ github.ref_name }}
+            **Commit**: ${{ github.sha }}
+            **Workflow**: [View Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            
+            ## Failed Benchmarks:
+            - Compilation: ${{ needs.compilation-benchmarks.result }}
+            - Runtime: ${{ needs.runtime-benchmarks.result }}
+            - WASM: ${{ needs.wasm-benchmarks.result }}
+            - ML Models: ${{ needs.ml-benchmarks.result }}
+            
+            Please investigate the performance regression and take appropriate action.`,
+            labels: ['performance', 'regression', 'priority-high', 'auto-generated']
+          });

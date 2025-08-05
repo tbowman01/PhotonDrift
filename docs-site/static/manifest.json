@@ -1,0 +1,81 @@
+{
+  "name": "PhotonDrift Documentation",
+  "short_name": "PhotonDrift Docs",
+  "description": "AI-Powered Architecture Decision Record Management Documentation",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#6366f1",
+  "background_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "categories": ["documentation", "developer", "tools"],
+  "lang": "en",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/img/photondrift_logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/img/photondrift_logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Quick Start",
+      "short_name": "Quick Start",
+      "description": "Get started with PhotonDrift quickly",
+      "url": "/docs/getting-started/quick-start",
+      "icons": [
+        {
+          "src": "/img/photondrift_logo.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "CLI Reference",
+      "short_name": "CLI",
+      "description": "Complete CLI command reference",
+      "url": "/docs/getting-started/cli",
+      "icons": [
+        {
+          "src": "/img/photondrift_logo.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "ML Features",
+      "short_name": "ML",
+      "description": "Machine learning capabilities",
+      "url": "/docs/ml-features/neural-training",
+      "icons": [
+        {
+          "src": "/img/photondrift_logo.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/img/screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "PhotonDrift Documentation on Desktop"
+    },
+    {
+      "src": "/img/screenshot-mobile.png",
+      "sizes": "320x640",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "PhotonDrift Documentation on Mobile"
+    }
+  ]
+}

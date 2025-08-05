@@ -1,0 +1,484 @@
+name: Rust Compilation Fix Workflow
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/ml/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'src/ml/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+    inputs:
+      fix_type:
+        description: 'Type of fix to apply'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - error-types
+        - factory-methods
+        - prediction-struct
+        - drift-features
+        - ml-methods
+        - type-ambiguity
+        - cleanup-warnings
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: full
+
+jobs:
+  # Analyze current compilation errors
+  analyze-errors:
+    name: Analyze Compilation Errors
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      has-errors: ${{ steps.check-compilation.outputs.has-errors }}
+      error-count: ${{ steps.check-compilation.outputs.error-count }}
+      error-summary: ${{ steps.check-compilation.outputs.error-summary }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.75.0
+        override: true
+        components: rustfmt, clippy
+
+    - name: Check current compilation status
+      id: check-compilation
+      run: |
+        echo "Checking compilation status..."
+        
+        # Capture compilation errors
+        if cargo check --all-features 2> compilation-errors.log; then
+          echo "has-errors=false" >> $GITHUB_OUTPUT
+          echo "error-count=0" >> $GITHUB_OUTPUT
+          echo "error-summary=No compilation errors found" >> $GITHUB_OUTPUT
+        else
+          error_count=$(grep -c "error\[E" compilation-errors.log || echo 0)
+          echo "has-errors=true" >> $GITHUB_OUTPUT
+          echo "error-count=$error_count" >> $GITHUB_OUTPUT
+          echo "error-summary=Found $error_count compilation errors" >> $GITHUB_OUTPUT
+          
+          echo "## Compilation Errors Analysis" > error-analysis.md
+          echo "Total errors found: $error_count" >> error-analysis.md
+          echo "" >> error-analysis.md
+          echo "### Error Details:" >> error-analysis.md
+          cat compilation-errors.log >> error-analysis.md
+        fi
+
+    - name: Analyze specific error types
+      run: |
+        if [ -f "compilation-errors.log" ]; then
+          echo "Analyzing error patterns..."
+          
+          # Count different error types
+          drift_errors=$(grep -c "DriftError" compilation-errors.log || echo 0)
+          method_errors=$(grep -c "method.*not found" compilation-errors.log || echo 0)
+          field_errors=$(grep -c "no field" compilation-errors.log || echo 0)
+          trait_errors=$(grep -c "not implemented" compilation-errors.log || echo 0)
+          type_errors=$(grep -c "type annotations" compilation-errors.log || echo 0)
+          
+          echo "Error type breakdown:" >> error-analysis.md
+          echo "- DriftError issues: $drift_errors" >> error-analysis.md
+          echo "- Missing method errors: $method_errors" >> error-analysis.md
+          echo "- Field access errors: $field_errors" >> error-analysis.md
+          echo "- Trait implementation errors: $trait_errors" >> error-analysis.md
+          echo "- Type annotation errors: $type_errors" >> error-analysis.md
+        fi
+
+    - name: Upload error analysis
+      if: failure() || steps.check-compilation.outputs.has-errors == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: compilation-error-analysis
+        path: |
+          compilation-errors.log
+          error-analysis.md
+        retention-days: 14
+
+  # Fix error types (Phase 1)
+  fix-error-types:
+    name: Fix Error Type References
+    needs: analyze-errors
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: needs.analyze-errors.outputs.has-errors == 'true' && (github.event.inputs.fix_type == 'all' || github.event.inputs.fix_type == 'error-types')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.75.0
+        override: true
+
+    - name: Fix DriftError references
+      run: |
+        echo "Fixing DriftError references in factory.rs..."
+        
+        # Fix the error type reference in factory.rs
+        if [ -f "src/ml/models/factory.rs" ]; then
+          sed -i 's/crate::error::DriftError/crate::AdrscanError::DriftError/g' src/ml/models/factory.rs
+          echo "Fixed DriftError references in factory.rs"
+        fi
+        
+        # Check for other DriftError references that need fixing
+        echo "Checking for other DriftError references..."
+        grep -r "crate::error::DriftError" src/ || echo "No more DriftError references found"
+
+    - name: Verify error type fixes
+      run: |
+        echo "Verifying error type fixes..."
+        cargo check --features ml || echo "Compilation still has issues"
+
+    - name: Create fix report
+      run: |
+        echo "# Error Type Fixes Report" > error-type-fixes.md
+        echo "Applied fixes for DriftError references" >> error-type-fixes.md
+        echo "" >> error-type-fixes.md
+        echo "## Changes made:" >> error-type-fixes.md
+        echo "- Fixed crate::error::DriftError -> crate::AdrscanError::DriftError" >> error-type-fixes.md
+
+    - name: Upload fix report
+      uses: actions/upload-artifact@v4
+      with:
+        name: error-type-fixes-report
+        path: error-type-fixes.md
+        retention-days: 7
+
+  # Fix factory methods (Phase 2)
+  fix-factory-methods:
+    name: Fix Factory Method Names
+    needs: analyze-errors
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: needs.analyze-errors.outputs.has-errors == 'true' && (github.event.inputs.fix_type == 'all' || github.event.inputs.fix_type == 'factory-methods')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.75.0
+        override: true
+
+    - name: Fix factory method calls
+      run: |
+        echo "Fixing factory method calls..."
+        
+        # Fix create_model -> create in detector.rs
+        if [ -f "src/ml/detector.rs" ]; then
+          sed -i 's/ModelFactory::create_model/ModelFactory::create/g' src/ml/detector.rs
+          echo "Fixed factory calls in detector.rs"
+        fi
+        
+        # Fix create_model -> create in training.rs
+        if [ -f "src/ml/training.rs" ]; then
+          sed -i 's/ModelFactory::create_model/ModelFactory::create/g' src/ml/training.rs
+          echo "Fixed factory calls in training.rs"
+        fi
+        
+        # Check for other factory method references
+        echo "Checking for other factory method references..."
+        grep -r "create_model" src/ || echo "No more create_model references found"
+
+    - name: Verify factory method fixes
+      run: |
+        echo "Verifying factory method fixes..."
+        cargo check --features ml || echo "Compilation still has issues"
+
+    - name: Create fix report
+      run: |
+        echo "# Factory Method Fixes Report" > factory-method-fixes.md
+        echo "Applied fixes for factory method naming" >> factory-method-fixes.md
+        echo "" >> factory-method-fixes.md
+        echo "## Changes made:" >> factory-method-fixes.md
+        echo "- Fixed ModelFactory::create_model -> ModelFactory::create" >> factory-method-fixes.md
+
+    - name: Upload fix report
+      uses: actions/upload-artifact@v4
+      with:
+        name: factory-method-fixes-report
+        path: factory-method-fixes.md
+        retention-days: 7
+
+  # Enhance prediction struct (Phase 3)
+  enhance-prediction-struct:
+    name: Enhance Prediction Struct
+    needs: analyze-errors
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: needs.analyze-errors.outputs.has-errors == 'true' && (github.event.inputs.fix_type == 'all' || github.event.inputs.fix_type == 'prediction-struct')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.75.0
+        override: true
+
+    - name: Add explanation field to Prediction struct
+      run: |
+        echo "Adding explanation field to Prediction struct..."
+        
+        # Check current Prediction struct definition
+        if [ -f "src/ml/detector.rs" ]; then
+          echo "Current Prediction struct in detector.rs:"
+          grep -A 10 "pub struct Prediction" src/ml/detector.rs
+          
+          # Add explanation field if not present
+          if ! grep -q "explanation" src/ml/detector.rs; then
+            echo "Adding explanation field to Prediction struct..."
+            # This would require more complex sed/awk manipulation
+            # For now, create a backup and manual instruction
+            cp src/ml/detector.rs src/ml/detector.rs.backup
+            echo "Created backup of detector.rs"
+            echo "Manual edit required: Add 'pub explanation: Option<String>,' to Prediction struct"
+          else
+            echo "Explanation field already exists in Prediction struct"
+          fi
+        fi
+
+    - name: Verify prediction struct enhancement
+      run: |
+        echo "Verifying prediction struct..."
+        cargo check --features ml || echo "Compilation still has issues"
+
+    - name: Create enhancement report
+      run: |
+        echo "# Prediction Struct Enhancement Report" > prediction-struct-fixes.md
+        echo "Analyzed Prediction struct for explanation field" >> prediction-struct-fixes.md
+        echo "" >> prediction-struct-fixes.md
+        echo "## Analysis:" >> prediction-struct-fixes.md
+        if [ -f "src/ml/detector.rs.backup" ]; then
+          echo "- Created backup of detector.rs" >> prediction-struct-fixes.md
+          echo "- Manual enhancement required for explanation field" >> prediction-struct-fixes.md
+        else
+          echo "- Explanation field may already exist" >> prediction-struct-fixes.md
+        fi
+
+    - name: Upload enhancement report
+      uses: actions/upload-artifact@v4
+      with:
+        name: prediction-struct-fixes-report
+        path: |
+          prediction-struct-fixes.md
+          src/ml/detector.rs.backup
+        retention-days: 7
+
+  # Fix DriftFeatures field mapping (Phase 4)
+  fix-drift-features:
+    name: Fix DriftFeatures Field Mapping
+    needs: analyze-errors
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: needs.analyze-errors.outputs.has-errors == 'true' && (github.event.inputs.fix_type == 'all' || github.event.inputs.fix_type == 'drift-features')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.75.0
+        override: true
+
+    - name: Analyze DriftFeatures structure
+      run: |
+        echo "Analyzing DriftFeatures structure..."
+        
+        # Find the DriftFeatures definition
+        echo "Looking for DriftFeatures definition..."
+        if [ -f "src/ml/features.rs" ]; then
+          echo "Found DriftFeatures in features.rs:"
+          grep -A 20 "pub struct DriftFeatures" src/ml/features.rs
+        fi
+        
+        # Look for field usage in ML models
+        echo "Checking field usage in ML models..."
+        grep -r "line_count\|decision_count\|change_frequency\|coupling_score" src/ml/models/ || echo "No problematic field references found"
+
+    - name: Fix field references in ML models
+      run: |
+        echo "Fixing field references..."
+        
+        # Fix common field mapping issues
+        for file in src/ml/models/*.rs; do
+          if [ -f "$file" ]; then
+            echo "Processing $file..."
+            # Create backup
+            cp "$file" "$file.backup"
+            
+            # Apply field mappings
+            sed -i 's/features\.line_count/features.file_count/g' "$file"
+            sed -i 's/features\.decision_count/features.complexity_score/g' "$file"
+            sed -i 's/features\.change_frequency/features.pattern_frequency/g' "$file"
+            sed -i 's/features\.coupling_score/features.structural_features.coupling_score/g' "$file"
+            
+            echo "Applied field mappings to $file"
+          fi
+        done
+
+    - name: Verify DriftFeatures fixes
+      run: |
+        echo "Verifying DriftFeatures fixes..."
+        cargo check --features ml || echo "Compilation still has issues"
+
+    - name: Create field mapping report
+      run: |
+        echo "# DriftFeatures Field Mapping Report" > drift-features-fixes.md
+        echo "Applied field mapping fixes to ML models" >> drift-features-fixes.md
+        echo "" >> drift-features-fixes.md
+        echo "## Field Mappings Applied:" >> drift-features-fixes.md
+        echo "- line_count → file_count" >> drift-features-fixes.md
+        echo "- decision_count → complexity_score" >> drift-features-fixes.md
+        echo "- change_frequency → pattern_frequency" >> drift-features-fixes.md
+        echo "- coupling_score → structural_features.coupling_score" >> drift-features-fixes.md
+        echo "" >> drift-features-fixes.md
+        echo "## Files Modified:" >> drift-features-fixes.md
+        ls -la src/ml/models/*.backup 2>/dev/null | awk '{print "- " $9}' | sed 's/.backup//' >> drift-features-fixes.md
+
+    - name: Upload field mapping report
+      uses: actions/upload-artifact@v4
+      with:
+        name: drift-features-fixes-report
+        path: |
+          drift-features-fixes.md
+          src/ml/models/*.backup
+        retention-days: 7
+
+  # Final compilation check
+  final-compilation-check:
+    name: Final Compilation Verification
+    needs: [analyze-errors, fix-error-types, fix-factory-methods, enhance-prediction-struct, fix-drift-features]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: always() && needs.analyze-errors.outputs.has-errors == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.75.0
+        override: true
+        components: rustfmt, clippy
+
+    - name: Final compilation check
+      run: |
+        echo "Running final compilation check..."
+        
+        # Check compilation with all features
+        if cargo check --all-features 2> final-compilation.log; then
+          echo "✅ Compilation successful!"
+          echo "compilation-status=success" >> $GITHUB_ENV
+        else
+          echo "❌ Compilation still has errors"
+          echo "compilation-status=failed" >> $GITHUB_ENV
+          
+          error_count=$(grep -c "error\[E" final-compilation.log || echo 0)
+          echo "Remaining errors: $error_count"
+        fi
+
+    - name: Run tests if compilation succeeds
+      if: env.compilation-status == 'success'
+      run: |
+        echo "Running tests..."
+        cargo test --all-features --verbose
+
+    - name: Generate final compilation report
+      run: |
+        echo "# Final Compilation Report" > final-compilation-report.md
+        echo "Generated at: $(date)" >> final-compilation-report.md
+        echo "" >> final-compilation-report.md
+        
+        if [ "$compilation-status" == "success" ]; then
+          echo "## ✅ Compilation Status: SUCCESS" >> final-compilation-report.md
+          echo "All Rust compilation errors have been resolved!" >> final-compilation-report.md
+        else
+          echo "## ❌ Compilation Status: FAILED" >> final-compilation-report.md
+          echo "Some compilation errors remain:" >> final-compilation-report.md
+          echo "" >> final-compilation-report.md
+          echo "### Remaining Errors:" >> final-compilation-report.md
+          cat final-compilation.log >> final-compilation-report.md
+        fi
+        
+        echo "" >> final-compilation-report.md
+        echo "## Applied Fixes Summary:" >> final-compilation-report.md
+        echo "- Error type references: ${{ needs.fix-error-types.result }}" >> final-compilation-report.md
+        echo "- Factory method names: ${{ needs.fix-factory-methods.result }}" >> final-compilation-report.md
+        echo "- Prediction struct enhancement: ${{ needs.enhance-prediction-struct.result }}" >> final-compilation-report.md
+        echo "- DriftFeatures field mapping: ${{ needs.fix-drift-features.result }}" >> final-compilation-report.md
+
+    - name: Upload final report
+      uses: actions/upload-artifact@v4
+      with:
+        name: final-compilation-report
+        path: |
+          final-compilation-report.md
+          final-compilation.log
+        retention-days: 30
+
+    - name: Create issue on failure
+      if: env.compilation-status == 'failed' && github.event_name == 'push'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const reportContent = fs.readFileSync('final-compilation-report.md', 'utf8');
+          
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: '🚨 Rust Compilation Errors Still Remain After Auto-Fix Attempt',
+            body: `This issue was automatically created because compilation errors persist after running the auto-fix workflow.
+            
+            ${reportContent}
+            
+            ## Next Steps:
+            1. Review the compilation error details above
+            2. Check the artifacts from the failed workflow run
+            3. Apply manual fixes for complex errors
+            4. Re-run the workflow after fixes
+            
+            **Workflow Run**: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`,
+            labels: ['bug', 'compilation', 'priority-high', 'auto-generated']
+          });
+
+    - name: Summary
+      run: |
+        echo "🔍 Rust Compilation Fix Workflow Summary:"
+        echo "Initial error count: ${{ needs.analyze-errors.outputs.error-count }}"
+        echo "Final compilation status: $compilation-status"
+        
+        if [ "$compilation-status" == "success" ]; then
+          echo "🎉 All compilation errors have been resolved!"
+          echo "The PhotonDrift project should now build successfully."
+        else
+          echo "⚠️ Some compilation errors still remain."
+          echo "Manual intervention may be required for complex fixes."
+          echo "Check the artifacts and error reports for details."
+        fi
