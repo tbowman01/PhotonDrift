@@ -170,7 +170,7 @@ impl FeatureExtractor {
         features.tech_diversity = self.calculate_tech_diversity(drift_item);
         features.complexity_score = self.calculate_complexity_score(drift_item);
         features.pattern_frequency = self.calculate_pattern_frequency(drift_item);
-        
+
         // Additional ML features
         features.line_count = features.lines_changed; // Use lines_changed as line_count
         features.decision_count = self.estimate_decision_count(drift_item);

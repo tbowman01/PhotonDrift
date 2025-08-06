@@ -1,9 +1,9 @@
 //! Isolation Forest implementation for anomaly detection
 
-use crate::drift::DriftResult;
-use super::core::{AnomalyModel, ModelType};
 use super::super::detector::Prediction;
 use super::super::features::DriftFeatures;
+use super::core::{AnomalyModel, ModelType};
+use crate::drift::DriftResult;
 // use std::collections::HashMap; // Currently unused
 
 /// Isolation Forest model for anomaly detection
@@ -42,13 +42,13 @@ impl IsolationForest {
     /// Build isolation forest from training data
     pub fn fit(&mut self, data: &[DriftFeatures]) -> DriftResult<()> {
         self.trees.clear();
-        
+
         for _ in 0..self.tree_count {
             let subsample = self.subsample(data);
             let tree = self.build_tree(&subsample, 0)?;
             self.trees.push(tree);
         }
-        
+
         Ok(())
     }
 
@@ -86,13 +86,14 @@ impl IsolationForest {
             return 0.5; // Default score if no trees
         }
 
-        let path_lengths: Vec<f64> = self.trees
+        let path_lengths: Vec<f64> = self
+            .trees
             .iter()
             .map(|tree| self.path_length(tree, features, 0))
             .collect();
 
         let avg_path_length = path_lengths.iter().sum::<f64>() / path_lengths.len() as f64;
-        
+
         // Convert path length to anomaly score (0-1 range)
         2.0_f64.powf(-avg_path_length / self.c_factor(self.subsample_size))
     }
@@ -114,7 +115,7 @@ impl AnomalyModel for IsolationForest {
     fn predict(&self, features: &DriftFeatures) -> DriftResult<Prediction> {
         let score = self.anomaly_score(features);
         let is_anomaly = score > 0.6; // Threshold can be tuned
-        
+
         Ok(Prediction {
             is_anomaly,
             confidence: score,
@@ -124,7 +125,10 @@ impl AnomalyModel for IsolationForest {
     }
 
     fn explain(&self, _features: &DriftFeatures) -> Option<String> {
-        Some("Isolation Forest: Anomalies are isolated with shorter path lengths in random trees".to_string())
+        Some(
+            "Isolation Forest: Anomalies are isolated with shorter path lengths in random trees"
+                .to_string(),
+        )
     }
 
     fn serialize(&self) -> DriftResult<Vec<u8>> {

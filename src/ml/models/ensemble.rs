@@ -1,10 +1,10 @@
 //! Ensemble model combining multiple anomaly detection algorithms
 
-use crate::drift::DriftResult;
-use super::core::{AnomalyModel, ModelType};
 use super::super::detector::Prediction;
 use super::super::features::DriftFeatures;
+use super::core::{AnomalyModel, ModelType};
 use super::{IsolationForest, OneClassSVM, StatisticalModel};
+use crate::drift::DriftResult;
 
 /// Ensemble model that combines multiple anomaly detection models
 pub struct EnsembleModel {
@@ -36,12 +36,12 @@ impl EnsembleModel {
     /// Create ensemble with default models
     pub fn with_default_models() -> Self {
         let mut ensemble = Self::new();
-        
+
         // Add default models with equal weights
         ensemble.add_model(Box::new(IsolationForest::new()), 1.0);
         ensemble.add_model(Box::new(OneClassSVM::new()), 1.0);
         ensemble.add_model(Box::new(StatisticalModel::new()), 1.0);
-        
+
         ensemble
     }
 
@@ -74,11 +74,12 @@ impl EnsembleModel {
         }
 
         // Get predictions from all models
-        let predictions: Result<Vec<Prediction>, _> = self.models
+        let predictions: Result<Vec<Prediction>, _> = self
+            .models
             .iter()
             .map(|model| model.predict(features))
             .collect();
-            
+
         let predictions = predictions?;
 
         match self.voting_strategy {
@@ -89,27 +90,27 @@ impl EnsembleModel {
     }
 
     fn majority_vote(&self, predictions: &[Prediction]) -> DriftResult<Prediction> {
-        let anomaly_votes = predictions.iter()
-            .filter(|p| p.is_anomaly)
-            .count();
-            
+        let anomaly_votes = predictions.iter().filter(|p| p.is_anomaly).count();
+
         let is_anomaly = anomaly_votes > predictions.len() / 2;
         let confidence = anomaly_votes as f64 / predictions.len() as f64;
-        
+
         Ok(Prediction {
             is_anomaly,
             confidence,
-            anomaly_score: predictions.iter().map(|p| p.anomaly_score).sum::<f64>() / predictions.len() as f64,
+            anomaly_score: predictions.iter().map(|p| p.anomaly_score).sum::<f64>()
+                / predictions.len() as f64,
             explanation: Some(format!(
                 "Ensemble Majority Vote: {}/{} models detected anomaly",
-                anomaly_votes, predictions.len()
+                anomaly_votes,
+                predictions.len()
             )),
         })
     }
 
     fn weighted_average(&self, predictions: &[Prediction]) -> DriftResult<Prediction> {
         let total_weight: f64 = self.weights.iter().take(predictions.len()).sum();
-        
+
         if total_weight == 0.0 {
             return Ok(Prediction {
                 is_anomaly: false,
@@ -119,14 +120,15 @@ impl EnsembleModel {
             });
         }
 
-        let weighted_score: f64 = predictions.iter()
+        let weighted_score: f64 = predictions
+            .iter()
             .zip(self.weights.iter())
             .map(|(pred, weight)| pred.confidence * weight)
             .sum();
-            
+
         let average_score = weighted_score / total_weight;
         let is_anomaly = average_score > 0.5; // Threshold can be tuned
-        
+
         Ok(Prediction {
             is_anomaly,
             confidence: average_score,
@@ -140,13 +142,18 @@ impl EnsembleModel {
 
     fn conservative_vote(&self, predictions: &[Prediction]) -> DriftResult<Prediction> {
         let all_anomaly = predictions.iter().all(|p| p.is_anomaly);
-        let min_confidence = predictions.iter()
+        let min_confidence = predictions
+            .iter()
             .map(|p| p.confidence)
             .fold(f64::INFINITY, f64::min);
-            
+
         Ok(Prediction {
             is_anomaly: all_anomaly,
-            anomaly_score: if all_anomaly { min_confidence } else { 1.0 - min_confidence },
+            anomaly_score: if all_anomaly {
+                min_confidence
+            } else {
+                1.0 - min_confidence
+            },
             confidence: if all_anomaly { min_confidence } else { 0.0 },
             explanation: Some(format!(
                 "Ensemble Conservative: all {} models must agree",

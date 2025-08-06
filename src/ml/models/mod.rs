@@ -15,19 +15,19 @@ use crate::drift::DriftResult;
 // use super::features::DriftFeatures; // Re-exported from core
 
 pub mod core;
-pub mod isolation_forest;
-pub mod svm;
-pub mod statistical;
 pub mod ensemble;
 pub mod factory;
+pub mod isolation_forest;
+pub mod statistical;
+pub mod svm;
 
 // Re-export public API
 pub use core::{AnomalyModel, ModelType};
+pub use ensemble::EnsembleModel;
 pub use factory::ModelFactory;
 pub use isolation_forest::IsolationForest;
-pub use svm::OneClassSVM;
 pub use statistical::StatisticalModel;
-pub use ensemble::EnsembleModel;
+pub use svm::OneClassSVM;
 
 // Backwards compatibility aliases
 pub use isolation_forest::IsolationForest as IsolationForestModel;

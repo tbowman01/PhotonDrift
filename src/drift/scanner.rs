@@ -5,11 +5,11 @@
 
 use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use walkdir::WalkDir;
-use std::collections::HashSet;
 
 use crate::config::DetectionPattern;
 use crate::drift::{DriftResult, PatternMatcher, Snapshot, SnapshotEntryType};
@@ -38,18 +38,62 @@ impl CodebaseScanner {
     pub fn new() -> Self {
         Self {
             include_extensions: [
-                "rs", "py", "js", "ts", "java", "go", "c", "cpp", "h", "hpp",
-                "toml", "json", "yaml", "yml", "xml", "tf", "dockerfile", "md",
-                "txt", "sql", "sh", "bat", "ps1", "rb", "php", "cs", "kt",
-                "swift", "scala", "clj", "hs", "ml", "ex", "exs"
+                "rs",
+                "py",
+                "js",
+                "ts",
+                "java",
+                "go",
+                "c",
+                "cpp",
+                "h",
+                "hpp",
+                "toml",
+                "json",
+                "yaml",
+                "yml",
+                "xml",
+                "tf",
+                "dockerfile",
+                "md",
+                "txt",
+                "sql",
+                "sh",
+                "bat",
+                "ps1",
+                "rb",
+                "php",
+                "cs",
+                "kt",
+                "swift",
+                "scala",
+                "clj",
+                "hs",
+                "ml",
+                "ex",
+                "exs",
             ]
             .iter()
             .map(|s| s.to_string())
             .collect(),
             exclude_dirs: [
-                "target", "node_modules", ".git", "build", "dist", ".cargo",
-                ".rustup", "__pycache__", ".pytest_cache", ".venv", "venv",
-                ".idea", ".vscode", "tmp", "temp", ".next", ".nuxt"
+                "target",
+                "node_modules",
+                ".git",
+                "build",
+                "dist",
+                ".cargo",
+                ".rustup",
+                "__pycache__",
+                ".pytest_cache",
+                ".venv",
+                "venv",
+                ".idea",
+                ".vscode",
+                "tmp",
+                "temp",
+                ".next",
+                ".nuxt",
             ]
             .iter()
             .map(|s| s.to_string())
@@ -137,7 +181,9 @@ impl CodebaseScanner {
             rayon::ThreadPoolBuilder::new()
                 .num_threads(self.max_threads)
                 .build_global()
-                .map_err(|e| AdrscanError::DriftError(format!("Failed to setup thread pool: {}", e)))?;
+                .map_err(|e| {
+                    AdrscanError::DriftError(format!("Failed to setup thread pool: {}", e))
+                })?;
         }
 
         // Process files in parallel or sequentially
@@ -203,14 +249,14 @@ impl CodebaseScanner {
             match std::fs::read_to_string(file_path) {
                 Ok(content) => {
                     let line_count = content.lines().count();
-                    
+
                     // Find technology matches
                     let tech_matches = pattern_matcher.find_matches(file_path, &content)?;
 
                     // Lock snapshot and update it
                     {
                         let mut snapshot = snapshot_mutex.lock().unwrap();
-                        
+
                         // Add technology matches to snapshot
                         for tech_match in tech_matches {
                             snapshot.add_technology_match(&tech_match);
@@ -238,7 +284,7 @@ impl CodebaseScanner {
                     {
                         let mut files = files_processed.lock().unwrap();
                         *files += 1;
-                        
+
                         if *files % 100 == 0 {
                             log::debug!("Processed {} files...", *files);
                         }
@@ -436,7 +482,8 @@ impl CodebaseScanner {
                 .ok()
                 .and_then(|output| {
                     if output.status.success() {
-                        let branch_name = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                        let branch_name =
+                            String::from_utf8_lossy(&output.stdout).trim().to_string();
                         if !branch_name.is_empty() {
                             Some(branch_name)
                         } else {
@@ -446,7 +493,7 @@ impl CodebaseScanner {
                         None
                     }
                 });
-            
+
             (commit, branch)
         };
 

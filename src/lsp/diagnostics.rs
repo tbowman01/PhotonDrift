@@ -8,7 +8,7 @@ use tokio::sync::Mutex;
 use crate::{config::Config, drift::DriftDetector, Result};
 
 #[cfg(feature = "ml")]
-use crate::ml::{MLDriftDetector, MLConfig};
+use crate::ml::{MLConfig, MLDriftDetector};
 
 /// Engine for creating LSP diagnostics from drift detection
 pub struct DiagnosticEngine {
@@ -26,7 +26,7 @@ impl DiagnosticEngine {
             ml_detector: None,
             config: Config::default(),
         };
-        
+
         // Initialize ML detector if available
         #[cfg(feature = "ml")]
         {
@@ -38,18 +38,21 @@ impl DiagnosticEngine {
                 cache_ttl_seconds: 3600,
                 max_features: 50,
             };
-            
+
             match MLDriftDetector::new(ml_config) {
                 Ok(ml_detector) => {
                     engine.ml_detector = Some(Arc::new(Mutex::new(ml_detector)));
                     log::info!("ML-enhanced diagnostics enabled");
                 }
                 Err(e) => {
-                    log::warn!("Failed to initialize ML detector, using basic detection: {}", e);
+                    log::warn!(
+                        "Failed to initialize ML detector, using basic detection: {}",
+                        e
+                    );
                 }
             }
         }
-        
+
         engine
     }
 
@@ -68,7 +71,10 @@ impl DiagnosticEngine {
                 #[cfg(feature = "ml")]
                 {
                     if let Some(ref ml_detector) = self.ml_detector {
-                        match self.enhance_with_ml(drift_items.items, content, ml_detector).await {
+                        match self
+                            .enhance_with_ml(drift_items.items, content, ml_detector)
+                            .await
+                        {
                             Ok(ml_diagnostics) => {
                                 diagnostics.extend(ml_diagnostics);
                             }
@@ -87,7 +93,7 @@ impl DiagnosticEngine {
                         }
                     }
                 }
-                
+
                 #[cfg(not(feature = "ml"))]
                 {
                     // ML feature not enabled, use basic detection
@@ -104,29 +110,31 @@ impl DiagnosticEngine {
     /// Enhance drift detection with ML analysis (async, non-blocking)
     #[cfg(feature = "ml")]
     async fn enhance_with_ml(
-        &self, 
-        drift_items: Vec<crate::drift::DriftItem>, 
+        &self,
+        drift_items: Vec<crate::drift::DriftItem>,
         content: &str,
-        ml_detector: &Arc<Mutex<MLDriftDetector>>
+        ml_detector: &Arc<Mutex<MLDriftDetector>>,
     ) -> Result<Vec<Diagnostic>> {
         let mut diagnostics = Vec::new();
-        
+
         // Create a timeout for ML processing to prevent LSP blocking
         let ml_future = tokio::time::timeout(
             tokio::time::Duration::from_millis(500), // 500ms max for real-time responsiveness
             async {
                 let mut detector = ml_detector.lock().await;
-                
+
                 for item in drift_items {
                     // Extract features for ML analysis
                     let features = self.extract_lsp_features(content, &item).await?;
-                    
+
                     // Get ML prediction with confidence scoring
                     match detector.predict_anomaly(&features).await {
                         Ok(ml_result) => {
                             // Only report if confidence is above threshold
                             if ml_result.confidence >= 0.7 {
-                                diagnostics.push(create_ml_enhanced_diagnostic(&item, &ml_result, content));
+                                diagnostics.push(create_ml_enhanced_diagnostic(
+                                    &item, &ml_result, content,
+                                ));
                             }
                         }
                         Err(_) => {
@@ -135,11 +143,11 @@ impl DiagnosticEngine {
                         }
                     }
                 }
-                
+
                 Ok::<Vec<Diagnostic>, crate::error::AdrscanError>(diagnostics)
-            }
+            },
         );
-        
+
         match ml_future.await {
             Ok(Ok(ml_diagnostics)) => Ok(ml_diagnostics),
             Ok(Err(e)) => Err(e),
@@ -157,10 +165,14 @@ impl DiagnosticEngine {
 
     /// Extract ML features specifically for LSP context
     #[cfg(feature = "ml")]
-    async fn extract_lsp_features(&self, content: &str, drift_item: &crate::drift::DriftItem) -> Result<crate::ml::DriftFeatures> {
+    async fn extract_lsp_features(
+        &self,
+        content: &str,
+        drift_item: &crate::drift::DriftItem,
+    ) -> Result<crate::ml::DriftFeatures> {
         // This would use the existing feature extractor but focus on LSP-relevant features
         let extractor = crate::ml::FeatureExtractor::new();
-        
+
         // Create a minimal file representation for feature extraction
         let temp_file_data = crate::drift::FileData {
             path: std::path::PathBuf::from(&drift_item.file_path),
@@ -168,7 +180,7 @@ impl DiagnosticEngine {
             size: content.len() as u64,
             modified: std::time::SystemTime::now(),
         };
-        
+
         extractor.extract_features(&[temp_file_data]).await
     }
 

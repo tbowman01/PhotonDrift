@@ -1,9 +1,9 @@
 //! Statistical anomaly detection model
 
-use crate::drift::DriftResult;
-use super::core::{AnomalyModel, ModelType};
 use super::super::detector::Prediction;
 use super::super::features::DriftFeatures;
+use super::core::{AnomalyModel, ModelType};
+use crate::drift::DriftResult;
 
 /// Simple statistical model using mean and standard deviation
 pub struct StatisticalModel {
@@ -35,7 +35,8 @@ impl StatisticalModel {
         }
 
         // Extract feature vectors
-        let feature_vectors: Vec<Vec<f64>> = data.iter()
+        let feature_vectors: Vec<Vec<f64>> = data
+            .iter()
             .map(|f| self.extract_feature_vector(f))
             .collect();
 
@@ -44,9 +45,7 @@ impl StatisticalModel {
 
         // Compute statistics for each feature
         for i in 0..feature_count {
-            let values: Vec<f64> = feature_vectors.iter()
-                .map(|vec| vec[i])
-                .collect();
+            let values: Vec<f64> = feature_vectors.iter().map(|vec| vec[i]).collect();
 
             let stats = self.compute_stats(&values);
             self.feature_stats.push(stats);
@@ -82,9 +81,7 @@ impl StatisticalModel {
         }
 
         let mean = values.iter().sum::<f64>() / values.len() as f64;
-        let variance = values.iter()
-            .map(|x| (x - mean).powi(2))
-            .sum::<f64>() / values.len() as f64;
+        let variance = values.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / values.len() as f64;
         let std_dev = variance.sqrt();
         let min = values.iter().fold(f64::INFINITY, |a, &b| a.min(b));
         let max = values.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
@@ -114,7 +111,7 @@ impl StatisticalModel {
                 } else {
                     0.0
                 };
-                
+
                 total_deviation += deviation;
                 max_deviation = max_deviation.max(deviation);
             }
@@ -130,10 +127,10 @@ impl AnomalyModel for StatisticalModel {
     fn predict(&self, features: &DriftFeatures) -> DriftResult<Prediction> {
         let score = self.anomaly_score(features);
         let is_anomaly = score > self.threshold_multiplier;
-        
+
         // Normalize confidence to 0-1 range
         let confidence = (score / (self.threshold_multiplier * 2.0)).min(1.0);
-        
+
         Ok(Prediction {
             is_anomaly,
             confidence,

@@ -203,6 +203,7 @@ pub enum IDEType {
     Sublime,
     Atom,
     Universal, // LSP-based
+    Other(String),
 }
 
 /// IDE configuration
@@ -407,119 +408,4 @@ pub struct VariableValidation {
     pub max_length: Option<usize>,
     pub min_value: Option<i64>,
     pub max_value: Option<i64>,
-}
-
-// Additional missing types that are imported in other modules
-
-/// Supported IDE types
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum IDEType {
-    VSCode,
-    IntelliJ,
-    Vim,
-    Emacs,
-    Universal,
-    Other(String),
-}
-
-/// IDE configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IDEConfig {
-    pub ide_type: IDEType,
-    pub version: Option<String>,
-    pub installation_path: Option<PathBuf>,
-    pub settings: serde_json::Map<String, Value>,
-}
-
-/// IDE event data
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum IDEEvent {
-    FileOpened { path: PathBuf },
-    FileSaved { path: PathBuf },
-    FileClosing { path: PathBuf },
-    SelectionChanged { range: TextRange },
-    CursorMoved { position: TextPosition },
-    ProjectOpened { path: PathBuf },
-    ProjectClosed { path: PathBuf },
-    Custom { event_type: String, data: Value },
-}
-
-/// IDE response to events
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum IDEResponse {
-    Success { message: Option<String> },
-    Error { error: String },
-    ShowMessage { message: String, level: MessageLevel },
-    OpenFile { path: PathBuf, line: Option<u32> },
-    ShowDiagnostics { diagnostics: Vec<IDEDiagnostic> },
-    Custom { response_type: String, data: Value },
-}
-
-/// Text position in a document
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct TextPosition {
-    pub line: u32,
-    pub column: u32,
-}
-
-/// Text range in a document
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TextRange {
-    pub start: TextPosition,
-    pub end: TextPosition,
-}
-
-/// Installation options for plugins
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InstallationOptions {
-    pub verify_signature: bool,
-    pub install_dependencies: bool,
-    pub allow_prerelease: bool,
-    pub force_reinstall: bool,
-}
-
-impl Default for InstallationOptions {
-    fn default() -> Self {
-        Self {
-            verify_signature: true,
-            install_dependencies: true,
-            allow_prerelease: false,
-            force_reinstall: false,
-        }
-    }
-}
-
-/// Search criteria for plugin marketplace
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchCriteria {
-    pub query: Option<String>,
-    pub category: Option<String>,
-    pub min_rating: Option<f32>,
-    pub sort_by: SortBy,
-    pub limit: Option<u32>,
-    pub offset: Option<u32>,
-}
-
-impl Default for SearchCriteria {
-    fn default() -> Self {
-        Self {
-            query: None,
-            category: None,
-            min_rating: None,
-            sort_by: SortBy::Relevance,
-            limit: Some(20),
-            offset: None,
-        }
-    }
-}
-
-/// Sort criteria for search results
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum SortBy {
-    Relevance,
-    Rating,
-    Downloads,
-    Updated,
-    Name,
-    Size,
 }
