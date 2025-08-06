@@ -52,7 +52,7 @@ jobs:
     - name: Setup Rust toolchain
       uses: actions-rs/toolchain@v1
       with:
-        toolchain: 1.75.0
+        toolchain: 1.76.0
         override: true
         components: rustfmt, clippy
 
@@ -124,7 +124,7 @@ jobs:
     - name: Setup Rust toolchain
       uses: actions-rs/toolchain@v1
       with:
-        toolchain: 1.75.0
+        toolchain: 1.76.0
         override: true
 
     - name: Fix DriftError references
@@ -176,7 +176,7 @@ jobs:
     - name: Setup Rust toolchain
       uses: actions-rs/toolchain@v1
       with:
-        toolchain: 1.75.0
+        toolchain: 1.76.0
         override: true
 
     - name: Fix factory method calls
@@ -234,7 +234,7 @@ jobs:
     - name: Setup Rust toolchain
       uses: actions-rs/toolchain@v1
       with:
-        toolchain: 1.75.0
+        toolchain: 1.76.0
         override: true
 
     - name: Add explanation field to Prediction struct
@@ -301,7 +301,7 @@ jobs:
     - name: Setup Rust toolchain
       uses: actions-rs/toolchain@v1
       with:
-        toolchain: 1.75.0
+        toolchain: 1.76.0
         override: true
 
     - name: Analyze DriftFeatures structure
@@ -383,7 +383,7 @@ jobs:
     - name: Setup Rust toolchain
       uses: actions-rs/toolchain@v1
       with:
-        toolchain: 1.75.0
+        toolchain: 1.76.0
         override: true
         components: rustfmt, clippy
 
