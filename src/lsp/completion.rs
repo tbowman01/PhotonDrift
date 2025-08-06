@@ -1,5 +1,7 @@
 //! ADR template completion provider for LSP
 
+#![cfg(feature = "lsp")]
+
 use lsp_types::{CompletionItem, CompletionItemKind, InsertTextFormat, Position};
 
 /// Provides intelligent completion for ADR templates and content

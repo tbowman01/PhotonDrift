@@ -1,5 +1,7 @@
 //! Real-time drift diagnostics for ADR files
 
+#![cfg(feature = "lsp")]
+
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range, Url};
 use std::collections::HashMap;
 use std::sync::Arc;

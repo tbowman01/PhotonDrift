@@ -1,5 +1,7 @@
 //! Core LSP server implementation for PhotonDrift
 
+#![cfg(feature = "lsp")]
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::signal;

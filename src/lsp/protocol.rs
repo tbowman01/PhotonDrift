@@ -1,5 +1,7 @@
 //! LSP protocol utilities and helper functions
 
+#![cfg(feature = "lsp")]
+
 use lsp_types::Url;
 use std::path::{Path, PathBuf};
 
