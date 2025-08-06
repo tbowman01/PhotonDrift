@@ -10,12 +10,14 @@ pub mod security;
 pub mod traits;
 
 pub use manager::{PluginConfig, PluginLoadError, PluginManager, SecurityLevel};
-pub use marketplace::{InstallationOptions, MarketplaceClient, PluginPackage, PluginRegistry, SearchCriteria, SortBy};
+pub use marketplace::{
+    InstallationOptions, MarketplaceClient, PluginPackage, PluginRegistry, SearchCriteria, SortBy,
+};
 pub use security::{PluginValidator, SandboxManager, SecurityPolicy};
 pub use traits::{
-    ArgumentType, CommandArgument, DiagnosticSeverity, DriftAnalysisPlugin, IDEAction, IDECommand, 
-    IDEConfig, IDEDiagnostic, IDEEvent, IDEIntegrationPlugin, IDEResponse, IDEType, MessageLevel, 
-    Plugin, PluginCapability, PluginContext, PluginMetadata, PluginResponse, TemplatePlugin, 
+    ArgumentType, CommandArgument, DiagnosticSeverity, DriftAnalysisPlugin, IDEAction, IDECommand,
+    IDEConfig, IDEDiagnostic, IDEEvent, IDEIntegrationPlugin, IDEResponse, IDEType, MessageLevel,
+    Plugin, PluginCapability, PluginContext, PluginMetadata, PluginResponse, TemplatePlugin,
     TextPosition, TextRange,
 };
 

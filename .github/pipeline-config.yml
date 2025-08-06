@@ -1,0 +1,178 @@
+# Pipeline Architecture Configuration
+# ===================================
+# Central configuration for optimized pipeline behavior
+
+# Default execution settings
+execution:
+  default_mode: "auto"              # auto, fast, full, minimal
+  max_parallel_jobs: 20             # Global parallelism limit
+  cache_strategy: "aggressive"      # conservative, balanced, aggressive
+  fail_fast_enabled: true           # Enable early termination on failures
+
+# Change analysis configuration
+change_analysis:
+  profiles:
+    docs_only:
+      patterns: ["*.md", "*.rst", "*.txt", "docs/**"]
+      skip_stages: ["build-matrix", "test-suite", "security", "performance", "container"]
+      max_duration_minutes: 8
+    
+    tests_only:
+      patterns: ["tests/**", "*_test.rs", "*.test.*"]
+      skip_stages: ["build-matrix", "security", "container"]
+      max_duration_minutes: 12
+    
+    core_changes:
+      patterns: ["src/main.rs", "src/lib.rs", "src/core/**", "src/engine/**"]
+      require_stages: ["all"]
+      max_duration_minutes: 25
+    
+    feature_changes:
+      patterns: ["src/ml/**", "src/wasm/**", "src/lsp/**", "src/plugins/**"]
+      conditional_stages: ["performance", "container"]
+      max_duration_minutes: 20
+    
+    config_changes:
+      patterns: ["Cargo.toml", "*.yml", "*.yaml", "*.json", ".github/**"]
+      require_stages: ["all"]
+      max_duration_minutes: 30
+
+# Impact scoring weights
+impact_scoring:
+  rust_core: 10           # Core Rust files
+  rust_features: 7        # Feature-specific Rust files
+  rust_other: 4           # Other Rust files
+  config_files: 6         # Configuration files
+  workflows: 8            # GitHub workflow files
+  tests: 2                # Test files
+  docs: 1                 # Documentation files
+
+# Matrix optimization settings
+matrix_optimization:
+  minimal:
+    platforms: ["ubuntu-latest"]
+    features: ["default"]
+    container_platforms: ["linux/amd64"]
+  
+  balanced:
+    platforms: ["ubuntu-latest", "windows-latest"]
+    features: ["default", "ml"]
+    container_platforms: ["linux/amd64", "linux/arm64"]
+  
+  full:
+    platforms: ["ubuntu-latest", "windows-latest", "macos-latest"]
+    features: ["default", "ml", "lsp", "realtime", "plugins", "wasm"]
+    container_platforms: ["linux/amd64", "linux/arm64"]
+
+# Cache configuration
+caching:
+  conservative:
+    base_key_components: ["os", "cargo_lock_hash"]
+    restore_key_fallbacks: 1
+    shared_cache: false
+    
+  balanced:
+    base_key_components: ["os", "cargo_lock_hash", "rust_version"]
+    restore_key_fallbacks: 2
+    shared_cache: true
+    
+  aggressive:
+    base_key_components: ["os", "cargo_lock_hash", "rust_version", "branch"]
+    restore_key_fallbacks: 3
+    shared_cache: true
+    cross_platform_fallback: true
+
+# Performance targets
+performance_targets:
+  docs_only: 
+    target_minutes: 8
+    acceptable_minutes: 10
+    
+  tests_only:
+    target_minutes: 12
+    acceptable_minutes: 15
+    
+  feature_changes:
+    target_minutes: 20
+    acceptable_minutes: 25
+    
+  core_changes:
+    target_minutes: 25
+    acceptable_minutes: 30
+    
+  config_changes:
+    target_minutes: 30
+    acceptable_minutes: 35
+
+# Stage timeouts (in minutes)
+stage_timeouts:
+  orchestrator: 5
+  fast_quality_checks: 8
+  build_matrix_per_job: 20
+  advanced_validation: 15
+  performance_benchmarks: 20
+  container_build_per_platform: 25
+  pipeline_summary: 5
+
+# Quality gates
+quality_gates:
+  required_checks:
+    - format_check
+    - basic_compile
+  
+  conditional_checks:
+    security_audit: 
+      condition: "impact_score > 15"
+    performance_benchmarks:
+      condition: "rust_core > 0 OR rust_features > 5"
+    container_build:
+      condition: "impact_score > 10 AND not docs_only"
+
+# Resource optimization
+resource_optimization:
+  rust_build:
+    cargo_build_jobs: 4
+    rustflags_native: true
+    incremental_compilation: true
+    
+  docker_build:
+    buildx_cache: true
+    multi_stage_optimization: true
+    layer_caching: "aggressive"
+    
+  test_execution:
+    parallel_test_threads: 2
+    test_timeout_seconds: 600
+    quick_fail_on_first_error: true
+
+# Monitoring and analytics
+monitoring:
+  collect_metrics: true
+  performance_tracking: true
+  optimization_feedback: true
+  failure_analysis: true
+  
+  metrics_retention_days: 90
+  analytics_export: true
+
+# Feature flags
+feature_flags:
+  enable_predictive_optimization: false
+  enable_ml_based_scheduling: false
+  enable_cross_repository_learning: false
+  enable_dynamic_resource_allocation: false
+  enable_advanced_analytics: true
+
+# Team-specific overrides
+team_overrides:
+  development:
+    default_mode: "fast"
+    cache_strategy: "aggressive"
+    
+  staging:
+    default_mode: "balanced"
+    cache_strategy: "balanced"
+    
+  production:
+    default_mode: "full"
+    cache_strategy: "conservative"
