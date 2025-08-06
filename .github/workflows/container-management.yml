@@ -57,13 +57,23 @@ jobs:
       fail-fast: false
       matrix:
         environment: [dev, staging, prod]
-        exclude:
-          - environment: staging
-            if: github.event.inputs.build_type == 'development'
-          - environment: prod
-            if: github.event.inputs.build_type == 'development'
+        include:
           - environment: dev
-            if: github.event.inputs.build_type == 'production'
+            dockerfile: Dockerfile
+            enabled: ${{ github.event.inputs.build_type == 'all' || github.event.inputs.build_type == 'development' || github.event.inputs.build_type == '' }}
+          - environment: staging  
+            dockerfile: Dockerfile
+            enabled: ${{ github.event.inputs.build_type == 'all' || github.event.inputs.build_type == 'staging' || github.event.inputs.build_type == '' }}
+          - environment: prod
+            dockerfile: Dockerfile
+            enabled: ${{ github.event.inputs.build_type == 'all' || github.event.inputs.build_type == 'production' || github.event.inputs.build_type == '' }}
+        exclude:
+          - environment: dev
+            enabled: false
+          - environment: staging
+            enabled: false  
+          - environment: prod
+            enabled: false
     
     steps:
     - name: Checkout code
@@ -97,17 +107,21 @@ jobs:
       run: |
         echo "Validating Dockerfile for ${{ matrix.environment }} environment..."
         
-        # Check if environment-specific Dockerfile exists
-        if [ -f "Dockerfile.${{ matrix.environment }}" ]; then
-          DOCKERFILE="Dockerfile.${{ matrix.environment }}"
-        else
+        # Use matrix dockerfile or fallback to standard Dockerfile
+        DOCKERFILE="${{ matrix.dockerfile }}"
+        if [ ! -f "$DOCKERFILE" ]; then
           DOCKERFILE="Dockerfile"
         fi
         
         echo "Using Dockerfile: $DOCKERFILE"
         
-        # Validate Dockerfile syntax
-        docker run --rm -i hadolint/hadolint < "$DOCKERFILE" || echo "Hadolint warnings detected"
+        # Validate Dockerfile syntax with hadolint
+        if command -v hadolint >/dev/null 2>&1; then
+          hadolint "$DOCKERFILE" || echo "Hadolint warnings detected"
+        else
+          # Use hadolint Docker image if command not available
+          docker run --rm -i hadolint/hadolint < "$DOCKERFILE" || echo "Hadolint warnings detected"
+        fi
         
         echo "DOCKERFILE_PATH=$DOCKERFILE" >> $GITHUB_ENV
 
@@ -203,11 +217,12 @@ jobs:
     - name: Build image for scanning
       run: |
         # Build image locally for security scanning
-        DOCKERFILE="Dockerfile"
-        if [ -f "Dockerfile.${{ matrix.environment }}" ]; then
-          DOCKERFILE="Dockerfile.${{ matrix.environment }}"
+        DOCKERFILE="${{ matrix.dockerfile || 'Dockerfile' }}"
+        if [ ! -f "$DOCKERFILE" ]; then
+          DOCKERFILE="Dockerfile"
         fi
         
+        echo "Building image for security scan using: $DOCKERFILE"
         docker build -t photondrift:${{ matrix.environment }}-scan -f "$DOCKERFILE" .
 
     - name: Run Trivy vulnerability scanner
