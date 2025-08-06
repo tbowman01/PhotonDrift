@@ -1,10 +1,10 @@
 [
   {
-    "id": "cmd-hive-mind-1754433560714",
-    "type": "hive-mind",
+    "id": "cmd-mcp-1754488970107",
+    "type": "mcp",
     "success": true,
-    "duration": 88.21755199999998,
-    "timestamp": 1754433560802,
+    "duration": 1.0511589999999842,
+    "timestamp": 1754488970109,
     "metadata": {}
   }
 ]
