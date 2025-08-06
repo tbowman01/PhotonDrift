@@ -1,83 +1,267 @@
-# Docker ignore file for ADRScan
-# Excludes unnecessary files from Docker build context
+# ==============================================================================
+# OPTIMIZED DOCKER BUILD CONTEXT EXCLUSIONS
+# Comprehensive .dockerignore for minimal build context and maximum security
+# ==============================================================================
 
-# Build artifacts
+# Build artifacts and compiled outputs
 target/
 Cargo.lock
+dist/
+build/
+out/
+*.wasm
+*.wat
 
-# Git and development files
+# Git and version control
 .git/
 .gitignore
+.gitattributes
+.gitmodules
 .github/
+**/.git/
+**/.gitignore
+
+# IDE and editor files  
 .vscode/
 .idea/
+*.sublime-*
+*.code-workspace
+.vs/
+*.swp
+*.swo
+*.tmp
+*~
 
-# Documentation and examples
+# Documentation and non-essential files
 docs/
 examples/
 *.md
 !README.md
+!assets/zscaler.crt
+CHANGELOG*
+LICENSE*
+CONTRIBUTING*
 
-# Test files
+# Test files and test data
 tests/
 **/tests/
 **/*_test.rs
 **/*_spec.rs
+**/*_test.go
+**/*_spec.js
+**/*_test.js
+test-*
+*.test.*
 
-# Development and CI files
+# Development and CI/CD files
 .env*
+!.env.example
 .travis.yml
 .circleci/
 codecov.yml
 .coverage/
+.nyc_output/
+coverage/
+jenkins/
+.gitlab-ci.yml
 
-# OS files
+# Operating system files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
-*.swp
-*.swo
-*~
+desktop.ini
 
-# Temporary files
+# Temporary files and logs
 tmp/
 temp/
 *.tmp
+*.temp
 *.log
+*.pid
+*.seed
+*.pid.lock
+.npm/
+.node_repl_history
 
-# IDE and editor files
-*.sublime-*
-*.code-workspace
-.vs/
-
-# Runtime and data files
+# Runtime and application data
 .adrscan-snapshot.json
 drift-report.json
 drift-analysis.json
 adr-inventory.json
+data/
+output/
+workspace/
+logs/
+*.sqlite
+*.db
 
-# WASM build outputs
+# WASM build outputs and web assets
 wasm/
 wasm-web/
 wasm-bundler/
 pkg/
+www/
+public/
+static/
 
-# Node.js (if present)
+# JavaScript/Node.js ecosystem
 node_modules/
-npm-debug.log
-yarn-error.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+.npm/
+.yarn/
+.eslintcache
+.parcel-cache/
+.cache/
 
-# Rust development
+# Rust development artifacts
 **/*.rs.bk
 .cargo/
+rust-toolchain*
+.rustfmt.toml
+clippy.toml
+
+# Python artifacts (if any)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
 # Security and secrets
 secrets/
 *.key
 *.pem
 *.crt
-!ca-certificates.crt
+*.p12
+*.pfx
+!assets/zscaler.crt
+.env.local
+.env.production
+.secrets
+auth.json
+credentials.json
 
-# Swarm coordination files
+# Swarm coordination and AI files
 .swarm/
 .hive-mind/
+.claude-flow/
 hive-mind-prompt-swarm-*
+*.swarm.json
+.ruv-swarm/
+
+# Docker and container files
+Docker*
+!Dockerfile
+!Dockerfile.*
+docker-compose*.yml
+!docker-compose.yml
+.dockerignore
+
+# Monitoring and profiling
+monitoring/
+prometheus-data/
+*.pprof
+*.prof
+flame.svg
+
+# Package manager lock files (keep only essential)
+yarn.lock
+package-lock.json
+pnpm-lock.yaml
+Poetry.lock
+Pipfile.lock
+
+# Large binary files and media
+*.bin
+*.exe
+*.dll
+*.so
+*.dylib
+*.dmg
+*.pkg
+*.deb
+*.rpm
+*.zip
+*.tar.gz
+*.7z
+*.rar
+*.iso
+*.img
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.mp3
+*.wav
+*.ogg
+*.flac
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+*.save
+*~
+
+# Performance and debugging files
+*.heapprofile
+*.heapsnapshot
+*.cpuprofile
+perf.data*
+callgrind.out*
+cachegrind.out*
+
+# Cloud and deployment artifacts
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+kubectl-*
+helm-*
+kustomization.yaml
+
+# Analytics and tracking
+.analytics/
+.sentry/
+.datadog/
+
+# ==============================================================================
+# KEEP ESSENTIAL FILES FOR BUILD
+# These patterns ensure required files are included despite broader exclusions
+# ==============================================================================
+
+# Essential source code
+!src/
+!Cargo.toml
+!assets/zscaler.crt
+
+# Required configuration files
+!.cargo/config.toml
+!rust-toolchain.toml
+
+# Essential documentation
+!README.md

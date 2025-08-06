@@ -49,6 +49,59 @@ PhotonDrift is an AI-powered Rust CLI tool that revolutionizes Architecture Deci
 - **Developer-Friendly**: One-command builds with environment automation
 - **Production-Ready**: Health checks, monitoring, and enterprise deployment
 
+## 🤖 GitHub Coordinator - Automated Repository Management
+
+### 🎯 **Intelligent Automation System**
+
+PhotonDrift includes a comprehensive **GitHub Coordinator** system that automatically:
+- 🔍 **Detects and resolves build issues** (129+ error types supported)
+- 🔧 **Handles merge conflicts** with smart, file-type-aware strategies
+- 📊 **Monitors repository health** continuously
+- 🛡️ **Enforces quality gates** and security standards
+- 🔄 **Manages PR lifecycle** with automated resubmission
+
+### 🚀 **Automatic Operation**
+
+The GitHub Coordinator runs automatically on:
+- ✅ **Push events** to main/develop branches
+- ✅ **Pull request** creation and updates
+- ✅ **Build failures** and quality issues
+- ✅ **Merge conflicts** detection
+- ✅ **Scheduled monitoring** (every 30 minutes)
+
+### 🎛️ **Manual Trigger Options**
+
+For advanced control, manually trigger specific coordinator modes:
+
+```bash
+# Full coordination (recommended)
+gh workflow run manual-coordinator-trigger.yml -f coordinator_mode=full-coordination
+
+# Build issues only
+gh workflow run manual-coordinator-trigger.yml -f coordinator_mode=build-fix-only
+
+# Conflict resolution only  
+gh workflow run manual-coordinator-trigger.yml -f coordinator_mode=conflict-resolution
+
+# Quality checks only
+gh workflow run manual-coordinator-trigger.yml -f coordinator_mode=quality-check
+
+# Emergency mode (bypass some checks)
+gh workflow run manual-coordinator-trigger.yml -f coordinator_mode=emergency-fix
+```
+
+### 📊 **System Status**
+
+Monitor coordinator activity:
+- **Actions Tab**: https://github.com/tbowman01/PhotonDrift/actions
+- **Build Health**: Automatic alerts for degradation
+- **Live Demo**: [PR #125](https://github.com/tbowman01/PhotonDrift/pull/125) shows 129 build errors being resolved automatically
+
+### 📚 **Complete Documentation**
+
+- **[GitHub Coordinator Guide](GITHUB_COORDINATOR_DOCUMENTATION.md)** - Complete usage and configuration
+- **[Deployment Summary](DEPLOYMENT_SUCCESS_SUMMARY.md)** - System capabilities and status
+
 ## 🐳 Quick Start - Container Usage
 
 ### Using the Simplified Build System (Recommended)

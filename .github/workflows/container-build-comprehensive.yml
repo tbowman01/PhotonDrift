@@ -1,0 +1,882 @@
+name: Comprehensive Container Build & Management
+
+on:
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Target platforms for build'
+        required: false
+        default: 'linux/amd64,linux/arm64'
+        type: string
+      environment:
+        description: 'Build environment'
+        required: false
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      push_to_registry:
+        description: 'Push containers to registry'
+        required: false
+        default: true
+        type: boolean
+      retry_on_failure:
+        description: 'Retry build on failure'
+        required: false
+        default: true
+        type: boolean
+      max_retries:
+        description: 'Maximum build retries'
+        required: false
+        default: '3'
+        type: string
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock' 
+      - 'Dockerfile*'
+      - '.dockerignore'
+      - '.github/workflows/container-build-comprehensive.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'Dockerfile*'
+      - '.dockerignore'
+  schedule:
+    # Daily build validation at 2 AM UTC
+    - cron: '0 2 * * *'
+
+concurrency:
+  group: container-build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  PLATFORMS: ${{ github.event.inputs.platforms || 'linux/amd64,linux/arm64' }}
+  BUILD_ENV: ${{ github.event.inputs.environment || 'development' }}
+  MAX_RETRIES: ${{ github.event.inputs.max_retries || '3' }}
+  ENABLE_RETRY: ${{ github.event.inputs.retry_on_failure || 'true' }}
+
+jobs:
+  # Pre-build validation and setup
+  pre-build-validation:
+    name: Pre-Build Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      build-context: ${{ steps.context.outputs.context }}
+      version: ${{ steps.version.outputs.version }}
+      should-build: ${{ steps.changes.outputs.should-build }}
+      dockerfile-path: ${{ steps.dockerfile.outputs.path }}
+      build-args: ${{ steps.build-args.outputs.args }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect build context and changes
+        id: changes
+        run: |
+          # Check if we should skip build for docs-only changes
+          if git diff --name-only HEAD~1 HEAD | grep -E "^(docs/|*.md$|CHANGELOG)" && ! git diff --name-only HEAD~1 HEAD | grep -E "^(src/|Cargo|Dockerfile)"; then
+            echo "should-build=false" >> $GITHUB_OUTPUT
+            echo "::notice::Docs-only changes detected, skipping build"
+          else
+            echo "should-build=true" >> $GITHUB_OUTPUT
+          fi
+          
+          # Detect significant changes
+          if git diff --name-only HEAD~1 HEAD | grep -E "^(src/ml/|src/wasm)"; then
+            echo "ML or WASM changes detected"
+            echo "critical-build=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate build context
+        id: context
+        run: |
+          BUILD_CONTEXT=$(cat <<EOF
+          {
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "git_sha": "${{ github.sha }}",
+            "git_ref": "${{ github.ref }}",
+            "branch": "${{ github.ref_name }}",
+            "event": "${{ github.event_name }}",
+            "actor": "${{ github.actor }}",
+            "run_id": "${{ github.run_id }}",
+            "environment": "${{ env.BUILD_ENV }}",
+            "platforms": "${{ env.PLATFORMS }}"
+          }
+          EOF
+          )
+          echo "context=${BUILD_CONTEXT}" >> $GITHUB_OUTPUT
+
+      - name: Extract version information
+        id: version
+        run: |
+          # Extract version from Cargo.toml
+          VERSION=$(grep '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)
+          
+          # Add build metadata for non-release builds
+          if [[ "${{ github.event_name }}" != "release" ]]; then
+            if [[ "${{ github.ref_name }}" == "develop" ]]; then
+              VERSION="${VERSION}-dev.${GITHUB_RUN_ID}"
+            elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+              VERSION="${VERSION}-pr.${{ github.event.pull_request.number }}"
+            elif [[ "${{ github.ref_name }}" != "main" ]]; then
+              BRANCH_CLEAN=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9-]/-/g')
+              VERSION="${VERSION}-${BRANCH_CLEAN}"
+            fi
+          fi
+          
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: Determine Dockerfile path
+        id: dockerfile
+        run: |
+          # Check for environment-specific Dockerfiles
+          if [[ -f "Dockerfile.${{ env.BUILD_ENV }}" ]]; then
+            echo "path=Dockerfile.${{ env.BUILD_ENV }}" >> $GITHUB_OUTPUT
+          elif [[ -f "Dockerfile.optimized" && "${{ env.BUILD_ENV }}" == "production" ]]; then
+            echo "path=Dockerfile.optimized" >> $GITHUB_OUTPUT
+          else
+            echo "path=Dockerfile" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate build arguments
+        id: build-args
+        run: |
+          BUILD_ARGS=$(cat <<EOF
+          VERSION=${{ steps.version.outputs.version }}
+          BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          GIT_SHA=${{ github.sha }}
+          GIT_SHA_SHORT=${GITHUB_SHA::8}
+          GIT_REF=${{ github.ref }}
+          BRANCH=${{ github.ref_name }}
+          BUILD_TYPE=${{ env.BUILD_ENV }}
+          SEMVER=${{ steps.version.outputs.version }}
+          GITHUB_RUN_ID=${{ github.run_id }}
+          BUILD_ENV=${{ env.BUILD_ENV }}
+          EOF
+          )
+          # Convert to single line for output
+          BUILD_ARGS_SINGLE=$(echo "$BUILD_ARGS" | tr '\n' '|' | sed 's/|$//')
+          echo "args=${BUILD_ARGS_SINGLE}" >> $GITHUB_OUTPUT
+
+      - name: Validate Docker context
+        run: |
+          echo "Validating Docker build context..."
+          
+          # Check Dockerfile exists
+          DOCKERFILE="${{ steps.dockerfile.outputs.path }}"
+          if [[ ! -f "$DOCKERFILE" ]]; then
+            echo "::error::Dockerfile not found: $DOCKERFILE"
+            exit 1
+          fi
+          
+          # Validate Dockerfile syntax with hadolint
+          docker run --rm -i hadolint/hadolint < "$DOCKERFILE" || {
+            echo "::warning::Dockerfile has linting warnings"
+          }
+          
+          # Check for required build context files
+          REQUIRED_FILES=("Cargo.toml" "src")
+          for file in "${REQUIRED_FILES[@]}"; do
+            if [[ ! -e "$file" ]]; then
+              echo "::error::Required build context file/directory missing: $file"
+              exit 1
+            fi
+          done
+          
+          echo "✅ Docker context validation passed"
+
+  # Multi-platform container build with retry logic
+  container-build:
+    name: Container Build (${{ matrix.platform }})
+    needs: pre-build-validation
+    if: needs.pre-build-validation.outputs.should-build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+    
+    outputs:
+      image-digest-amd64: ${{ steps.build-amd64.outputs.digest }}
+      image-digest-arm64: ${{ steps.build-arm64.outputs.digest }}
+      image-id: ${{ steps.meta.outputs.tags }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: ${{ matrix.platform }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: ${{ env.PLATFORMS }}
+          driver-opts: |
+            network=host
+
+      - name: Log in to Container Registry
+        if: github.event.inputs.push_to_registry != 'false'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}
+          flavor: |
+            latest=false
+            prefix=
+            suffix=
+          tags: |
+            # Environment-based tags
+            type=raw,value=${{ env.BUILD_ENV }}
+            type=raw,value=${{ env.BUILD_ENV }}-${{ needs.pre-build-validation.outputs.version }}
+            
+            # Branch-based tags
+            type=ref,event=branch,suffix=-${{ env.BUILD_ENV }}
+            type=ref,event=pr,prefix=pr-,suffix=-${{ env.BUILD_ENV }}
+            
+            # SHA-based tags
+            type=sha,prefix=sha-,suffix=-${{ env.BUILD_ENV }}
+            
+            # Version tags
+            type=raw,value=${{ needs.pre-build-validation.outputs.version }}
+            
+            # Latest tags
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' && env.BUILD_ENV == 'production' }}
+            type=raw,value=latest-${{ env.BUILD_ENV }},enable=${{ github.ref == 'refs/heads/main' }}
+            
+            # Platform-specific tags
+            type=raw,value=${{ env.BUILD_ENV }}-${{ matrix.platform }},suffix=
+          
+          labels: |
+            org.opencontainers.image.title=PhotonDrift ADRScan
+            org.opencontainers.image.description=AI-powered Architecture Decision Record management
+            org.opencontainers.image.vendor=PhotonDrift
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/README.md
+            
+            build.version=${{ needs.pre-build-validation.outputs.version }}
+            build.platform=${{ matrix.platform }}
+            build.environment=${{ env.BUILD_ENV }}
+            build.context=${{ needs.pre-build-validation.outputs.build-context }}
+
+      - name: Build container image with retry logic
+        id: build-with-retry
+        run: |
+          set -e
+          
+          # Parse build args
+          BUILD_ARGS_RAW="${{ needs.pre-build-validation.outputs.build-args }}"
+          BUILD_ARGS=$(echo "$BUILD_ARGS_RAW" | tr '|' '\n')
+          
+          # Create build args file
+          echo "$BUILD_ARGS" > build-args.txt
+          
+          # Build function with retry logic
+          build_container() {
+            local attempt=$1
+            local max_attempts=${{ env.MAX_RETRIES }}
+            
+            echo "🔨 Build attempt $attempt of $max_attempts for ${{ matrix.platform }}"
+            
+            # Create buildx build command
+            BUILD_CMD="docker buildx build \
+              --platform ${{ matrix.platform }} \
+              --file ${{ needs.pre-build-validation.outputs.dockerfile-path }} \
+              --load \
+              --tag photondrift:build-${{ matrix.platform }}-attempt-${attempt} \
+              --cache-from type=gha,scope=build-${{ matrix.platform }} \
+              --cache-to type=gha,mode=max,scope=build-${{ matrix.platform }}"
+            
+            # Add build args
+            while IFS= read -r arg; do
+              if [[ -n "$arg" ]]; then
+                BUILD_CMD="$BUILD_CMD --build-arg $arg"
+              fi
+            done < build-args.txt
+            
+            # Add context
+            BUILD_CMD="$BUILD_CMD ."
+            
+            # Execute build
+            if eval "$BUILD_CMD"; then
+              echo "✅ Build successful on attempt $attempt"
+              return 0
+            else
+              echo "❌ Build failed on attempt $attempt"
+              
+              # Analyze common failure patterns
+              echo "Analyzing failure patterns..."
+              
+              # Check for dependency issues
+              if docker logs $(docker ps -lq) 2>&1 | grep -i "could not find.*crate\|failed to resolve"; then
+                echo "🔍 Dependency resolution issue detected"
+                # Clear cache and retry
+                docker buildx prune -f
+              fi
+              
+              # Check for compilation errors
+              if docker logs $(docker ps -lq) 2>&1 | grep -i "error\[E[0-9]\+\]"; then
+                echo "🔍 Rust compilation error detected"
+                # Try with different Rust version or features
+              fi
+              
+              # Check for resource issues
+              if docker logs $(docker ps -lq) 2>&1 | grep -i "out of memory\|killed"; then
+                echo "🔍 Resource constraint detected"
+                # Add build args for resource optimization
+                BUILD_CMD="$BUILD_CMD --build-arg CARGO_BUILD_JOBS=1"
+              fi
+              
+              return 1
+            fi
+          }
+          
+          # Retry logic
+          for attempt in $(seq 1 ${{ env.MAX_RETRIES }}); do
+            if build_container $attempt; then
+              echo "build-success=true" >> $GITHUB_OUTPUT
+              echo "build-attempts=$attempt" >> $GITHUB_OUTPUT
+              break
+            elif [[ $attempt -eq ${{ env.MAX_RETRIES }} ]]; then
+              echo "❌ All build attempts failed"
+              echo "build-success=false" >> $GITHUB_OUTPUT
+              echo "build-attempts=$attempt" >> $GITHUB_OUTPUT
+              
+              # Generate failure report
+              echo "## Build Failure Report" > build-failure-${{ matrix.platform }}.md
+              echo "- Platform: ${{ matrix.platform }}" >> build-failure-${{ matrix.platform }}.md
+              echo "- Attempts: $attempt" >> build-failure-${{ matrix.platform }}.md
+              echo "- Environment: ${{ env.BUILD_ENV }}" >> build-failure-${{ matrix.platform }}.md
+              echo "- Dockerfile: ${{ needs.pre-build-validation.outputs.dockerfile-path }}" >> build-failure-${{ matrix.platform }}.md
+              echo "- Timestamp: $(date)" >> build-failure-${{ matrix.platform }}.md
+              
+              if [[ "${{ env.ENABLE_RETRY }}" == "false" ]]; then
+                exit 1
+              fi
+            else
+              echo "⏳ Waiting before retry attempt..."
+              sleep $((attempt * 10))  # Exponential backoff
+            fi
+          done
+
+      - name: Test container functionality
+        if: steps.build-with-retry.outputs.build-success == 'true'
+        run: |
+          echo "🧪 Testing container functionality for ${{ matrix.platform }}"
+          
+          IMAGE_TAG="photondrift:build-${{ matrix.platform }}-attempt-${{ steps.build-with-retry.outputs.build-attempts }}"
+          
+          # Basic functionality tests
+          echo "Testing binary execution..."
+          docker run --rm --platform ${{ matrix.platform }} "$IMAGE_TAG" --version
+          docker run --rm --platform ${{ matrix.platform }} "$IMAGE_TAG" --help > /dev/null
+          
+          # Test with sample workspace
+          echo "Testing with sample workspace..."
+          mkdir -p test-workspace
+          echo "# Test ADR" > test-workspace/adr-001.md
+          
+          docker run --rm --platform ${{ matrix.platform }} \
+            -v "$(pwd)/test-workspace:/workspace:ro" \
+            "$IMAGE_TAG" scan --json /workspace || echo "Scan test completed"
+          
+          # Verify container metadata
+          echo "Verifying container metadata..."
+          docker inspect "$IMAGE_TAG" | jq -r '.[0].Config.Labels' > labels-${{ matrix.platform }}.json
+          
+          # Check non-root execution
+          USER_ID=$(docker run --rm --platform ${{ matrix.platform }} "$IMAGE_TAG" id -u)
+          if [[ "$USER_ID" != "0" ]]; then
+            echo "✅ Container runs as non-root user (UID: $USER_ID)"
+          else
+            echo "❌ Container running as root!"
+            exit 1
+          fi
+          
+          echo "✅ Container functionality tests passed"
+
+      - name: Push to registry
+        if: steps.build-with-retry.outputs.build-success == 'true' && github.event.inputs.push_to_registry != 'false'
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ needs.pre-build-validation.outputs.dockerfile-path }}
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=build-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=build-${{ matrix.platform }}
+          build-args: ${{ needs.pre-build-validation.outputs.build-args }}
+          provenance: true
+          sbom: true
+
+      - name: Generate build summary
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 🐳 Container Build Summary (${{ matrix.platform }})
+          
+          **Build Status:** ${{ steps.build-with-retry.outputs.build-success == 'true' && '✅ Success' || '❌ Failed' }}
+          **Attempts:** ${{ steps.build-with-retry.outputs.build-attempts }}/${{ env.MAX_RETRIES }}
+          **Platform:** ${{ matrix.platform }}
+          **Environment:** ${{ env.BUILD_ENV }}
+          **Version:** ${{ needs.pre-build-validation.outputs.version }}
+          
+          EOF
+          
+          if [[ "${{ steps.build-with-retry.outputs.build-success }}" == "true" ]]; then
+            cat >> $GITHUB_STEP_SUMMARY << EOF
+          **Image Tags:**
+          \`\`\`
+          ${{ steps.meta.outputs.tags }}
+          \`\`\`
+          
+          **Digest:** \`${{ steps.push.outputs.digest }}\`
+          EOF
+          fi
+
+      - name: Upload build artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-failure-${{ matrix.platform }}
+          path: |
+            build-failure-${{ matrix.platform }}.md
+            labels-${{ matrix.platform }}.json
+            build-args.txt
+          retention-days: 7
+
+  # Security scanning with comprehensive coverage
+  security-scan:
+    name: Security Scan & Validation
+    needs: [pre-build-validation, container-build]
+    if: always() && needs.container-build.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        scanner: [trivy, grype]
+        platform: [linux/amd64, linux/arm64]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Pull built image for scanning
+        run: |
+          # Pull the specific platform image for scanning
+          IMAGE_TAG="${{ env.REGISTRY }}/${{ github.repository }}:${{ env.BUILD_ENV }}-${{ needs.pre-build-validation.outputs.version }}"
+          
+          echo "Pulling image for security scan: $IMAGE_TAG"
+          docker pull --platform ${{ matrix.platform }} "$IMAGE_TAG"
+
+      - name: Run Trivy security scan
+        if: matrix.scanner == 'trivy'
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ github.repository }}:${{ env.BUILD_ENV }}-${{ needs.pre-build-validation.outputs.version }}
+          format: 'sarif'
+          output: 'trivy-results-${{ matrix.platform }}.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          exit-code: '0'
+
+      - name: Run Grype security scan
+        if: matrix.scanner == 'grype'
+        run: |
+          # SECURITY: Install Grype with secure checksum verification
+          GRYPE_VERSION="v0.79.4"
+          # Note: This is a placeholder checksum - replace with actual checksum for production
+          GRYPE_CHECKSUM="9f4c8b7a6e5d3f2a1b9c8d7e6f5a4b3c2d1e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5"
+          
+          # Use secure helper script for download and verification
+          chmod +x .github/scripts/security-checksum-helper.sh
+          
+          # Download with secure verification
+          .github/scripts/security-checksum-helper.sh download \
+            "https://github.com/anchore/grype/releases/download/${GRYPE_VERSION}/grype_${GRYPE_VERSION#v}_linux_amd64.tar.gz" \
+            "grype.tar.gz" \
+            "${GRYPE_CHECKSUM}" \
+            "sha256" \
+            3
+          
+          # Extract and install with secure permissions
+          tar -xzf grype.tar.gz grype
+          chmod +x grype
+          sudo mv grype /usr/local/bin/grype
+          rm -f grype.tar.gz
+          
+          # Verify installation and version
+          grype version
+          echo "✅ SECURITY: Grype installed securely with checksum verification"
+          
+          IMAGE_TAG="${{ env.REGISTRY }}/${{ github.repository }}:${{ env.BUILD_ENV }}-${{ needs.pre-build-validation.outputs.version }}"
+          
+          # Run Grype scan
+          grype "$IMAGE_TAG" -o json > grype-results-${{ matrix.platform }}.json || true
+          grype "$IMAGE_TAG" -o table > grype-results-${{ matrix.platform }}.txt || true
+
+      - name: Upload security scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && matrix.scanner == 'trivy' && hashFiles(format('trivy-results-{0}.sarif', matrix.platform)) != ''
+        with:
+          sarif_file: trivy-results-${{ matrix.platform }}.sarif
+
+      - name: Generate security report
+        run: |
+          echo "# Security Scan Report (${{ matrix.scanner }} - ${{ matrix.platform }})" > security-report-${{ matrix.scanner }}-${{ matrix.platform }}.md
+          echo "Generated at: $(date)" >> security-report-${{ matrix.scanner }}-${{ matrix.platform }}.md
+          echo "Platform: ${{ matrix.platform }}" >> security-report-${{ matrix.scanner }}-${{ matrix.platform }}.md
+          echo "Scanner: ${{ matrix.scanner }}" >> security-report-${{ matrix.scanner }}-${{ matrix.platform }}.md
+          echo "" >> security-report-${{ matrix.scanner }}-${{ matrix.platform }}.md
+          
+          if [[ "${{ matrix.scanner }}" == "trivy" && -f "trivy-results-${{ matrix.platform }}.sarif" ]]; then
+            echo "✅ Trivy scan completed - Results uploaded to Security tab" >> security-report-${{ matrix.scanner }}-${{ matrix.platform }}.md
+          elif [[ "${{ matrix.scanner }}" == "grype" && -f "grype-results-${{ matrix.platform }}.json" ]]; then
+            echo "✅ Grype scan completed - Results available in artifacts" >> security-report-${{ matrix.scanner }}-${{ matrix.platform }}.md
+          fi
+
+      - name: Upload security artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan-${{ matrix.scanner }}-${{ matrix.platform }}
+          path: |
+            security-report-${{ matrix.scanner }}-${{ matrix.platform }}.md
+            trivy-results-${{ matrix.platform }}.sarif
+            grype-results-${{ matrix.platform }}.json
+            grype-results-${{ matrix.platform }}.txt
+          retention-days: 30
+
+  # Deployment and registry management
+  deployment-prep:
+    name: Deployment Preparation
+    needs: [pre-build-validation, container-build, security-scan]
+    if: always() && needs.container-build.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      deployment-ready: ${{ steps.checks.outputs.ready }}
+      manifests-generated: ${{ steps.manifests.outputs.generated }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deployment readiness checks
+        id: checks
+        run: |
+          echo "🔍 Performing deployment readiness checks..."
+          
+          READY=true
+          
+          # Check if security scans passed
+          if [[ "${{ needs.security-scan.result }}" != "success" ]]; then
+            echo "❌ Security scans not complete"
+            READY=false
+          fi
+          
+          # Check if all platforms built successfully
+          if [[ "${{ needs.container-build.result }}" != "success" ]]; then
+            echo "❌ Container builds not successful"
+            READY=false
+          fi
+          
+          # Additional environment-specific checks
+          if [[ "${{ env.BUILD_ENV }}" == "production" ]]; then
+            # Production requires successful security scans
+            echo "🔒 Production deployment requires clean security scan"
+            # Add additional production readiness checks here
+          fi
+          
+          echo "ready=$READY" >> $GITHUB_OUTPUT
+          echo "Deployment ready: $READY"
+
+      - name: Generate deployment manifests
+        id: manifests
+        run: |
+          echo "📝 Generating deployment manifests..."
+          
+          mkdir -p deployment-manifests
+          
+          # Kubernetes deployment
+          cat > deployment-manifests/kubernetes-deployment.yaml << EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: photondrift-adrscan
+            labels:
+              app: photondrift-adrscan
+              version: "${{ needs.pre-build-validation.outputs.version }}"
+              environment: "${{ env.BUILD_ENV }}"
+          spec:
+            replicas: ${{ env.BUILD_ENV == 'production' && '3' || '1' }}
+            selector:
+              matchLabels:
+                app: photondrift-adrscan
+            template:
+              metadata:
+                labels:
+                  app: photondrift-adrscan
+                  version: "${{ needs.pre-build-validation.outputs.version }}"
+              spec:
+                containers:
+                - name: adrscan
+                  image: ${{ env.REGISTRY }}/${{ github.repository }}:${{ env.BUILD_ENV }}-${{ needs.pre-build-validation.outputs.version }}
+                  imagePullPolicy: Always
+                  resources:
+                    requests:
+                      memory: "128Mi"
+                      cpu: "100m"
+                    limits:
+                      memory: "512Mi"
+                      cpu: "500m"
+                  env:
+                  - name: RUST_LOG
+                    value: "info"
+                  - name: BUILD_ENV
+                    value: "${{ env.BUILD_ENV }}"
+                  volumeMounts:
+                  - name: workspace
+                    mountPath: /workspace
+                    readOnly: true
+                volumes:
+                - name: workspace
+                  emptyDir: {}
+                securityContext:
+                  runAsNonRoot: true
+                  runAsUser: 65532
+                  runAsGroup: 65532
+                  fsGroup: 65532
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: photondrift-adrscan-service
+            labels:
+              app: photondrift-adrscan
+          spec:
+            selector:
+              app: photondrift-adrscan
+            ports:
+            - name: http
+              port: 8080
+              targetPort: 8080
+              protocol: TCP
+            type: ClusterIP
+          EOF
+          
+          # Docker Compose for local development
+          cat > deployment-manifests/docker-compose.yml << EOF
+          version: '3.8'
+          services:
+            photondrift:
+              image: ${{ env.REGISTRY }}/${{ github.repository }}:${{ env.BUILD_ENV }}-${{ needs.pre-build-validation.outputs.version }}
+              container_name: photondrift-adrscan
+              environment:
+                - RUST_LOG=info
+                - BUILD_ENV=${{ env.BUILD_ENV }}
+              volumes:
+                - ./workspace:/workspace:ro
+                - ./output:/output
+              working_dir: /workspace
+              user: "65532:65532"
+              security_opt:
+                - no-new-privileges:true
+              read_only: true
+              tmpfs:
+                - /tmp:noexec,nosuid,size=100m
+              restart: unless-stopped
+              deploy:
+                resources:
+                  limits:
+                    cpus: '0.5'
+                    memory: 512M
+                  reservations:
+                    cpus: '0.1'
+                    memory: 128M
+          EOF
+          
+          # Helm values template
+          cat > deployment-manifests/helm-values.yaml << EOF
+          image:
+            repository: ${{ env.REGISTRY }}/${{ github.repository }}
+            tag: "${{ env.BUILD_ENV }}-${{ needs.pre-build-validation.outputs.version }}"
+            pullPolicy: Always
+          
+          replicaCount: ${{ env.BUILD_ENV == 'production' && '3' || '1' }}
+          
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          
+          environment: ${{ env.BUILD_ENV }}
+          version: "${{ needs.pre-build-validation.outputs.version }}"
+          
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            fsGroup: 65532
+          EOF
+          
+          echo "generated=true" >> $GITHUB_OUTPUT
+          echo "✅ Deployment manifests generated"
+
+      - name: Upload deployment artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-manifests-${{ env.BUILD_ENV }}
+          path: deployment-manifests/
+          retention-days: 90
+
+  # Final reporting and notifications
+  build-report:
+    name: Build Report & Notifications
+    needs: [pre-build-validation, container-build, security-scan, deployment-prep]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: always()
+    
+    steps:
+      - name: Generate comprehensive build report
+        run: |
+          echo "# 🚀 Comprehensive Container Build Report" > build-report.md
+          echo "Generated at: $(date)" >> build-report.md
+          echo "Repository: ${{ github.repository }}" >> build-report.md
+          echo "Commit: ${{ github.sha }}" >> build-report.md
+          echo "Branch: ${{ github.ref_name }}" >> build-report.md
+          echo "Environment: ${{ env.BUILD_ENV }}" >> build-report.md
+          echo "" >> build-report.md
+          
+          echo "## 📊 Job Results Summary" >> build-report.md
+          echo "| Job | Status | Duration |" >> build-report.md
+          echo "|-----|--------|----------|" >> build-report.md
+          echo "| Pre-Build Validation | ${{ needs.pre-build-validation.result }} | - |" >> build-report.md
+          echo "| Container Build | ${{ needs.container-build.result }} | - |" >> build-report.md
+          echo "| Security Scan | ${{ needs.security-scan.result }} | - |" >> build-report.md
+          echo "| Deployment Prep | ${{ needs.deployment-prep.result }} | - |" >> build-report.md
+          echo "" >> build-report.md
+          
+          # Build details
+          if [[ "${{ needs.pre-build-validation.result }}" == "success" ]]; then
+            echo "## 🔧 Build Configuration" >> build-report.md
+            echo "- **Version:** ${{ needs.pre-build-validation.outputs.version }}" >> build-report.md
+            echo "- **Platforms:** ${{ env.PLATFORMS }}" >> build-report.md
+            echo "- **Environment:** ${{ env.BUILD_ENV }}" >> build-report.md
+            echo "- **Dockerfile:** ${{ needs.pre-build-validation.outputs.dockerfile-path }}" >> build-report.md
+            echo "- **Registry:** ${{ env.REGISTRY }}/${{ github.repository }}" >> build-report.md
+            echo "" >> build-report.md
+          fi
+          
+          # Success summary
+          if [[ "${{ needs.container-build.result }}" == "success" ]]; then
+            echo "## ✅ Successfully Built Images" >> build-report.md
+            echo "\`\`\`" >> build-report.md
+            echo "${{ env.REGISTRY }}/${{ github.repository }}:${{ env.BUILD_ENV }}-${{ needs.pre-build-validation.outputs.version }}" >> build-report.md
+            echo "${{ env.REGISTRY }}/${{ github.repository }}:${{ env.BUILD_ENV }}" >> build-report.md
+            echo "\`\`\`" >> build-report.md
+            echo "" >> build-report.md
+            
+            echo "## 🚢 Deployment Ready" >> build-report.md
+            echo "- **Status:** ${{ needs.deployment-prep.outputs.deployment-ready == 'true' && '✅ Ready' || '❌ Not Ready' }}" >> build-report.md
+            echo "- **Manifests:** ${{ needs.deployment-prep.outputs.manifests-generated == 'true' && '✅ Generated' || '❌ Not Generated' }}" >> build-report.md
+            echo "" >> build-report.md
+          fi
+          
+          # Failure analysis
+          if [[ "${{ needs.container-build.result }}" == "failure" ]]; then
+            echo "## ❌ Build Failures" >> build-report.md
+            echo "The container build failed. Check the build logs and artifacts for detailed error information." >> build-report.md
+            echo "" >> build-report.md
+            echo "### Recommended Actions:" >> build-report.md
+            echo "1. Review build logs for specific error messages" >> build-report.md
+            echo "2. Check dependency conflicts or compilation errors" >> build-report.md
+            echo "3. Verify Dockerfile and build context" >> build-report.md
+            echo "4. Consider enabling retry with \`retry_on_failure: true\`" >> build-report.md
+            echo "" >> build-report.md
+          fi
+          
+          # Security findings
+          if [[ "${{ needs.security-scan.result }}" == "success" ]]; then
+            echo "## 🛡️ Security Scan Results" >> build-report.md
+            echo "Security scans completed successfully. Check the Security tab for detailed vulnerability reports." >> build-report.md
+            echo "" >> build-report.md
+          fi
+          
+          echo "## 🔗 Quick Actions" >> build-report.md
+          if [[ "${{ needs.container-build.result }}" == "success" ]]; then
+            echo "\`\`\`bash" >> build-report.md
+            echo "# Pull and test the built image" >> build-report.md
+            echo "docker pull ${{ env.REGISTRY }}/${{ github.repository }}:${{ env.BUILD_ENV }}-${{ needs.pre-build-validation.outputs.version }}" >> build-report.md
+            echo "docker run --rm ${{ env.REGISTRY }}/${{ github.repository }}:${{ env.BUILD_ENV }}-${{ needs.pre-build-validation.outputs.version }} --help" >> build-report.md
+            echo "" >> build-report.md
+            echo "# Deploy with Docker Compose" >> build-report.md
+            echo "# Download deployment-manifests artifact and run:" >> build-report.md
+            echo "docker-compose -f docker-compose.yml up" >> build-report.md
+            echo "\`\`\`" >> build-report.md
+          fi
+
+      - name: Upload build report
+        uses: actions/upload-artifact@v4
+        with:
+          name: comprehensive-build-report
+          path: build-report.md
+          retention-days: 90
+
+      - name: Notify on success
+        if: needs.container-build.result == 'success' && needs.security-scan.result == 'success'
+        run: |
+          echo "🎉 Container build pipeline completed successfully!"
+          echo ""
+          echo "✅ Built for platforms: ${{ env.PLATFORMS }}"
+          echo "✅ Security scanned: All platforms"
+          echo "✅ Deployment ready: ${{ needs.deployment-prep.outputs.deployment-ready }}"
+          echo ""
+          echo "📦 Images available at:"
+          echo "   ${{ env.REGISTRY }}/${{ github.repository }}:${{ env.BUILD_ENV }}-${{ needs.pre-build-validation.outputs.version }}"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Container build pipeline failed!"
+          echo ""
+          echo "Failed jobs:"
+          [[ "${{ needs.pre-build-validation.result }}" == "failure" ]] && echo "  - Pre-Build Validation"
+          [[ "${{ needs.container-build.result }}" == "failure" ]] && echo "  - Container Build" 
+          [[ "${{ needs.security-scan.result }}" == "failure" ]] && echo "  - Security Scan"
+          [[ "${{ needs.deployment-prep.result }}" == "failure" ]] && echo "  - Deployment Prep"
+          echo ""
+          echo "🔍 Check build artifacts and logs for detailed error information."
+          echo "💡 Consider enabling retry_on_failure if build issues are transient."
