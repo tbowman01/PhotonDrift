@@ -1,0 +1,282 @@
+# Advanced Rust/Cargo Caching Configuration
+# Optimized for 40-60% compile time reduction
+
+cache_strategies:
+  # Multi-layer Rust compilation caching
+  rust_compilation:
+    # Layer 1: Cargo Registry Cache (Most stable, longest TTL)
+    registry_cache:
+      paths:
+        - "~/.cargo/registry/index"
+        - "~/.cargo/registry/cache"
+      key_strategy: "rust_version + cargo_toml_hash"
+      ttl: "7d"
+      fallback_levels: 3
+      save_policy: "always"
+      
+    # Layer 2: Git Dependencies Cache (Moderate stability)
+    git_cache:
+      paths:
+        - "~/.cargo/git"
+      key_strategy: "rust_version + git_refs_hash"
+      ttl: "3d"
+      fallback_levels: 2
+      save_policy: "on_success"
+      
+    # Layer 3: sccache Distributed Compilation (High performance)
+    sccache_cache:
+      paths:
+        - "~/.cache/sccache"
+        - "/tmp/sccache" # Windows: "C:/sccache"
+      key_strategy: "rust_version + source_hash + feature_flags"
+      ttl: "1d"
+      fallback_levels: 1
+      save_policy: "always"
+      compression: "zstd"
+      
+    # Layer 4: Target Directory Cache (Most volatile, shortest TTL)
+    target_cache:
+      paths:
+        # Debug artifacts
+        - "target/debug/deps"
+        - "target/debug/build"
+        - "target/debug/incremental" 
+        # Release artifacts
+        - "target/release/deps"
+        - "target/release/build"
+        # Exclude final binaries to force linking
+      exclude_paths:
+        - "target/debug/adrscan*"
+        - "target/release/adrscan*"
+        - "target/*/examples"
+        - "target/*/tests"
+      key_strategy: "source_hash + cargo_lock_hash + feature_flags + profile"
+      ttl: "6h"
+      fallback_levels: 4
+      save_policy: "on_success"
+
+# Smart cache key generation strategies
+cache_keys:
+  rust_version:
+    source: "rustc_version"
+    format: "rust-{version}"
+    stability: "high"
+    
+  cargo_toml_hash:
+    source: "file_hash"
+    files: ["Cargo.toml"]
+    algorithm: "sha256"
+    length: 12
+    stability: "medium"
+    
+  cargo_lock_hash:
+    source: "file_hash" 
+    files: ["Cargo.lock"]
+    algorithm: "sha256"
+    length: 16
+    stability: "high"
+    
+  source_hash:
+    source: "git_tree_hash"
+    paths: ["src/**", "benches/**", "examples/**"]
+    algorithm: "sha256"
+    length: 8
+    stability: "low"
+    
+  feature_flags:
+    source: "normalized_flags"
+    algorithm: "sha256"
+    length: 8
+    stability: "medium"
+
+# Fallback chain configuration
+fallback_chains:
+  aggressive:
+    # Maximum cache reuse, fastest builds
+    registry:
+      - "v3-{os}-cargo-{rust_version}-{cargo_toml_hash}"
+      - "v3-{os}-cargo-{rust_version}-"
+      - "v3-{os}-cargo-"
+    target:
+      - "v3-{os}-target-{source_hash}-{feature_flags}-{profile}"
+      - "v3-{os}-target-{source_hash}-{feature_flags}-"
+      - "v3-{os}-target-{source_hash}-"
+      - "v3-{os}-target-"
+      
+  balanced:
+    # Balanced performance and safety
+    registry:
+      - "v3-{os}-cargo-{rust_version}-{cargo_lock_hash[0:12]}"
+      - "v3-{os}-cargo-{rust_version}-{cargo_toml_hash}"
+      - "v3-{os}-cargo-{rust_version}-"
+    target:
+      - "v3-{os}-target-{source_hash}-{cargo_lock_hash[0:8]}-{profile}"
+      - "v3-{os}-target-{source_hash}-{profile}"
+      - "v3-{os}-target-{profile}"
+      
+  conservative:
+    # Maximum build reliability
+    registry:
+      - "v3-{os}-cargo-{rust_version}-{cargo_lock_hash}"
+      - "v3-{os}-cargo-{rust_version}-{cargo_lock_hash[0:16]}"
+    target:
+      - "v3-{os}-target-{source_hash}-{cargo_lock_hash}-{feature_flags}-{profile}"
+      - "v3-{os}-target-{source_hash}-{cargo_lock_hash}-{profile}"
+
+# Optimization configurations per build type
+build_optimizations:
+  development:
+    profile: "dev"
+    incremental: true
+    parallel_jobs: "auto"  # num_cpus
+    codegen_units: 256
+    debug_assertions: true
+    overflow_checks: true
+    lto: false
+    
+  ci_fast:
+    profile: "dev-opt" 
+    incremental: true
+    parallel_jobs: "auto"
+    codegen_units: 16
+    debug_assertions: true
+    overflow_checks: true
+    lto: false
+    opt_level: 1
+    
+  release:
+    profile: "release"
+    incremental: false
+    parallel_jobs: "auto" 
+    codegen_units: 16
+    debug_assertions: false
+    overflow_checks: false
+    lto: "thin"
+    opt_level: "s"
+    strip: "symbols"
+    
+  production:
+    profile: "production"
+    incremental: false
+    parallel_jobs: "auto"
+    codegen_units: 1
+    debug_assertions: false
+    overflow_checks: false  
+    lto: "fat"
+    opt_level: "z"
+    strip: "symbols"
+
+# Feature-specific cache optimizations
+feature_optimization:
+  # Base features (always cached)
+  base:
+    dependencies: ["serde", "clap", "anyhow", "log"]
+    cache_priority: "high"
+    precompile: true
+    
+  # ML features (heavy compilation)
+  ml:
+    dependencies: ["smartcore", "ndarray", "nalgebra"]
+    cache_priority: "critical"
+    precompile: true
+    parallel_friendly: false
+    
+  # LSP features (moderate compilation)
+  lsp:
+    dependencies: ["tower-lsp", "lsp-types", "tokio-util"]
+    cache_priority: "high"
+    precompile: true
+    
+  # Realtime features (async runtime)
+  realtime:
+    dependencies: ["tokio", "notify", "dashmap"]
+    cache_priority: "medium"
+    precompile: false
+    
+  # Plugin features (complex dependencies)
+  plugins:
+    dependencies: ["wasmtime", "libloading", "reqwest"]
+    cache_priority: "high"
+    precompile: true
+    
+  # WASM features (target-specific)
+  wasm:
+    dependencies: ["wasm-bindgen", "js-sys", "web-sys"]
+    cache_priority: "medium"
+    precompile: false
+    target_specific: true
+
+# Platform-specific optimizations
+platform_config:
+  linux:
+    sccache_size: "10G"
+    parallel_jobs_multiplier: 1.0
+    registry_compression: "zstd"
+    
+  windows:
+    sccache_size: "8G"
+    parallel_jobs_multiplier: 0.8
+    registry_compression: "gzip"
+    path_separator: "\\"
+    
+  macos:
+    sccache_size: "6G" 
+    parallel_jobs_multiplier: 0.9
+    registry_compression: "zstd"
+
+# Cache warming strategies
+warming_strategies:
+  minimal:
+    features: ["base"]
+    profiles: ["dev"]
+    frequency: "daily"
+    
+  comprehensive:
+    features: ["base", "ml", "lsp", "realtime"]
+    profiles: ["dev", "release"]
+    frequency: "daily"
+    
+  full_matrix:
+    features: ["base", "ml", "lsp", "realtime", "plugins", "all-features"]
+    profiles: ["dev", "dev-opt", "release"]
+    frequency: "weekly"
+
+# Performance monitoring
+monitoring:
+  cache_hit_rate:
+    target: ">85%"
+    alert_threshold: "<70%"
+    
+  build_time_reduction:
+    cold_vs_warm: ">40%"
+    warm_vs_hot: ">70%"
+    
+  sccache_efficiency:
+    hit_rate: ">60%"
+    compilation_reduction: ">30%"
+
+# Maintenance schedule
+maintenance:
+  daily:
+    - "dependency_warming"
+    - "cache_health_check"
+    
+  weekly:
+    - "full_cache_refresh"
+    - "performance_analysis"
+    
+  monthly:
+    - "strategy_optimization"
+    - "cleanup_stale_caches"
+
+# Emergency procedures
+emergency:
+  cache_corruption:
+    - "invalidate_all_caches"
+    - "rebuild_from_scratch"
+    - "warm_critical_dependencies"
+    
+  performance_degradation:
+    - "analyze_cache_hit_rates"
+    - "check_sccache_health"
+    - "review_key_strategies"
