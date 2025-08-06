@@ -1,8 +1,8 @@
 //! Factory for creating ML models
 
-use crate::drift::DriftResult;
 use super::core::{AnomalyModel, ModelType};
-use super::{IsolationForest, OneClassSVM, StatisticalModel, EnsembleModel};
+use super::{EnsembleModel, IsolationForest, OneClassSVM, StatisticalModel};
+use crate::drift::DriftResult;
 
 /// Factory for creating ML models
 pub struct ModelFactory;
@@ -18,7 +18,7 @@ impl ModelFactory {
             ModelType::LocalOutlierFactor => {
                 // TODO: Implement LOF model
                 Err(crate::AdrscanError::DriftError(
-                    "LocalOutlierFactor not implemented yet".to_string()
+                    "LocalOutlierFactor not implemented yet".to_string(),
                 ))
             }
         }
@@ -28,7 +28,7 @@ impl ModelFactory {
     pub fn available_models() -> Vec<ModelType> {
         vec![
             ModelType::IsolationForest,
-            ModelType::OneClassSVM, 
+            ModelType::OneClassSVM,
             ModelType::Statistical,
             ModelType::Ensemble,
         ]

@@ -4,6 +4,8 @@
 //! enabling real-time ADR analysis, drift detection, and intelligent
 //! code assistance features.
 
+#![cfg(feature = "lsp")]
+
 mod completion;
 mod diagnostics;
 mod handlers;

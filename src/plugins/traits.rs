@@ -3,7 +3,9 @@
 use crate::{AdrscanError, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 /// Core plugin trait that all plugins must implement
 pub trait Plugin: Send + Sync {
@@ -201,6 +203,7 @@ pub enum IDEType {
     Sublime,
     Atom,
     Universal, // LSP-based
+    Other(String),
 }
 
 /// IDE configuration

@@ -91,24 +91,6 @@ jobs:
           echo "BRANCH_NAME_CLEAN=${BRANCH_NAME//[^a-zA-Z0-9-]/-}" >> $GITHUB_ENV
           echo "BRANCH=${GITHUB_REF_NAME}" >> $GITHUB_ENV
           
-<<<<<<< HEAD
-          # Extract version from Cargo.toml
-          VERSION=$(grep '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          
-          # Extract semantic version
-          if [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]]; then
-            SEMVER="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
-            echo "SEMVER=$SEMVER" >> $GITHUB_ENV
-            echo "MAJOR=${BASH_REMATCH[1]}" >> $GITHUB_ENV
-            echo "MINOR=${BASH_REMATCH[2]}" >> $GITHUB_ENV
-            echo "PATCH=${BASH_REMATCH[3]}" >> $GITHUB_ENV
-            echo "PRERELEASE=${BASH_REMATCH[4]}" >> $GITHUB_ENV
-          else
-            echo "SEMVER=$VERSION" >> $GITHUB_ENV
-          fi
-=======
           # Extract version from Cargo.toml and append run ID for CI builds
           VERSION=$(grep '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)
           if [[ "${{ github.event_name }}" != "pull_request" && "$BRANCH_NAME" == "develop" ]]; then
@@ -291,10 +273,6 @@ jobs:
           
           echo "🔍 Testing container: $IMAGE"
           
-<<<<<<< HEAD
-          # Basic functionality tests
-          echo "Testing adrscan binary functionality..."
-=======
           # Issue #87 - Explicit Docker Binary Verification Tests
           echo "=== Issue #87: Docker Binary Verification ==="
           

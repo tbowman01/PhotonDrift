@@ -71,57 +71,66 @@ jobs:
           
           # Generate SARIF report for GitHub Security tab
           echo "::group::Generating SARIF report"
-          cargo audit --json | python3 -c "
-import json
-import sys
-
-# Read cargo-audit JSON output
-audit_data = json.load(sys.stdin)
-
-# Convert to SARIF format
-sarif = {
-    'version': '2.1.0',
-    'runs': [{
-        'tool': {
-            'driver': {
-                'name': 'cargo-audit',
-                'version': '0.20.0',
-                'informationUri': 'https://github.com/RustSec/cargo-audit'
-            }
-        },
-        'results': []
-    }]
-}
-
-# Convert vulnerabilities to SARIF results
-if 'vulnerabilities' in audit_data:
-    for vuln in audit_data['vulnerabilities']['list']:
-        result = {
-            'ruleId': vuln['advisory']['id'],
-            'level': 'error' if vuln['advisory']['severity'] in ['critical', 'high'] else 'warning',
-            'message': {
-                'text': f\"{vuln['advisory']['title']}: {vuln['advisory']['description']}\"
-            },
-            'locations': [{
-                'physicalLocation': {
-                    'artifactLocation': {
-                        'uri': 'Cargo.toml'
-                    }
-                }
-            }],
-            'properties': {
-                'package': vuln['package']['name'],
-                'version': vuln['package']['version'],
-                'severity': vuln['advisory']['severity'],
-                'cve': vuln['advisory'].get('cve', 'N/A'),
-                'url': vuln['advisory'].get('url', '')
-            }
-        }
-        sarif['runs'][0]['results'].append(result)
-
-# Output SARIF
-print(json.dumps(sarif, indent=2))
-" > security-reports/audit-report.sarif || echo '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"cargo-audit"}},"results":[]}]}' > security-reports/audit-report.sarif
+          
+          # Create Python script for SARIF conversion (avoiding heredoc YAML issues)
+          echo 'import json' > sarif_converter.py
+          echo 'import sys' >> sarif_converter.py
+          echo '' >> sarif_converter.py
+          echo 'try:' >> sarif_converter.py
+          echo '    # Read cargo-audit JSON output' >> sarif_converter.py
+          echo '    audit_data = json.load(sys.stdin)' >> sarif_converter.py
+          echo '    ' >> sarif_converter.py
+          echo '    # Convert to SARIF format' >> sarif_converter.py
+          echo '    sarif = {' >> sarif_converter.py
+          echo "        'version': '2.1.0'," >> sarif_converter.py
+          echo "        'runs': [{" >> sarif_converter.py
+          echo "            'tool': {" >> sarif_converter.py
+          echo "                'driver': {" >> sarif_converter.py
+          echo "                    'name': 'cargo-audit'," >> sarif_converter.py
+          echo "                    'version': '0.20.0'," >> sarif_converter.py
+          echo "                    'informationUri': 'https://github.com/RustSec/cargo-audit'" >> sarif_converter.py
+          echo "                }" >> sarif_converter.py
+          echo "            }," >> sarif_converter.py
+          echo "            'results': []" >> sarif_converter.py
+          echo "        }]" >> sarif_converter.py
+          echo '    }' >> sarif_converter.py
+          echo '    ' >> sarif_converter.py
+          echo "    # Convert vulnerabilities to SARIF results" >> sarif_converter.py
+          echo "    if 'vulnerabilities' in audit_data:" >> sarif_converter.py
+          echo "        for vuln in audit_data['vulnerabilities']['list']:" >> sarif_converter.py
+          echo "            result = {" >> sarif_converter.py
+          echo "                'ruleId': vuln['advisory']['id']," >> sarif_converter.py
+          echo "                'level': 'error' if vuln['advisory']['severity'] in ['critical', 'high'] else 'warning'," >> sarif_converter.py
+          echo '                "message": {' >> sarif_converter.py
+          echo '                    "text": f"{vuln[\"advisory\"][\"title\"]}: {vuln[\"advisory\"][\"description\"]}"' >> sarif_converter.py
+          echo '                },' >> sarif_converter.py
+          echo '                "locations": [{' >> sarif_converter.py
+          echo '                    "physicalLocation": {' >> sarif_converter.py
+          echo '                        "artifactLocation": {' >> sarif_converter.py
+          echo '                            "uri": "Cargo.toml"' >> sarif_converter.py
+          echo '                        }' >> sarif_converter.py
+          echo '                    }' >> sarif_converter.py
+          echo '                }],' >> sarif_converter.py
+          echo '                "properties": {' >> sarif_converter.py
+          echo '                    "package": vuln["package"]["name"],' >> sarif_converter.py
+          echo '                    "version": vuln["package"]["version"],' >> sarif_converter.py
+          echo '                    "severity": vuln["advisory"]["severity"],' >> sarif_converter.py
+          echo '                    "cve": vuln["advisory"].get("cve", "N/A"),' >> sarif_converter.py
+          echo '                    "url": vuln["advisory"].get("url", "")' >> sarif_converter.py
+          echo '                }' >> sarif_converter.py
+          echo '            }' >> sarif_converter.py
+          echo '            sarif["runs"][0]["results"].append(result)' >> sarif_converter.py
+          echo '    ' >> sarif_converter.py
+          echo '    # Output SARIF' >> sarif_converter.py
+          echo '    print(json.dumps(sarif, indent=2))' >> sarif_converter.py
+          echo '    ' >> sarif_converter.py
+          echo 'except Exception as e:' >> sarif_converter.py
+          echo '    # Fallback empty SARIF on error' >> sarif_converter.py
+          echo '    empty_sarif = {"version":"2.1.0","runs":[{"tool":{"driver":{"name":"cargo-audit"}},"results":[]}]}' >> sarif_converter.py
+          echo '    print(json.dumps(empty_sarif))' >> sarif_converter.py
+          
+          # Run SARIF conversion
+          cargo audit --json | python3 sarif_converter.py > security-reports/audit-report.sarif || echo '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"cargo-audit"}},"results":[]}]}' > security-reports/audit-report.sarif
           echo "::endgroup::"
           
           # Set output

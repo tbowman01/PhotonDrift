@@ -1,9 +1,11 @@
 //! Core LSP server implementation for PhotonDrift
 
+#![cfg(feature = "lsp")]
+
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use tokio::signal;
+use tokio::sync::RwLock;
 
 use lsp_types::{
     CompletionOptions, CompletionParams, CompletionResponse, DidChangeTextDocumentParams,
@@ -202,7 +204,7 @@ impl LanguageServer for PhotonDriftLspServer {
 pub async fn start_lsp_server() -> crate::Result<()> {
     // Initialize logging
     eprintln!("Starting PhotonDrift LSP server...");
-    
+
     // Setup async I/O
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
@@ -210,28 +212,36 @@ pub async fn start_lsp_server() -> crate::Result<()> {
     // Create LSP service
     let (service, socket) = LspService::new(PhotonDriftLspServer::new);
     let server = Server::new(stdin, stdout, socket);
-    
+
     eprintln!("LSP server initialized, waiting for connections...");
-    
+
     // Run server with graceful shutdown handling
     let server_task = tokio::spawn(async move {
         if let Err(e) = server.serve(service).await {
             eprintln!("LSP server error: {}", e);
-            return Err(crate::AdrscanError::RealtimeError(format!("LSP server failed: {}", e)));
+            return Err(crate::AdrscanError::RealtimeError(format!(
+                "LSP server failed: {}",
+                e
+            )));
         }
         Ok(())
     });
-    
+
     // Handle shutdown signals
     let shutdown_task = tokio::spawn(async {
         #[cfg(unix)]
         {
             use tokio::signal::unix::{signal, SignalKind};
-            let mut sigterm = signal(SignalKind::terminate())
-                .map_err(|e| crate::AdrscanError::RealtimeError(format!("Failed to setup SIGTERM handler: {}", e)))?;
-            let mut sigint = signal(SignalKind::interrupt())
-                .map_err(|e| crate::AdrscanError::RealtimeError(format!("Failed to setup SIGINT handler: {}", e)))?;
-            
+            let mut sigterm = signal(SignalKind::terminate()).map_err(|e| {
+                crate::AdrscanError::RealtimeError(format!(
+                    "Failed to setup SIGTERM handler: {}",
+                    e
+                ))
+            })?;
+            let mut sigint = signal(SignalKind::interrupt()).map_err(|e| {
+                crate::AdrscanError::RealtimeError(format!("Failed to setup SIGINT handler: {}", e))
+            })?;
+
             tokio::select! {
                 _ = sigterm.recv() => {
                     eprintln!("Received SIGTERM, shutting down LSP server...");
@@ -241,18 +251,21 @@ pub async fn start_lsp_server() -> crate::Result<()> {
                 }
             }
         }
-        
+
         #[cfg(not(unix))]
         {
             if let Err(e) = signal::ctrl_c().await {
-                return Err(crate::AdrscanError::RealtimeError(format!("Failed to setup Ctrl+C handler: {}", e)));
+                return Err(crate::AdrscanError::RealtimeError(format!(
+                    "Failed to setup Ctrl+C handler: {}",
+                    e
+                )));
             }
             eprintln!("Received Ctrl+C, shutting down LSP server...");
         }
-        
+
         Ok(())
     });
-    
+
     // Wait for either server completion or shutdown signal
     tokio::select! {
         result = server_task => {

@@ -1,8 +1,8 @@
 //! Core traits and types for ML models
 
-use crate::drift::DriftResult;
 use super::super::detector::Prediction;
 use super::super::features::DriftFeatures;
+use crate::drift::DriftResult;
 
 /// Supported ML model types
 #[derive(Debug, Clone, Copy, PartialEq)]

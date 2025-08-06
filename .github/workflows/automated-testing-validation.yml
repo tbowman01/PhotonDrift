@@ -81,7 +81,7 @@ jobs:
         id: rust-setup
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.75.0
+          toolchain: 1.76.0
           components: rustfmt, clippy, llvm-tools-preview
           override: true
           profile: complete
@@ -118,16 +118,16 @@ jobs:
           # Generate comprehensive test matrix based on test level
           case "${{ env.TEST_LEVEL }}" in
             "basic")
-              MATRIX='{"os": ["ubuntu-latest"], "rust": ["1.75.0"], "features": ["", "--all-features"]}'
+              MATRIX='{"os": ["ubuntu-latest"], "rust": ["1.76.0"], "features": ["", "--all-features"]}'
               ;;
             "standard")
-              MATRIX='{"os": ["ubuntu-latest", "windows-latest"], "rust": ["1.75.0"], "features": ["", "--features ml", "--features lsp", "--all-features"]}'
+              MATRIX='{"os": ["ubuntu-latest", "windows-latest"], "rust": ["1.76.0"], "features": ["", "--features ml", "--features lsp", "--all-features"]}'
               ;;
             "comprehensive")
-              MATRIX='{"os": ["ubuntu-latest", "windows-latest", "macos-latest"], "rust": ["1.75.0", "stable"], "features": ["", "--features ml", "--features lsp", "--features realtime", "--features plugins", "--all-features"]}'
+              MATRIX='{"os": ["ubuntu-latest", "windows-latest", "macos-latest"], "rust": ["1.76.0", "stable"], "features": ["", "--features ml", "--features lsp", "--features realtime", "--features plugins", "--all-features"]}'
               ;;
             "exhaustive")
-              MATRIX='{"os": ["ubuntu-latest", "windows-latest", "macos-latest"], "rust": ["1.75.0", "stable", "beta"], "features": ["", "--features ml", "--features lsp", "--features realtime", "--features plugins", "--features wasm", "--all-features"]}'
+              MATRIX='{"os": ["ubuntu-latest", "windows-latest", "macos-latest"], "rust": ["1.76.0", "stable", "beta"], "features": ["", "--features ml", "--features lsp", "--features realtime", "--features plugins", "--features wasm", "--all-features"]}'
               ;;
           esac
           
@@ -600,7 +600,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.75.0
+          toolchain: 1.76.0
           override: true
 
       - name: Install benchmarking tools
@@ -735,7 +735,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.75.0
+          toolchain: 1.76.0
           components: clippy
           override: true
 

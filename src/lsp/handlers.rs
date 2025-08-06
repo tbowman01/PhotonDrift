@@ -1,5 +1,7 @@
 //! Additional LSP handlers and utilities
 
+#![cfg(feature = "lsp")]
+
 use lsp_types::{
     CodeActionParams, CodeActionResponse, DocumentFormattingParams, DocumentSymbolParams,
     DocumentSymbolResponse, TextEdit, WorkspaceEdit,

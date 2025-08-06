@@ -4,7 +4,7 @@
 # ==============================================================================
 
 # Build arguments for comprehensive versioning and metadata
-ARG RUST_VERSION=1.75
+ARG RUST_VERSION=1.76
 ARG ALPINE_VERSION=3.22
 ARG VERSION="unknown"
 ARG BUILD_DATE="unknown"

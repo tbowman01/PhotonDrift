@@ -32,6 +32,35 @@ on:
         required: false
         default: '3'
         type: string
+      dockerfile_variant:
+        description: 'Dockerfile variant to build'
+        required: false
+        default: 'both'
+        type: choice
+        options:
+          - standard
+          - optimized
+          - both
+      security_scan:
+        description: 'Enable security vulnerability scanning'
+        required: false
+        default: true
+        type: boolean
+      performance_test:
+        description: 'Run performance benchmarks after build'
+        required: false
+        default: false
+        type: boolean
+      cleanup_after_build:
+        description: 'Clean up build artifacts and images after completion'
+        required: false
+        default: true
+        type: boolean
+      build_timeout:
+        description: 'Build timeout in minutes'
+        required: false
+        default: '45'
+        type: string
   push:
     branches: [main, develop]
     paths:

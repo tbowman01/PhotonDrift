@@ -428,30 +428,73 @@ jobs:
           
           # Generate summary comment for PR
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            SUMMARY_COMMENT="## 🛡️ Quality Gate Summary
-
-**Overall Status**: $([ "$OVERALL_STATUS" = "success" ] && echo "✅ PASSED" || echo "❌ FAILED")
-
-### 📊 Quality Checks
-| Check | Status | Details |
-|-------|--------|---------|
-| Code Quality | $([ "$CODE_QUALITY_RESULT" = "success" ] && echo "✅ Passed" || [ "$CODE_QUALITY_RESULT" = "skipped" ] && echo "⏭️ Skipped" || echo "❌ Failed") | Formatting, linting, security audit |
-| Build Matrix | $([ "$BUILD_MATRIX_RESULT" = "success" ] && echo "✅ Passed" || [ "$BUILD_MATRIX_RESULT" = "skipped" ] && echo "⏭️ Skipped" || echo "❌ Failed") | Multi-platform, multi-feature builds |
-| Dependencies | $([ "$DEPENDENCY_CHECK_RESULT" = "success" ] && echo "✅ Passed" || [ "$DEPENDENCY_CHECK_RESULT" = "skipped" ] && echo "⏭️ Skipped" || echo "❌ Failed") | Duplicates, security, licensing |
-
-### 🔍 Change Analysis
-- **Scope**: ${{ needs.quality-gate-pre-check.outputs.change_scope }}
-- **Risk Level**: ${{ needs.quality-gate-pre-check.outputs.risk_level }}
-- **Full Suite Run**: ${{ needs.quality-gate-pre-check.outputs.should_run_full_suite }}
-
-$([ "$OVERALL_STATUS" = "success" ] && echo "### ✅ Ready for Review
-This PR has passed all quality gates and is ready for review." || echo "### ❌ Action Required
-This PR has failed quality checks. Please review the failed checks and make necessary corrections.")
-
----
-*Quality Gates v2.0 - Automated Code Quality Assurance*"
+            # Create summary comment using simple echo commands  
+            echo "## 🛡️ Quality Gate Summary" > quality_summary.md
+            echo "" >> quality_summary.md
             
-            echo "$SUMMARY_COMMENT" > quality_summary.md
+            # Add overall status
+            if [ "$OVERALL_STATUS" = "success" ]; then
+              echo "**Overall Status**: ✅ PASSED" >> quality_summary.md
+            else
+              echo "**Overall Status**: ❌ FAILED" >> quality_summary.md
+            fi
+            echo "" >> quality_summary.md
+            
+            # Add quality checks table
+            echo "### 📊 Quality Checks" >> quality_summary.md
+            echo "| Check | Status | Details |" >> quality_summary.md
+            echo "|-------|--------|---------|" >> quality_summary.md
+            
+            # Code quality status
+            if [ "$CODE_QUALITY_RESULT" = "success" ]; then
+              CODE_STATUS="✅ Passed"
+            elif [ "$CODE_QUALITY_RESULT" = "skipped" ]; then
+              CODE_STATUS="⏭️ Skipped"
+            else
+              CODE_STATUS="❌ Failed"
+            fi
+            echo "| Code Quality | $CODE_STATUS | Formatting, linting, security audit |" >> quality_summary.md
+            
+            # Build matrix status  
+            if [ "$BUILD_MATRIX_RESULT" = "success" ]; then
+              BUILD_STATUS="✅ Passed"
+            elif [ "$BUILD_MATRIX_RESULT" = "skipped" ]; then
+              BUILD_STATUS="⏭️ Skipped"
+            else
+              BUILD_STATUS="❌ Failed"
+            fi
+            echo "| Build Matrix | $BUILD_STATUS | Multi-platform, multi-feature builds |" >> quality_summary.md
+            
+            # Dependencies status
+            if [ "$DEPENDENCY_CHECK_RESULT" = "success" ]; then
+              DEPS_STATUS="✅ Passed"
+            elif [ "$DEPENDENCY_CHECK_RESULT" = "skipped" ]; then
+              DEPS_STATUS="⏭️ Skipped"
+            else
+              DEPS_STATUS="❌ Failed"
+            fi
+            echo "| Dependencies | $DEPS_STATUS | Duplicates, security, licensing |" >> quality_summary.md
+            
+            # Change analysis
+            echo "" >> quality_summary.md
+            echo "### 🔍 Change Analysis" >> quality_summary.md
+            echo "- **Scope**: ${{ needs.quality-gate-pre-check.outputs.change_scope }}" >> quality_summary.md
+            echo "- **Risk Level**: ${{ needs.quality-gate-pre-check.outputs.risk_level }}" >> quality_summary.md
+            echo "- **Full Suite Run**: ${{ needs.quality-gate-pre-check.outputs.should_run_full_suite }}" >> quality_summary.md
+            echo "" >> quality_summary.md
+            
+            # Conclusion
+            if [ "$OVERALL_STATUS" = "success" ]; then
+              echo "### ✅ Ready for Review" >> quality_summary.md
+              echo "This PR has passed all quality gates and is ready for review." >> quality_summary.md
+            else
+              echo "### ❌ Action Required" >> quality_summary.md
+              echo "This PR has failed quality checks. Please review the failed checks and make necessary corrections." >> quality_summary.md
+            fi
+            
+            echo "" >> quality_summary.md
+            echo "---" >> quality_summary.md
+            echo "*Quality Gates v2.0 - Automated Code Quality Assurance*" >> quality_summary.md
             
             # Post or update comment
             gh pr comment ${{ github.event.pull_request.number }} --body-file quality_summary.md

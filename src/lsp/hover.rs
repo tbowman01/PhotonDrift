@@ -1,5 +1,7 @@
 //! Hover information provider for ADR files
 
+#![cfg(feature = "lsp")]
+
 use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind, Position, Range};
 
 /// Provides contextual hover information for ADR elements

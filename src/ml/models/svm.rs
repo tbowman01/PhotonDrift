@@ -1,9 +1,9 @@
 //! One-Class SVM implementation for outlier detection
 
-use crate::drift::DriftResult;
-use super::core::{AnomalyModel, ModelType};
 use super::super::detector::Prediction;
 use super::super::features::DriftFeatures;
+use super::core::{AnomalyModel, ModelType};
+use crate::drift::DriftResult;
 
 /// One-Class SVM model for outlier detection
 pub struct OneClassSVM {
@@ -41,20 +41,19 @@ impl OneClassSVM {
         if data.is_empty() {
             return 0.0;
         }
-        
+
         // Simplified offset computation
-        let scores: Vec<f64> = data.iter()
+        let scores: Vec<f64> = data
+            .iter()
             .map(|features| self.rbf_kernel_sum(features, data))
             .collect();
-            
+
         let mean_score = scores.iter().sum::<f64>() / scores.len() as f64;
         mean_score * self.nu
     }
 
     fn rbf_kernel_sum(&self, x: &DriftFeatures, data: &[DriftFeatures]) -> f64 {
-        data.iter()
-            .map(|y| self.rbf_kernel(x, y))
-            .sum()
+        data.iter().map(|y| self.rbf_kernel(x, y)).sum()
     }
 
     fn rbf_kernel(&self, x: &DriftFeatures, y: &DriftFeatures) -> f64 {
@@ -71,7 +70,7 @@ impl OneClassSVM {
             x.complexity_score,
             x.change_frequency,
         ];
-        
+
         let y_vec = vec![
             y.line_count as f64,
             y.decision_count as f64,
@@ -79,7 +78,8 @@ impl OneClassSVM {
             y.change_frequency,
         ];
 
-        x_vec.iter()
+        x_vec
+            .iter()
             .zip(y_vec.iter())
             .map(|(a, b)| (a - b).powi(2))
             .sum()
@@ -89,7 +89,7 @@ impl OneClassSVM {
         if self.support_vectors.is_empty() {
             return 0.0;
         }
-        
+
         let kernel_sum = self.rbf_kernel_sum(features, &self.support_vectors);
         kernel_sum - self.decision_function_offset
     }
@@ -100,11 +100,15 @@ impl AnomalyModel for OneClassSVM {
         let score = self.decision_function(features);
         let is_anomaly = score < 0.0; // Negative scores indicate outliers
         let confidence = score.abs(); // Use absolute value as confidence
-        
+
         Ok(Prediction {
             is_anomaly,
             confidence,
-            anomaly_score: if is_anomaly { score.abs() } else { 1.0 - score.abs() },
+            anomaly_score: if is_anomaly {
+                score.abs()
+            } else {
+                1.0 - score.abs()
+            },
             explanation: self.explain(features),
         })
     }
@@ -118,8 +122,13 @@ impl AnomalyModel for OneClassSVM {
 
     fn serialize(&self) -> DriftResult<Vec<u8>> {
         // Simplified serialization
-        Ok(format!("OneClassSVM:{}:{}:{}", 
-                  self.gamma, self.nu, self.support_vectors.len()).into_bytes())
+        Ok(format!(
+            "OneClassSVM:{}:{}:{}",
+            self.gamma,
+            self.nu,
+            self.support_vectors.len()
+        )
+        .into_bytes())
     }
 
     fn model_type(&self) -> ModelType {
