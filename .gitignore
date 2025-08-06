@@ -60,3 +60,4 @@ docs-site/.docusaurus/
 docs-site/build/
 docs-site/node_modules/
 docs-site/.cache/
+.claude-flow/metrics/*
