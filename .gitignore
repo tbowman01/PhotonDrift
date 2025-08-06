@@ -53,6 +53,7 @@ wasm-*
 .swarm/
 .hive-mind/
 hive-mind-**-fallback.txt
+.claude-flow/metrics/
 
 # Docusaurus generated files
 docs-site/.docusaurus/
