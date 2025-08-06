@@ -1,0 +1,367 @@
+version: '3.8'
+
+# ==============================================================================
+# PHOTONDRIFT MULTI-CONTAINER ORCHESTRATION
+# Comprehensive Docker Compose with security, monitoring, and performance
+# ==============================================================================
+
+services:
+  # Main ADRScan Application Container
+  adrscan:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+      args:
+        VERSION: ${VERSION:-dev}
+        BUILD_DATE: ${BUILD_DATE}
+        GIT_SHA: ${GIT_SHA:-unknown}
+        GIT_SHA_SHORT: ${GIT_SHA_SHORT:-unknown}
+        GIT_REF: ${GIT_REF:-unknown}
+        BRANCH: ${BRANCH:-main}
+        BUILD_TYPE: ${BUILD_TYPE:-development}
+        SEMVER: ${SEMVER:-0.1.0-dev}
+        GITHUB_RUN_ID: ${GITHUB_RUN_ID:-0}
+        TARGETPLATFORM: ${TARGETPLATFORM:-linux/amd64}
+        TARGETARCH: ${TARGETARCH:-amd64}
+      cache_from:
+        - photondrift/adrscan:cache-deps
+        - photondrift/adrscan:cache-builder
+    image: photondrift/adrscan:${VERSION:-dev}
+    container_name: photondrift-adrscan
+    hostname: adrscan
+    restart: unless-stopped
+    
+    # Security Configuration
+    user: "65532:65532"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:unconfined
+    cap_drop:
+      - ALL
+    
+    # Resource Limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+          pids: 100
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    
+    # Environment Variables
+    environment:
+      - RUST_LOG=${RUST_LOG:-info}
+      - ADRSCAN_CONFIG_PATH=/workspace/.adrscan
+      - ADRSCAN_WORKSPACE=/workspace
+      - BUILD_ENV=${BUILD_TYPE:-development}
+    
+    # Volume Mounts
+    volumes:
+      - type: bind
+        source: ${PWD}/workspace
+        target: /workspace
+        read_only: true
+        bind:
+          propagation: rprivate
+      - type: bind
+        source: ${PWD}/output
+        target: /output
+        read_only: false
+        bind:
+          propagation: rprivate
+      - type: tmpfs
+        target: /tmp
+        tmpfs:
+          size: 100m
+          mode: 1777
+          noexec: true
+          nosuid: true
+    
+    # Working directory
+    working_dir: /workspace
+    
+    # Network Configuration
+    networks:
+      - photondrift-network
+    
+    # Health Check
+    healthcheck:
+      test: ["/usr/local/bin/adrscan", "--version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # Logging Configuration
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+        labels: "service,version,environment"
+    
+    # Labels
+    labels:
+      - "traefik.enable=false"
+      - "service.name=adrscan"
+      - "service.version=${VERSION:-dev}"
+      - "service.environment=${BUILD_TYPE:-development}"
+      - "monitoring.enable=true"
+
+  # Dashboard Backend API Server
+  dashboard-backend:
+    build:
+      context: ./dashboard/backend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        NODE_VERSION: ${NODE_VERSION:-20}
+        BUILD_ENV: ${BUILD_TYPE:-development}
+        VERSION: ${VERSION:-0.3.0-alpha}
+    image: photondrift/dashboard-backend:${VERSION:-dev}
+    container_name: photondrift-dashboard-backend
+    hostname: dashboard-backend
+    restart: unless-stopped
+    
+    # Security Configuration
+    user: "1001:1001"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    
+    # Resource Limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+          pids: 50
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    
+    # Environment Variables
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - HOST=0.0.0.0
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
+      - RATE_LIMIT_WINDOW_MS=900000
+      - RATE_LIMIT_MAX=100
+    
+    # Volume Mounts
+    volumes:
+      - type: bind
+        source: ${PWD}/data
+        target: /app/data
+        read_only: false
+        bind:
+          propagation: rprivate
+      - type: tmpfs
+        target: /tmp
+        tmpfs:
+          size: 50m
+          mode: 1777
+          noexec: true
+    
+    # Port Exposure
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    
+    # Network Configuration
+    networks:
+      - photondrift-network
+    
+    # Dependencies
+    depends_on:
+      adrscan:
+        condition: service_healthy
+    
+    # Health Check
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    
+    # Logging Configuration
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    
+    # Labels
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard-backend.rule=Host(`api.photondrift.local`)"
+      - "traefik.http.services.dashboard-backend.loadbalancer.server.port=3001"
+      - "service.name=dashboard-backend"
+      - "service.version=${VERSION:-dev}"
+      - "monitoring.enable=true"
+
+  # Redis Cache for Performance (Optional)
+  redis:
+    image: redis:7-alpine
+    container_name: photondrift-redis
+    hostname: redis
+    restart: unless-stopped
+    
+    # Security Configuration
+    user: "999:999"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    
+    # Resource Limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+    
+    # Configuration
+    command: >
+      redis-server
+      --maxmemory 64mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+      --appendonly no
+      --tcp-keepalive 60
+      --timeout 300
+    
+    # Volume Mounts
+    volumes:
+      - type: tmpfs
+        target: /data
+        tmpfs:
+          size: 100m
+          mode: 0755
+    
+    # Network Configuration
+    networks:
+      - photondrift-network
+    
+    # Health Check
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    
+    # Labels
+    labels:
+      - "service.name=redis-cache"
+      - "service.type=cache"
+      - "monitoring.enable=false"
+
+  # Prometheus Metrics (Optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: photondrift-prometheus
+    hostname: prometheus
+    restart: unless-stopped
+    profiles:
+      - monitoring
+    
+    # Security Configuration
+    user: "nobody:nogroup"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    
+    # Resource Limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    
+    # Configuration
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+      - type: tmpfs
+        target: /tmp
+        tmpfs:
+          size: 50m
+    
+    # Port Exposure
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    
+    # Network Configuration
+    networks:
+      - photondrift-network
+    
+    # Command Override
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=7d'
+      - '--storage.tsdb.retention.size=512MB'
+      - '--web.enable-lifecycle'
+    
+    # Labels
+    labels:
+      - "service.name=prometheus"
+      - "service.type=monitoring"
+
+# ==============================================================================
+# NETWORK CONFIGURATION
+# ==============================================================================
+networks:
+  photondrift-network:
+    name: photondrift-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+          gateway: 172.20.0.1
+    driver_opts:
+      com.docker.network.bridge.name: photondrift-br
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+      com.docker.network.bridge.host_binding_ipv4: "0.0.0.0"
+
+# ==============================================================================
+# PERSISTENT VOLUMES
+# ==============================================================================
+volumes:
+  prometheus-data:
+    name: photondrift-prometheus-data
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/monitoring/prometheus-data
+
+# ==============================================================================
+# CONFIGURATION PROFILES
+# ==============================================================================
+# Usage:
+# docker-compose up                           # Core services only
+# docker-compose --profile monitoring up     # Include monitoring stack
+# docker-compose --profile full up           # All services including optional ones
