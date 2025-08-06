@@ -1,0 +1,386 @@
+name: 🔧 Automated Conflict Resolver
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_branch:
+        description: 'Source branch to merge from'
+        required: true
+        default: 'main'
+      target_branch:
+        description: 'Target branch to merge into'
+        required: true
+        default: 'develop'
+      strategy:
+        description: 'Conflict resolution strategy'
+        required: false
+        default: 'smart'
+        type: choice
+        options:
+          - 'smart'      # Intelligent resolution based on file types
+          - 'ours'       # Keep target branch changes
+          - 'theirs'     # Keep source branch changes
+          - 'manual'     # Create conflict resolution PR
+      force_merge:
+        description: 'Force merge even with conflicts (use with caution)'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  resolve-conflicts:
+    name: 🔧 Resolve Branch Conflicts
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: ⚙️ Configure Git
+        run: |
+          git config --global user.name "Conflict Resolver Bot"
+          git config --global user.email "conflict-resolver@users.noreply.github.com"
+
+      - name: 🔍 Pre-merge Analysis
+        id: analysis
+        run: |
+          echo "🔍 Analyzing branches for conflicts..."
+          
+          SOURCE_BRANCH="${{ github.event.inputs.source_branch }}"
+          TARGET_BRANCH="${{ github.event.inputs.target_branch }}"
+          
+          echo "Source: $SOURCE_BRANCH"
+          echo "Target: $TARGET_BRANCH"
+          
+          # Fetch latest changes
+          git fetch origin
+          
+          # Switch to target branch
+          git checkout origin/$TARGET_BRANCH
+          git checkout -b temp-merge-branch
+          
+          # Check if merge would create conflicts
+          if git merge --no-commit --no-ff origin/$SOURCE_BRANCH; then
+            echo "✅ No conflicts detected - merge can proceed cleanly"
+            echo "has_conflicts=false" >> $GITHUB_OUTPUT
+            git merge --abort
+          else
+            echo "⚠️ Conflicts detected - will need resolution"
+            echo "has_conflicts=true" >> $GITHUB_OUTPUT
+            
+            # Get list of conflicted files
+            CONFLICTED_FILES=$(git diff --name-only --diff-filter=U | tr '\n' ' ')
+            echo "conflicted_files=$CONFLICTED_FILES" >> $GITHUB_OUTPUT
+            echo "Conflicted files: $CONFLICTED_FILES"
+            
+            git merge --abort
+          fi
+
+      - name: 🔧 Smart Conflict Resolution
+        if: steps.analysis.outputs.has_conflicts == 'true' && github.event.inputs.strategy == 'smart'
+        id: smart-resolve
+        run: |
+          echo "🔧 Applying smart conflict resolution..."
+          
+          SOURCE_BRANCH="${{ github.event.inputs.source_branch }}"
+          TARGET_BRANCH="${{ github.event.inputs.target_branch }}"
+          CONFLICTED_FILES="${{ steps.analysis.outputs.conflicted_files }}"
+          
+          # Attempt merge again
+          git merge --no-ff origin/$SOURCE_BRANCH || echo "Expected merge conflicts"
+          
+          RESOLUTION_LOG=""
+          RESOLVED_COUNT=0
+          MANUAL_COUNT=0
+          
+          for file in $CONFLICTED_FILES; do
+            echo "🔧 Processing $file..."
+            
+            case "$file" in
+              # Rust source code - prefer source branch (newer features)
+              *.rs)
+                echo "  📝 Rust source file - using source branch version"
+                git checkout --theirs "$file"
+                git add "$file"
+                RESOLUTION_LOG="$RESOLUTION_LOG\n- $file: Used source branch version (Rust code)"
+                RESOLVED_COUNT=$((RESOLVED_COUNT + 1))
+                ;;
+              
+              # Configuration files - merge intelligently
+              Cargo.toml|Cargo.lock)
+                echo "  ⚙️ Cargo file - attempting intelligent merge"
+                if [[ "$file" == "Cargo.toml" ]]; then
+                  # For Cargo.toml, try to merge dependencies
+                  python3 - << 'EOF'
+import re
+import sys
+
+try:
+    with open('Cargo.toml', 'r') as f:
+        content = f.read()
+    
+    # Remove conflict markers and merge dependencies
+    lines = content.split('\n')
+    cleaned_lines = []
+    in_conflict = False
+    our_section = []
+    their_section = []
+    
+    for line in lines:
+        if line.startswith('<<<<<<< '):
+            in_conflict = True
+            continue
+        elif line.startswith('======='):
+            continue
+        elif line.startswith('>>>>>>> '):
+            in_conflict = False
+            # Merge both sections
+            cleaned_lines.extend(our_section)
+            cleaned_lines.extend([l for l in their_section if l not in our_section])
+            our_section = []
+            their_section = []
+            continue
+        elif in_conflict:
+            their_section.append(line)
+        else:
+            if not in_conflict:
+                cleaned_lines.append(line)
+            else:
+                our_section.append(line)
+    
+    with open('Cargo.toml', 'w') as f:
+        f.write('\n'.join(cleaned_lines))
+    print("✅ Cargo.toml merged successfully")
+    
+except Exception as e:
+    print(f"❌ Failed to merge Cargo.toml: {e}")
+    sys.exit(1)
+EOF
+                  if [ $? -eq 0 ]; then
+                    git add "$file"
+                    RESOLUTION_LOG="$RESOLUTION_LOG\n- $file: Intelligently merged dependencies"
+                    RESOLVED_COUNT=$((RESOLVED_COUNT + 1))
+                  else
+                    echo "  ❌ Failed to merge - keeping target version"
+                    git checkout --ours "$file"
+                    git add "$file"
+                    RESOLUTION_LOG="$RESOLUTION_LOG\n- $file: Used target branch version (merge failed)"
+                    RESOLVED_COUNT=$((RESOLVED_COUNT + 1))
+                  fi
+                else
+                  # For Cargo.lock, prefer source branch
+                  git checkout --theirs "$file"
+                  git add "$file"
+                  RESOLUTION_LOG="$RESOLUTION_LOG\n- $file: Used source branch version (Cargo.lock)"
+                  RESOLVED_COUNT=$((RESOLVED_COUNT + 1))
+                fi
+                ;;
+              
+              # Documentation - try to merge both versions
+              *.md|docs/*)
+                echo "  📚 Documentation file - merging both versions"
+                if grep -q "^<<<<<<< " "$file"; then
+                  # Create a merged version keeping both changes
+                  sed -i '/^<<<<<<< /d; /^=======$/d; /^>>>>>>> /d' "$file"
+                  git add "$file"
+                  RESOLUTION_LOG="$RESOLUTION_LOG\n- $file: Merged documentation (removed conflict markers)"
+                  RESOLVED_COUNT=$((RESOLVED_COUNT + 1))
+                else
+                  MANUAL_COUNT=$((MANUAL_COUNT + 1))
+                fi
+                ;;
+              
+              # GitHub workflows and configs - prefer target branch
+              .github/*|*.yml|*.yaml)
+                echo "  ⚙️ Config/workflow file - using target branch version"
+                git checkout --ours "$file"
+                git add "$file"
+                RESOLUTION_LOG="$RESOLUTION_LOG\n- $file: Used target branch version (config)"
+                RESOLVED_COUNT=$((RESOLVED_COUNT + 1))
+                ;;
+              
+              # JSON files - try to merge
+              *.json)
+                echo "  🔧 JSON file - attempting merge"
+                git checkout --theirs "$file"
+                git add "$file"
+                RESOLUTION_LOG="$RESOLUTION_LOG\n- $file: Used source branch version (JSON)"
+                RESOLVED_COUNT=$((RESOLVED_COUNT + 1))
+                ;;
+              
+              # Default - needs manual resolution
+              *)
+                echo "  ❓ Unknown file type - needs manual resolution"
+                RESOLUTION_LOG="$RESOLUTION_LOG\n- $file: NEEDS MANUAL RESOLUTION"
+                MANUAL_COUNT=$((MANUAL_COUNT + 1))
+                ;;
+            esac
+          done
+          
+          echo "resolved_count=$RESOLVED_COUNT" >> $GITHUB_OUTPUT
+          echo "manual_count=$MANUAL_COUNT" >> $GITHUB_OUTPUT
+          echo "resolution_log<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$RESOLUTION_LOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "📊 Resolution Summary:"
+          echo "  ✅ Automatically resolved: $RESOLVED_COUNT files"
+          echo "  ❓ Need manual resolution: $MANUAL_COUNT files"
+
+      - name: 🔧 Complete Merge
+        if: steps.analysis.outputs.has_conflicts == 'false' || (steps.smart-resolve.outputs.resolved_count > 0 && steps.smart-resolve.outputs.manual_count == 0)
+        run: |
+          echo "🔧 Completing merge..."
+          
+          SOURCE_BRANCH="${{ github.event.inputs.source_branch }}"
+          TARGET_BRANCH="${{ github.event.inputs.target_branch }}"
+          
+          if [ "${{ steps.analysis.outputs.has_conflicts }}" = "false" ]; then
+            # Clean merge
+            git merge --no-ff origin/$SOURCE_BRANCH -m "🔧 Automated merge: $SOURCE_BRANCH → $TARGET_BRANCH
+
+Clean merge with no conflicts detected.
+
+Co-authored-by: Conflict Resolver Bot <conflict-resolver@users.noreply.github.com>"
+          else
+            # Resolved conflicts
+            RESOLUTION_LOG="${{ steps.smart-resolve.outputs.resolution_log }}"
+            git commit -m "🔧 Automated conflict resolution: $SOURCE_BRANCH → $TARGET_BRANCH
+
+Resolved ${{ steps.smart-resolve.outputs.resolved_count }} conflicted files using smart resolution:
+
+$RESOLUTION_LOG
+
+Co-authored-by: Conflict Resolver Bot <conflict-resolver@users.noreply.github.com>"
+          fi
+          
+          # Push to target branch
+          git checkout origin/$TARGET_BRANCH
+          git checkout -b $TARGET_BRANCH
+          git merge temp-merge-branch --ff-only
+          git push origin $TARGET_BRANCH
+          
+          echo "✅ Merge completed and pushed to $TARGET_BRANCH"
+
+      - name: 📋 Create Manual Resolution PR
+        if: steps.smart-resolve.outputs.manual_count > 0
+        run: |
+          echo "📋 Creating PR for manual conflict resolution..."
+          
+          SOURCE_BRANCH="${{ github.event.inputs.source_branch }}"
+          TARGET_BRANCH="${{ github.event.inputs.target_branch }}"
+          
+          # Create a new branch for manual resolution
+          RESOLUTION_BRANCH="conflict-resolution-${SOURCE_BRANCH}-to-${TARGET_BRANCH}-$(date +%s)"
+          git checkout -b $RESOLUTION_BRANCH
+          
+          # Commit the partially resolved state
+          git commit -m "🔧 Partial conflict resolution: $SOURCE_BRANCH → $TARGET_BRANCH
+
+Automatically resolved: ${{ steps.smart-resolve.outputs.resolved_count }} files
+Need manual resolution: ${{ steps.smart-resolve.outputs.manual_count }} files
+
+${{ steps.smart-resolve.outputs.resolution_log }}
+
+Co-authored-by: Conflict Resolver Bot <conflict-resolver@users.noreply.github.com>"
+          
+          # Push resolution branch
+          git push origin $RESOLUTION_BRANCH
+          
+          # Create PR
+          PR_TITLE="🔧 Manual Conflict Resolution: $SOURCE_BRANCH → $TARGET_BRANCH"
+          PR_BODY="## 🔧 Conflict Resolution Required
+
+This PR was automatically created because some conflicts between \`$SOURCE_BRANCH\` and \`$TARGET_BRANCH\` require manual resolution.
+
+### ✅ Automatically Resolved
+${{ steps.smart-resolve.outputs.resolved_count }} files were automatically resolved using smart strategies.
+
+### ❓ Manual Resolution Required
+${{ steps.smart-resolve.outputs.manual_count }} files need your attention:
+
+${{ steps.smart-resolve.outputs.resolution_log }}
+
+### Next Steps
+1. Review the conflicts in the files marked for manual resolution
+2. Edit the files to resolve conflicts appropriately
+3. Commit your changes
+4. Merge this PR into \`$TARGET_BRANCH\`
+
+### Resolution Strategies Used
+- **Rust source files**: Used source branch version (newer features)
+- **Documentation**: Merged both versions where possible
+- **Configuration files**: Used target branch version (stability)
+- **Dependencies**: Attempted intelligent merge of Cargo.toml
+
+---
+*Automatically created by Conflict Resolver Bot*"
+          
+          gh pr create \
+            --title "$PR_TITLE" \
+            --body "$PR_BODY" \
+            --base "$TARGET_BRANCH" \
+            --head "$RESOLUTION_BRANCH" \
+            --label "conflict-resolution,automation" \
+            --assignee "${{ github.actor }}"
+          
+          echo "✅ Manual resolution PR created: $RESOLUTION_BRANCH"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📊 Generate Report
+        if: always()
+        run: |
+          echo "📊 Generating conflict resolution report..."
+          
+          REPORT_FILE="conflict-resolution-report.md"
+          SOURCE_BRANCH="${{ github.event.inputs.source_branch }}"
+          TARGET_BRANCH="${{ github.event.inputs.target_branch }}"
+          STRATEGY="${{ github.event.inputs.strategy }}"
+          
+          cat > $REPORT_FILE << EOF
+# 🔧 Conflict Resolution Report
+
+**Generated**: $(date -u)
+**Source Branch**: \`$SOURCE_BRANCH\`
+**Target Branch**: \`$TARGET_BRANCH\`
+**Strategy**: $STRATEGY
+**Workflow Run**: [${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Conflicts Detected | ${{ steps.analysis.outputs.has_conflicts }} |
+| Files with Conflicts | ${{ steps.analysis.outputs.conflicted_files }} |
+| Auto-resolved Files | ${{ steps.smart-resolve.outputs.resolved_count || 0 }} |
+| Manual Resolution Needed | ${{ steps.smart-resolve.outputs.manual_count || 0 }} |
+
+## Resolution Details
+
+${{ steps.smart-resolve.outputs.resolution_log || 'No conflicts detected - clean merge completed.' }}
+
+## Status
+
+$([ "${{ steps.smart-resolve.outputs.manual_count }}" = "0" ] && echo "✅ **COMPLETED**: All conflicts resolved automatically" || echo "⏳ **PENDING**: Manual resolution PR created")
+
+---
+*Generated by Automated Conflict Resolver v1.0*
+EOF
+
+          echo "📄 Report generated: $REPORT_FILE"
+
+      - name: 📤 Upload Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: conflict-resolution-report
+          path: conflict-resolution-report.md

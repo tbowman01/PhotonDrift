@@ -1,0 +1,53 @@
+# GitHub Code Owners
+# This file defines who should be requested for review when changes are made to specific parts of the codebase.
+# For more information about CODEOWNERS files, see:
+# https://docs.github.com/en/github/creating-cloning-and-archiving-repositories/about-code-owners
+
+# Global owners (fallback for any files not specified below)
+* @tbowman01
+
+# GitHub Workflows and Automation
+.github/ @tbowman01
+.github/workflows/ @tbowman01
+.github/CODEOWNERS @tbowman01
+
+# Core Rust source code
+src/ @tbowman01
+Cargo.toml @tbowman01
+Cargo.lock @tbowman01
+
+# Build and deployment configurations
+Dockerfile @tbowman01
+docker-compose.yml @tbowman01
+scripts/ @tbowman01
+Makefile @tbowman01
+
+# Documentation
+docs/ @tbowman01
+README.md @tbowman01
+CHANGELOG.md @tbowman01
+
+# Documentation website
+docs-site/ @tbowman01
+docs-site/package.json @tbowman01
+
+# Security and quality files
+.gitignore @tbowman01
+.gitattributes @tbowman01
+LICENSE @tbowman01
+
+# Machine Learning components
+src/ml/ @tbowman01
+
+# LSP and real-time features
+src/lsp/ @tbowman01
+src/realtime/ @tbowman01
+
+# Plugin system
+src/plugins/ @tbowman01
+
+# Configuration files
+*.yml @tbowman01
+*.yaml @tbowman01
+*.toml @tbowman01
+*.json @tbowman01

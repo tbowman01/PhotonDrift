@@ -1,0 +1,347 @@
+name: 📊 Continuous Build Monitor
+
+on:
+  schedule:
+    # Run every 30 minutes during business hours (UTC)
+    - cron: '*/30 8-18 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      monitor_duration:
+        description: 'Monitoring duration in minutes'
+        required: false
+        default: '60'
+      alert_threshold:
+        description: 'Alert threshold for build failures (%)'
+        required: false
+        default: '20'
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  monitor-builds:
+    name: 📊 Monitor Build Health
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 📊 Collect Build Metrics
+        id: metrics
+        run: |
+          echo "📊 Collecting build metrics from recent workflow runs..."
+          
+          # Get recent workflow runs (last 50)
+          WORKFLOW_RUNS=$(gh api repos/${{ github.repository }}/actions/runs \
+            --jq '.workflow_runs[:50] | map(select(.created_at > (now - 7*24*3600 | strftime("%Y-%m-%dT%H:%M:%SZ"))))' \
+            --paginate)
+          
+          # Calculate success rate
+          TOTAL_RUNS=$(echo "$WORKFLOW_RUNS" | jq 'length')
+          SUCCESSFUL_RUNS=$(echo "$WORKFLOW_RUNS" | jq 'map(select(.conclusion == "success")) | length')
+          FAILED_RUNS=$(echo "$WORKFLOW_RUNS" | jq 'map(select(.conclusion == "failure")) | length')
+          
+          if [ $TOTAL_RUNS -gt 0 ]; then
+            SUCCESS_RATE=$(echo "scale=2; $SUCCESSFUL_RUNS * 100 / $TOTAL_RUNS" | bc -l)
+            FAILURE_RATE=$(echo "scale=2; $FAILED_RUNS * 100 / $TOTAL_RUNS" | bc -l)
+          else
+            SUCCESS_RATE=100
+            FAILURE_RATE=0
+          fi
+          
+          echo "total_runs=$TOTAL_RUNS" >> $GITHUB_OUTPUT
+          echo "successful_runs=$SUCCESSFUL_RUNS" >> $GITHUB_OUTPUT
+          echo "failed_runs=$FAILED_RUNS" >> $GITHUB_OUTPUT
+          echo "success_rate=$SUCCESS_RATE" >> $GITHUB_OUTPUT
+          echo "failure_rate=$FAILURE_RATE" >> $GITHUB_OUTPUT
+          
+          # Get average build time
+          AVG_BUILD_TIME=$(echo "$WORKFLOW_RUNS" | jq '[.[] | select(.conclusion == "success") | 
+            (((.updated_at | fromdateiso8601) - (.created_at | fromdateiso8601)) / 60)] | 
+            if length > 0 then (add / length) else 0 end | round')
+          
+          echo "avg_build_time=$AVG_BUILD_TIME" >> $GITHUB_OUTPUT
+          
+          echo "📊 Build Health Summary:"
+          echo "  📈 Total Runs (7d): $TOTAL_RUNS"
+          echo "  ✅ Success Rate: $SUCCESS_RATE%"
+          echo "  ❌ Failure Rate: $FAILURE_RATE%"
+          echo "  ⏱️ Avg Build Time: ${AVG_BUILD_TIME}min"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🔍 Analyze Failure Patterns
+        id: analysis
+        run: |
+          echo "🔍 Analyzing failure patterns..."
+          
+          # Get failed workflow runs details
+          FAILED_RUNS=$(gh api repos/${{ github.repository }}/actions/runs \
+            --jq '.workflow_runs[:20] | map(select(.conclusion == "failure" and .created_at > (now - 7*24*3600 | strftime("%Y-%m-%dT%H:%M:%SZ"))))' \
+            --paginate)
+          
+          # Analyze failure reasons
+          FAILURE_REASONS=""
+          COMMON_FAILURES=""
+          
+          echo "$FAILED_RUNS" | jq -r '.[] | .id' | while read -r run_id; do
+            # Get job details for each failed run
+            JOB_FAILURES=$(gh api repos/${{ github.repository }}/actions/runs/$run_id/jobs \
+              --jq '.jobs[] | select(.conclusion == "failure") | .name')
+            echo "Run $run_id failed jobs: $JOB_FAILURES"
+          done
+          
+          # Count common failure patterns
+          RUST_FAILURES=$(echo "$FAILED_RUNS" | jq '[.[] | select(.name | contains("Rust") or contains("Build"))] | length')
+          TEST_FAILURES=$(echo "$FAILED_RUNS" | jq '[.[] | select(.name | contains("Test") or contains("CI"))] | length')
+          LINT_FAILURES=$(echo "$FAILED_RUNS" | jq '[.[] | select(.name | contains("Lint") or contains("Check"))] | length')
+          
+          echo "rust_failures=$RUST_FAILURES" >> $GITHUB_OUTPUT
+          echo "test_failures=$TEST_FAILURES" >> $GITHUB_OUTPUT
+          echo "lint_failures=$LINT_FAILURES" >> $GITHUB_OUTPUT
+          
+          # Determine dominant failure type
+          DOMINANT_FAILURE="unknown"
+          if [ $RUST_FAILURES -gt $TEST_FAILURES ] && [ $RUST_FAILURES -gt $LINT_FAILURES ]; then
+            DOMINANT_FAILURE="build"
+          elif [ $TEST_FAILURES -gt $LINT_FAILURES ]; then
+            DOMINANT_FAILURE="test"
+          elif [ $LINT_FAILURES -gt 0 ]; then
+            DOMINANT_FAILURE="lint"
+          fi
+          
+          echo "dominant_failure=$DOMINANT_FAILURE" >> $GITHUB_OUTPUT
+          
+          echo "🔍 Failure Pattern Analysis:"
+          echo "  🏗️ Build Failures: $RUST_FAILURES"
+          echo "  🧪 Test Failures: $TEST_FAILURES"
+          echo "  📝 Lint Failures: $LINT_FAILURES"
+          echo "  🎯 Dominant Pattern: $DOMINANT_FAILURE"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🚨 Generate Health Alert
+        if: steps.metrics.outputs.failure_rate > github.event.inputs.alert_threshold || steps.metrics.outputs.failure_rate > '20'
+        run: |
+          echo "🚨 Build health alert triggered!"
+          
+          ALERT_TITLE="🚨 Build Health Alert: High Failure Rate Detected"
+          FAILURE_RATE="${{ steps.metrics.outputs.failure_rate }}"
+          THRESHOLD="${{ github.event.inputs.alert_threshold || '20' }}"
+          
+          ALERT_BODY="## 🚨 Build Health Alert
+          
+**Alert Triggered**: $(date -u)
+**Threshold Exceeded**: $FAILURE_RATE% > $THRESHOLD%
+
+### 📊 Current Metrics (7 days)
+- **Total Runs**: ${{ steps.metrics.outputs.total_runs }}
+- **Success Rate**: ${{ steps.metrics.outputs.success_rate }}%
+- **Failure Rate**: ${{ steps.metrics.outputs.failure_rate }}%
+- **Average Build Time**: ${{ steps.metrics.outputs.avg_build_time }} minutes
+
+### 🔍 Failure Analysis
+- **Build Failures**: ${{ steps.analysis.outputs.rust_failures }}
+- **Test Failures**: ${{ steps.analysis.outputs.test_failures }}
+- **Lint Failures**: ${{ steps.analysis.outputs.lint_failures }}
+- **Dominant Pattern**: ${{ steps.analysis.outputs.dominant_failure }}
+
+### 🎯 Recommended Actions
+$([ "${{ steps.analysis.outputs.dominant_failure }}" = "build" ] && echo "1. **Build Issues**: Review dependency conflicts, check Cargo.toml for issues
+2. **Environment**: Verify build environment consistency across platforms
+3. **Dependencies**: Consider dependency version pinning or updates")
+$([ "${{ steps.analysis.outputs.dominant_failure }}" = "test" ] && echo "1. **Test Stability**: Review flaky tests and add retries where appropriate
+2. **Test Environment**: Ensure test data and fixtures are consistent
+3. **Parallel Testing**: Check for race conditions in concurrent tests")
+$([ "${{ steps.analysis.outputs.dominant_failure }}" = "lint" ] && echo "1. **Code Quality**: Run \`cargo fmt\` and \`cargo clippy\` locally before pushing
+2. **CI Configuration**: Update lint rules if they're too strict
+3. **Pre-commit Hooks**: Enable automated formatting and linting")
+
+### 🔗 Links
+- [Workflow Runs](https://github.com/${{ github.repository }}/actions)
+- [This Monitor Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+**Note**: This alert will auto-close when build health improves above $THRESHOLD% success rate.
+          
+---
+*Automated alert from Build Monitor v1.0*"
+          
+          # Check if alert issue already exists
+          EXISTING_ALERT=$(gh issue list --label "build-health,alert" --state open --json number --jq '.[0].number' || echo "")
+          
+          if [ -z "$EXISTING_ALERT" ]; then
+            # Create new alert issue
+            gh issue create \
+              --title "$ALERT_TITLE" \
+              --body "$ALERT_BODY" \
+              --label "build-health,alert,critical" \
+              --assignee "${{ github.repository_owner }}"
+            echo "🚨 New build health alert created"
+          else
+            # Update existing alert
+            gh issue comment "$EXISTING_ALERT" --body "🔄 **Updated**: Build health still critical - $FAILURE_RATE% failure rate
+
+$(echo "$ALERT_BODY" | grep -A 20 "### 📊 Current Metrics")"
+            echo "🔄 Updated existing alert #$EXISTING_ALERT"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: ✅ Close Health Alerts
+        if: steps.metrics.outputs.failure_rate <= github.event.inputs.alert_threshold || steps.metrics.outputs.failure_rate <= '20'
+        run: |
+          echo "✅ Build health is good - checking for open alerts to close..."
+          
+          OPEN_ALERTS=$(gh issue list --label "build-health,alert" --state open --json number --jq '.[].number' || echo "")
+          
+          for alert in $OPEN_ALERTS; do
+            if [ -n "$alert" ]; then
+              gh issue close "$alert" --comment "✅ **Resolved**: Build health has improved!
+
+**Current Status**:
+- Success Rate: ${{ steps.metrics.outputs.success_rate }}%
+- Failure Rate: ${{ steps.metrics.outputs.failure_rate }}%
+- Total Runs (7d): ${{ steps.metrics.outputs.total_runs }}
+
+Build health is now within acceptable thresholds. Monitoring will continue automatically.
+
+---
+*Auto-closed by Build Monitor v1.0*"
+              echo "✅ Closed health alert #$alert"
+            fi
+          done
+
+      - name: 📊 Generate Monitoring Report
+        run: |
+          echo "📊 Generating build monitoring report..."
+          
+          REPORT_FILE="build-monitor-report-$(date +%Y%m%d-%H%M%S).md"
+          
+          cat > $REPORT_FILE << 'EOF'
+# 📊 Build Monitoring Report
+
+**Generated**: `date -u`
+**Repository**: ${{ github.repository }}
+**Monitor Period**: 7 days
+
+## 📈 Build Health Summary
+
+| Metric | Value | Status |
+|--------|--------|---------|
+| Total Runs | ${{ steps.metrics.outputs.total_runs }} | ℹ️ |
+| Success Rate | ${{ steps.metrics.outputs.success_rate }}% | $([ $(echo "${{ steps.metrics.outputs.success_rate }} >= 80" | bc -l) -eq 1 ] && echo "✅ Good" || echo "⚠️ Poor") |
+| Failure Rate | ${{ steps.metrics.outputs.failure_rate }}% | $([ $(echo "${{ steps.metrics.outputs.failure_rate }} <= 20" | bc -l) -eq 1 ] && echo "✅ Good" || echo "🚨 High") |
+| Avg Build Time | ${{ steps.metrics.outputs.avg_build_time }} min | $([ ${{ steps.metrics.outputs.avg_build_time }} -lt 10 ] && echo "✅ Fast" || [ ${{ steps.metrics.outputs.avg_build_time }} -lt 20 ] && echo "⚠️ Slow" || echo "🚨 Very Slow") |
+
+## 🔍 Failure Analysis
+
+| Failure Type | Count | Percentage |
+|-------------|--------|------------|
+| Build Failures | ${{ steps.analysis.outputs.rust_failures }} | $([ ${{ steps.metrics.outputs.failed_runs }} -gt 0 ] && echo "scale=1; ${{ steps.analysis.outputs.rust_failures }} * 100 / ${{ steps.metrics.outputs.failed_runs }}" | bc -l || echo "0")% |
+| Test Failures | ${{ steps.analysis.outputs.test_failures }} | $([ ${{ steps.metrics.outputs.failed_runs }} -gt 0 ] && echo "scale=1; ${{ steps.analysis.outputs.test_failures }} * 100 / ${{ steps.metrics.outputs.failed_runs }}" | bc -l || echo "0")% |
+| Lint Failures | ${{ steps.analysis.outputs.lint_failures }} | $([ ${{ steps.metrics.outputs.failed_runs }} -gt 0 ] && echo "scale=1; ${{ steps.analysis.outputs.lint_failures }} * 100 / ${{ steps.metrics.outputs.failed_runs }}" | bc -l || echo "0")% |
+
+**Dominant Failure Pattern**: ${{ steps.analysis.outputs.dominant_failure }}
+
+## 🎯 Recommendations
+
+$([ "${{ steps.metrics.outputs.failure_rate }}" > "20" ] && echo "### 🚨 Immediate Action Required
+- Build health is below acceptable thresholds
+- Review recent failed runs for common patterns  
+- Consider implementing automated fixes for common issues" || echo "### ✅ Build Health Good
+- Continue monitoring for any degradation trends
+- Consider optimizing build times if needed")
+
+## 📊 Trends & Insights
+
+- **Build Stability**: $([ "${{ steps.metrics.outputs.success_rate }}" > "90" ] && echo "Excellent" || [ "${{ steps.metrics.outputs.success_rate }}" > "80" ] && echo "Good" || [ "${{ steps.metrics.outputs.success_rate }}" > "70" ] && echo "Fair" || echo "Poor")
+- **Performance**: $([ ${{ steps.metrics.outputs.avg_build_time }} -lt 5 ] && echo "Very Fast" || [ ${{ steps.metrics.outputs.avg_build_time }} -lt 10 ] && echo "Fast" || [ ${{ steps.metrics.outputs.avg_build_time }} -lt 15 ] && echo "Moderate" || echo "Slow")
+- **Reliability**: $([ "${{ steps.metrics.outputs.failure_rate }}" < "5" ] && echo "Very Reliable" || [ "${{ steps.metrics.outputs.failure_rate }}" < "15" ] && echo "Reliable" || [ "${{ steps.metrics.outputs.failure_rate }}" < "25" ] && echo "Moderate" || echo "Unreliable")
+
+---
+*Generated by Build Monitor v1.0 - Automated Build Health Monitoring*
+EOF
+
+          echo "📄 Monitoring report generated: $REPORT_FILE"
+
+      - name: 📤 Upload Monitoring Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-monitor-report
+          path: build-monitor-report-*.md
+
+  dependency-health-check:
+    name: 📦 Dependency Health Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚡ Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt, clippy
+
+      - name: 📦 Dependency Analysis
+        run: |
+          echo "📦 Analyzing dependency health..."
+          
+          # Check for outdated dependencies
+          if ! cargo outdated --exit-code 1 2>/dev/null; then
+            echo "⚠️ Some dependencies may be outdated"
+            cargo outdated || echo "cargo-outdated not available"
+          fi
+          
+          # Check for security vulnerabilities
+          if command -v cargo-audit >/dev/null 2>&1; then
+            echo "🔒 Running security audit..."
+            cargo audit || echo "⚠️ Security vulnerabilities found"
+          else
+            echo "ℹ️ cargo-audit not available - consider installing for security checks"
+          fi
+          
+          # Check for duplicate dependencies
+          echo "🔍 Checking for duplicate dependencies..."
+          DUPLICATES=$(cargo tree --duplicates --quiet || echo "")
+          
+          if [ -n "$DUPLICATES" ]; then
+            echo "⚠️ Duplicate dependencies found:"
+            echo "$DUPLICATES"
+          else
+            echo "✅ No duplicate dependencies found"
+          fi
+          
+          # Generate dependency report
+          echo "📊 Dependency summary:"
+          cargo tree --depth 1 | wc -l | xargs echo "Direct dependencies:"
+          cargo tree | wc -l | xargs echo "Total dependencies:"
+
+      - name: 🏗️ Build Environment Check
+        run: |
+          echo "🏗️ Checking build environment health..."
+          
+          # Check disk space
+          DISK_USAGE=$(df -h . | tail -1 | awk '{print $5}' | sed 's/%//')
+          echo "💾 Disk usage: ${DISK_USAGE}%"
+          
+          if [ $DISK_USAGE -gt 80 ]; then
+            echo "⚠️ Disk usage is high (${DISK_USAGE}%)"
+          fi
+          
+          # Check available memory
+          if command -v free >/dev/null 2>&1; then
+            echo "🧠 Memory status:"
+            free -h
+          fi
+          
+          # Check Rust toolchain
+          echo "🦀 Rust toolchain:"
+          rustc --version
+          cargo --version
+          
+          echo "✅ Build environment check complete"
