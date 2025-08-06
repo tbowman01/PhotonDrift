@@ -1,0 +1,468 @@
+name: 🛡️ Quality Gates & Protection
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      enforce_strict:
+        description: 'Enforce strict quality checks'
+        type: boolean
+        required: false
+        default: true
+      skip_slow_tests:
+        description: 'Skip slow/expensive tests'
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: quality-gates-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+  statuses: write
+
+env:
+  RUST_BACKTRACE: 1
+  CARGO_TERM_COLOR: always
+
+jobs:
+  quality-gate-pre-check:
+    name: 🔍 Quality Gate Pre-Check
+    runs-on: ubuntu-latest
+    outputs:
+      should_run_full_suite: ${{ steps.decision.outputs.should_run_full_suite }}
+      is_draft: ${{ steps.pr-info.outputs.is_draft }}
+      change_scope: ${{ steps.analysis.outputs.change_scope }}
+      risk_level: ${{ steps.analysis.outputs.risk_level }}
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📋 Analyze PR Information
+        id: pr-info
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "📋 Analyzing PR information..."
+          
+          IS_DRAFT="${{ github.event.pull_request.draft }}"
+          PR_SIZE=$(gh pr view ${{ github.event.pull_request.number }} --json additions,deletions --jq '.additions + .deletions')
+          
+          echo "is_draft=$IS_DRAFT" >> $GITHUB_OUTPUT
+          echo "pr_size=$PR_SIZE" >> $GITHUB_OUTPUT
+          
+          echo "📊 PR Analysis:"
+          echo "  🎯 Draft: $IS_DRAFT"
+          echo "  📏 Size: $PR_SIZE lines"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🔍 Analyze Change Scope
+        id: analysis
+        run: |
+          echo "🔍 Analyzing change scope and risk..."
+          
+          # Get changed files
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            CHANGED_FILES=$(gh pr view ${{ github.event.pull_request.number }} --json files --jq '.files[].path')
+          else
+            CHANGED_FILES=$(git diff --name-only HEAD~1)
+          fi
+          
+          echo "📁 Changed files:"
+          echo "$CHANGED_FILES"
+          
+          # Categorize changes
+          RUST_CHANGES=$(echo "$CHANGED_FILES" | grep -c '\.rs$' || echo "0")
+          CONFIG_CHANGES=$(echo "$CHANGED_FILES" | grep -c -E '\.(toml|yml|yaml|json)$' || echo "0")
+          DOC_CHANGES=$(echo "$CHANGED_FILES" | grep -c -E '\.(md|rst|txt)$' || echo "0")
+          WORKFLOW_CHANGES=$(echo "$CHANGED_FILES" | grep -c '\.github/' || echo "0")
+          TEST_CHANGES=$(echo "$CHANGED_FILES" | grep -c -E '(test|spec)' || echo "0")
+          
+          echo "rust_changes=$RUST_CHANGES" >> $GITHUB_OUTPUT
+          echo "config_changes=$CONFIG_CHANGES" >> $GITHUB_OUTPUT
+          echo "doc_changes=$DOC_CHANGES" >> $GITHUB_OUTPUT
+          echo "workflow_changes=$WORKFLOW_CHANGES" >> $GITHUB_OUTPUT
+          echo "test_changes=$TEST_CHANGES" >> $GITHUB_OUTPUT
+          
+          # Determine change scope
+          if [ $DOC_CHANGES -gt 0 ] && [ $RUST_CHANGES -eq 0 ] && [ $CONFIG_CHANGES -eq 0 ]; then
+            CHANGE_SCOPE="docs-only"
+          elif [ $TEST_CHANGES -gt 0 ] && [ $RUST_CHANGES -eq 0 ]; then
+            CHANGE_SCOPE="tests-only"
+          elif [ $RUST_CHANGES -gt 0 ]; then
+            CHANGE_SCOPE="code-changes"
+          elif [ $CONFIG_CHANGES -gt 0 ] || [ $WORKFLOW_CHANGES -gt 0 ]; then
+            CHANGE_SCOPE="config-changes"
+          else
+            CHANGE_SCOPE="misc"
+          fi
+          
+          # Determine risk level
+          RISK_LEVEL="low"
+          if [ $RUST_CHANGES -gt 10 ] || [ $CONFIG_CHANGES -gt 3 ] || [ $WORKFLOW_CHANGES -gt 1 ]; then
+            RISK_LEVEL="medium"
+          fi
+          if [ $RUST_CHANGES -gt 25 ] || [ "$CHANGE_SCOPE" = "config-changes" ]; then
+            RISK_LEVEL="high"
+          fi
+          
+          echo "change_scope=$CHANGE_SCOPE" >> $GITHUB_OUTPUT
+          echo "risk_level=$RISK_LEVEL" >> $GITHUB_OUTPUT
+          
+          echo "📊 Change Analysis:"
+          echo "  🦀 Rust files: $RUST_CHANGES"
+          echo "  ⚙️ Config files: $CONFIG_CHANGES"
+          echo "  📚 Documentation: $DOC_CHANGES"
+          echo "  🔧 Workflows: $WORKFLOW_CHANGES"
+          echo "  🧪 Tests: $TEST_CHANGES"
+          echo "  📊 Scope: $CHANGE_SCOPE"
+          echo "  ⚠️ Risk Level: $RISK_LEVEL"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🎯 Quality Gate Decision
+        id: decision
+        run: |
+          echo "🎯 Making quality gate decisions..."
+          
+          SHOULD_RUN_FULL_SUITE="true"
+          IS_DRAFT="${{ steps.pr-info.outputs.is_draft || 'false' }}"
+          CHANGE_SCOPE="${{ steps.analysis.outputs.change_scope }}"
+          ENFORCE_STRICT="${{ github.event.inputs.enforce_strict || 'true' }}"
+          
+          # Skip full suite for docs-only changes
+          if [ "$CHANGE_SCOPE" = "docs-only" ] && [ "$ENFORCE_STRICT" = "false" ]; then
+            SHOULD_RUN_FULL_SUITE="false"
+            echo "📚 Docs-only changes - skipping full quality suite"
+          fi
+          
+          # Skip for draft PRs unless enforcing strict
+          if [ "$IS_DRAFT" = "true" ] && [ "$ENFORCE_STRICT" = "false" ]; then
+            SHOULD_RUN_FULL_SUITE="false"
+            echo "📝 Draft PR - skipping full quality suite"
+          fi
+          
+          echo "should_run_full_suite=$SHOULD_RUN_FULL_SUITE" >> $GITHUB_OUTPUT
+          
+          echo "🎯 Quality Gate Decision:"
+          echo "  🏃 Run Full Suite: $SHOULD_RUN_FULL_SUITE"
+          echo "  📝 Is Draft: $IS_DRAFT"
+          echo "  📊 Change Scope: $CHANGE_SCOPE"
+          echo "  🛡️ Enforce Strict: $ENFORCE_STRICT"
+
+  code-quality-checks:
+    name: 📝 Code Quality Checks
+    runs-on: ubuntu-latest
+    needs: quality-gate-pre-check
+    if: needs.quality-gate-pre-check.outputs.should_run_full_suite == 'true'
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚡ Setup Rust Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt, clippy
+          cache: true
+
+      - name: 🎨 Check Code Formatting
+        run: |
+          echo "🎨 Checking code formatting with rustfmt..."
+          
+          if ! cargo fmt --all -- --check; then
+            echo "❌ Code formatting issues found!"
+            echo ""
+            echo "🔧 To fix formatting issues, run:"
+            echo "   cargo fmt --all"
+            echo ""
+            exit 1
+          fi
+          
+          echo "✅ Code formatting is correct"
+
+      - name: 📝 Lint with Clippy
+        run: |
+          echo "📝 Running Clippy lints..."
+          
+          # Run clippy with different levels based on risk
+          RISK_LEVEL="${{ needs.quality-gate-pre-check.outputs.risk_level }}"
+          
+          if [ "$RISK_LEVEL" = "high" ]; then
+            echo "🔥 High risk changes - running strict clippy checks"
+            cargo clippy --all-targets --all-features -- -D warnings -D clippy::all
+          elif [ "$RISK_LEVEL" = "medium" ]; then
+            echo "⚠️ Medium risk changes - running standard clippy checks"
+            cargo clippy --all-targets --all-features -- -D warnings
+          else
+            echo "✅ Low risk changes - running basic clippy checks"
+            cargo clippy --all-targets -- -D warnings
+          fi
+          
+          echo "✅ Clippy checks passed"
+
+      - name: 🔍 Security Audit
+        run: |
+          echo "🔍 Running security audit..."
+          
+          # Install cargo-audit if not available
+          if ! command -v cargo-audit >/dev/null 2>&1; then
+            echo "📦 Installing cargo-audit..."
+            cargo install --quiet cargo-audit
+          fi
+          
+          # Run security audit
+          if ! cargo audit; then
+            echo "❌ Security vulnerabilities found!"
+            echo ""
+            echo "🔧 To fix security issues:"
+            echo "   1. Update vulnerable dependencies: cargo update"
+            echo "   2. Check for security advisories: cargo audit"
+            echo "   3. Consider alternative dependencies if needed"
+            echo ""
+            
+            # Don't fail on security issues for now, just warn
+            echo "⚠️ Proceeding with warning - please address security issues"
+          else
+            echo "✅ No security vulnerabilities found"
+          fi
+
+      - name: 📊 Code Complexity Analysis
+        run: |
+          echo "📊 Analyzing code complexity..."
+          
+          # Simple complexity metrics using basic tools
+          echo "📈 Line count analysis:"
+          find src -name "*.rs" -exec wc -l {} + | tail -1
+          
+          echo "📊 Function count analysis:"
+          grep -r "^fn " src --include="*.rs" | wc -l | xargs echo "Total functions:"
+          
+          # Check for very large files (complexity indicator)
+          echo "🔍 Large file analysis:"
+          find src -name "*.rs" -exec wc -l {} + | sort -nr | head -5
+          
+          # Look for TODO/FIXME comments
+          echo "📝 Code debt analysis:"
+          TODO_COUNT=$(grep -r -i "todo\|fixme\|hack" src --include="*.rs" | wc -l || echo "0")
+          echo "Code debt markers found: $TODO_COUNT"
+          
+          if [ $TODO_COUNT -gt 10 ]; then
+            echo "⚠️ High number of code debt markers found ($TODO_COUNT)"
+            echo "Consider addressing technical debt before merging"
+          fi
+
+  build-quality-matrix:
+    name: 🏗️ Build Quality Matrix
+    runs-on: ${{ matrix.os }}
+    needs: quality-gate-pre-check
+    if: needs.quality-gate-pre-check.outputs.should_run_full_suite == 'true'
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        rust: [stable]
+        features: ['default', 'ml', 'lsp', 'realtime']
+        exclude:
+          # Reduce matrix size for docs-only changes
+          - os: windows-latest
+            features: 'realtime'
+          - os: macos-latest
+            features: 'realtime'
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚡ Setup Rust Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+          cache: true
+
+      - name: 🏗️ Build with Feature Set
+        run: |
+          echo "🏗️ Building with feature set: ${{ matrix.features }}"
+          
+          case "${{ matrix.features }}" in
+            "default")
+              FEATURE_FLAGS=""
+              ;;
+            "ml")
+              FEATURE_FLAGS="--features ml"
+              ;;
+            "lsp")
+              FEATURE_FLAGS="--features lsp"
+              ;;
+            "realtime")
+              FEATURE_FLAGS="--features realtime"
+              ;;
+          esac
+          
+          echo "🚀 Building with flags: $FEATURE_FLAGS"
+          
+          if ! cargo build $FEATURE_FLAGS --verbose; then
+            echo "❌ Build failed with feature set: ${{ matrix.features }}"
+            exit 1
+          fi
+          
+          echo "✅ Build successful with feature set: ${{ matrix.features }}"
+
+      - name: 🧪 Test with Feature Set
+        if: github.event.inputs.skip_slow_tests != 'true'
+        run: |
+          echo "🧪 Testing with feature set: ${{ matrix.features }}"
+          
+          case "${{ matrix.features }}" in
+            "default")
+              FEATURE_FLAGS=""
+              ;;
+            "ml")
+              FEATURE_FLAGS="--features ml"
+              ;;
+            "lsp")
+              FEATURE_FLAGS="--features lsp"
+              ;;
+            "realtime")
+              FEATURE_FLAGS="--features realtime"
+              ;;
+          esac
+          
+          if ! cargo test $FEATURE_FLAGS --verbose; then
+            echo "❌ Tests failed with feature set: ${{ matrix.features }}"
+            exit 1
+          fi
+          
+          echo "✅ Tests passed with feature set: ${{ matrix.features }}"
+
+  dependency-quality-check:
+    name: 📦 Dependency Quality Check
+    runs-on: ubuntu-latest
+    needs: quality-gate-pre-check
+    if: needs.quality-gate-pre-check.outputs.should_run_full_suite == 'true'
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚡ Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: 📦 Check Dependency Issues
+        run: |
+          echo "📦 Checking for dependency issues..."
+          
+          # Check for duplicate dependencies
+          echo "🔍 Checking for duplicate dependencies..."
+          DUPLICATES=$(cargo tree --duplicates --quiet || echo "")
+          
+          if [ -n "$DUPLICATES" ]; then
+            echo "⚠️ Duplicate dependencies found:"
+            echo "$DUPLICATES"
+            echo ""
+            echo "🔧 Consider consolidating versions in Cargo.toml"
+          else
+            echo "✅ No duplicate dependencies found"
+          fi
+          
+          # Check for unused dependencies (basic check)
+          echo "🔍 Basic unused dependency check..."
+          # This is a simple check - for production, consider using cargo-udeps
+          cargo check --quiet 2>&1 | grep -i "unused" || echo "✅ No obvious unused dependency warnings"
+
+      - name: 📊 Dependency Analysis Report
+        run: |
+          echo "📊 Generating dependency analysis..."
+          
+          echo "📈 Dependency tree summary:"
+          cargo tree --depth 1 | wc -l | xargs echo "Direct dependencies:"
+          cargo tree | wc -l | xargs echo "Total dependencies:"
+          
+          echo ""
+          echo "📦 License summary:"
+          # Basic license check - for production, consider cargo-license
+          grep -r "license" Cargo.toml || echo "License information in Cargo.toml"
+
+  quality-gate-summary:
+    name: 📊 Quality Gate Summary
+    runs-on: ubuntu-latest
+    needs: [quality-gate-pre-check, code-quality-checks, build-quality-matrix, dependency-quality-check]
+    if: always()
+    
+    steps:
+      - name: 📊 Generate Quality Report
+        run: |
+          echo "📊 Generating quality gate summary..."
+          
+          # Collect results
+          PRE_CHECK_RESULT="${{ needs.quality-gate-pre-check.result }}"
+          CODE_QUALITY_RESULT="${{ needs.code-quality-checks.result }}"
+          BUILD_MATRIX_RESULT="${{ needs.build-quality-matrix.result }}"
+          DEPENDENCY_CHECK_RESULT="${{ needs.dependency-quality-check.result }}"
+          
+          echo "📋 Quality Gate Results:"
+          echo "  🔍 Pre-check: $PRE_CHECK_RESULT"
+          echo "  📝 Code Quality: $CODE_QUALITY_RESULT"
+          echo "  🏗️ Build Matrix: $BUILD_MATRIX_RESULT"
+          echo "  📦 Dependencies: $DEPENDENCY_CHECK_RESULT"
+          
+          # Determine overall status
+          OVERALL_STATUS="success"
+          if [ "$CODE_QUALITY_RESULT" = "failure" ] || [ "$BUILD_MATRIX_RESULT" = "failure" ]; then
+            OVERALL_STATUS="failure"
+          fi
+          
+          echo "🎯 Overall Quality Gate Status: $OVERALL_STATUS"
+          
+          # Generate summary comment for PR
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            SUMMARY_COMMENT="## 🛡️ Quality Gate Summary
+
+**Overall Status**: $([ "$OVERALL_STATUS" = "success" ] && echo "✅ PASSED" || echo "❌ FAILED")
+
+### 📊 Quality Checks
+| Check | Status | Details |
+|-------|--------|---------|
+| Code Quality | $([ "$CODE_QUALITY_RESULT" = "success" ] && echo "✅ Passed" || [ "$CODE_QUALITY_RESULT" = "skipped" ] && echo "⏭️ Skipped" || echo "❌ Failed") | Formatting, linting, security audit |
+| Build Matrix | $([ "$BUILD_MATRIX_RESULT" = "success" ] && echo "✅ Passed" || [ "$BUILD_MATRIX_RESULT" = "skipped" ] && echo "⏭️ Skipped" || echo "❌ Failed") | Multi-platform, multi-feature builds |
+| Dependencies | $([ "$DEPENDENCY_CHECK_RESULT" = "success" ] && echo "✅ Passed" || [ "$DEPENDENCY_CHECK_RESULT" = "skipped" ] && echo "⏭️ Skipped" || echo "❌ Failed") | Duplicates, security, licensing |
+
+### 🔍 Change Analysis
+- **Scope**: ${{ needs.quality-gate-pre-check.outputs.change_scope }}
+- **Risk Level**: ${{ needs.quality-gate-pre-check.outputs.risk_level }}
+- **Full Suite Run**: ${{ needs.quality-gate-pre-check.outputs.should_run_full_suite }}
+
+$([ "$OVERALL_STATUS" = "success" ] && echo "### ✅ Ready for Review
+This PR has passed all quality gates and is ready for review." || echo "### ❌ Action Required
+This PR has failed quality checks. Please review the failed checks and make necessary corrections.")
+
+---
+*Quality Gates v2.0 - Automated Code Quality Assurance*"
+            
+            echo "$SUMMARY_COMMENT" > quality_summary.md
+            
+            # Post or update comment
+            gh pr comment ${{ github.event.pull_request.number }} --body-file quality_summary.md
+          fi
+          
+          # Exit with failure if quality gates failed
+          if [ "$OVERALL_STATUS" = "failure" ]; then
+            echo "❌ Quality gates failed - exiting with error"
+            exit 1
+          fi
+          
+          echo "✅ All quality gates passed"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

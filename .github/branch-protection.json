@@ -1,0 +1,49 @@
+{
+  "main": {
+    "required_status_checks": {
+      "strict": true,
+      "contexts": [
+        "🛡️ Quality Gates & Protection / 📝 Code Quality Checks",
+        "🛡️ Quality Gates & Protection / 🏗️ Build Quality Matrix (ubuntu-latest, stable, default)",
+        "🛡️ Quality Gates & Protection / 🏗️ Build Quality Matrix (ubuntu-latest, stable, ml)",
+        "🛡️ Quality Gates & Protection / 📦 Dependency Quality Check",
+        "🤖 GitHub Coordinator - Build Issue Resolution & Conflict Management / 🏗️ Comprehensive Build Validation (ubuntu-latest, stable)",
+        "Rust Security Audit"
+      ]
+    },
+    "enforce_admins": false,
+    "required_pull_request_reviews": {
+      "required_approving_review_count": 1,
+      "dismiss_stale_reviews": true,
+      "require_code_owner_reviews": true,
+      "require_last_push_approval": false
+    },
+    "restrictions": null,
+    "allow_force_pushes": false,
+    "allow_deletions": false,
+    "block_creations": false,
+    "required_conversation_resolution": true
+  },
+  "develop": {
+    "required_status_checks": {
+      "strict": false,
+      "contexts": [
+        "🛡️ Quality Gates & Protection / 📝 Code Quality Checks",
+        "🛡️ Quality Gates & Protection / 🏗️ Build Quality Matrix (ubuntu-latest, stable, default)",
+        "🤖 GitHub Coordinator - Build Issue Resolution & Conflict Management / 🏗️ Comprehensive Build Validation (ubuntu-latest, stable)"
+      ]
+    },
+    "enforce_admins": false,
+    "required_pull_request_reviews": {
+      "required_approving_review_count": 1,
+      "dismiss_stale_reviews": false,
+      "require_code_owner_reviews": false,
+      "require_last_push_approval": false
+    },
+    "restrictions": null,
+    "allow_force_pushes": false,
+    "allow_deletions": false,
+    "block_creations": false,
+    "required_conversation_resolution": false
+  }
+}

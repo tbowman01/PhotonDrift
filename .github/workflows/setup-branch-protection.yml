@@ -1,0 +1,174 @@
+name: 🛡️ Setup Branch Protection
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branches:
+        description: 'Branches to protect (comma-separated)'
+        required: false
+        default: 'main,develop'
+      dry_run:
+        description: 'Dry run - show what would be configured without applying'
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: read
+  administration: write
+
+jobs:
+  setup-protection:
+    name: 🛡️ Configure Branch Protection
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🛡️ Configure Branch Protection Rules
+        run: |
+          echo "🛡️ Setting up branch protection rules..."
+          
+          DRY_RUN="${{ github.event.inputs.dry_run || 'true' }}"
+          BRANCHES="${{ github.event.inputs.target_branches || 'main,develop' }}"
+          
+          echo "🎯 Target branches: $BRANCHES"
+          echo "🔍 Dry run mode: $DRY_RUN"
+          
+          # Read branch protection configuration
+          if [ ! -f .github/branch-protection.json ]; then
+            echo "❌ Branch protection configuration not found at .github/branch-protection.json"
+            exit 1
+          fi
+          
+          # Process each branch
+          for branch in $(echo $BRANCHES | tr ',' ' '); do
+            branch=$(echo $branch | xargs) # trim whitespace
+            echo ""
+            echo "🔧 Configuring protection for branch: $branch"
+            
+            # Extract configuration for this branch
+            BRANCH_CONFIG=$(jq -r ".\"$branch\"" .github/branch-protection.json)
+            
+            if [ "$BRANCH_CONFIG" = "null" ]; then
+              echo "⚠️ No configuration found for branch '$branch' in branch-protection.json"
+              continue
+            fi
+            
+            echo "📋 Configuration for $branch:"
+            echo "$BRANCH_CONFIG" | jq '.'
+            
+            if [ "$DRY_RUN" = "false" ]; then
+              echo "🚀 Applying branch protection rules for $branch..."
+              
+              # Apply branch protection using GitHub CLI
+              # Note: This requires admin permissions on the repository
+              if gh api repos/${{ github.repository }}/branches/$branch/protection \
+                --method PUT \
+                --input <(echo "$BRANCH_CONFIG"); then
+                echo "✅ Successfully configured protection for $branch"
+              else
+                echo "❌ Failed to configure protection for $branch"
+                echo "   Make sure you have admin permissions and the branch exists"
+              fi
+            else
+              echo "🔍 DRY RUN: Would apply the above configuration to $branch"
+            fi
+          done
+          
+          if [ "$DRY_RUN" = "true" ]; then
+            echo ""
+            echo "🔍 DRY RUN COMPLETE"
+            echo "To actually apply these settings, run this workflow with 'dry_run' set to false"
+          else
+            echo ""
+            echo "✅ Branch protection setup complete!"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📊 Generate Protection Report
+        run: |
+          echo "📊 Generating branch protection report..."
+          
+          BRANCHES="${{ github.event.inputs.target_branches || 'main,develop' }}"
+          REPORT_FILE="branch-protection-report.md"
+          
+          cat > $REPORT_FILE << EOF
+# 🛡️ Branch Protection Report
+
+**Generated**: $(date -u)
+**Repository**: ${{ github.repository }}
+**Configured By**: ${{ github.actor }}
+**Dry Run**: ${{ github.event.inputs.dry_run || 'true' }}
+
+## 📋 Protected Branches
+
+EOF
+          
+          for branch in $(echo $BRANCHES | tr ',' ' '); do
+            branch=$(echo $branch | xargs)
+            
+            cat >> $REPORT_FILE << EOF
+### 🌟 Branch: \`$branch\`
+
+**Protection Rules Applied**:
+$(jq -r ".\"$branch\"" .github/branch-protection.json | jq -r 'to_entries[] | "- **\(.key)**: \(.value)"' 2>/dev/null || echo "- No configuration found")
+
+---
+EOF
+          done
+          
+          cat >> $REPORT_FILE << EOF
+
+## 🔧 How to Modify Protection Rules
+
+1. Edit \`.github/branch-protection.json\` with your desired settings
+2. Run this workflow with \`dry_run: true\` to preview changes
+3. Run with \`dry_run: false\` to apply changes
+
+## 📚 GitHub Branch Protection Documentation
+
+- [About protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/about-protected-branches)
+- [Managing branch protection rules](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/managing-a-branch-protection-rule)
+
+---
+*Generated by Branch Protection Setup v1.0*
+EOF
+
+          echo "📄 Report generated: $REPORT_FILE"
+
+      - name: 📤 Upload Protection Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: branch-protection-report
+          path: branch-protection-report.md
+
+  validate-current-protection:
+    name: 📋 Validate Current Protection
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 📋 Check Current Protection Status
+        run: |
+          echo "📋 Checking current branch protection status..."
+          
+          BRANCHES="${{ github.event.inputs.target_branches || 'main,develop' }}"
+          
+          for branch in $(echo $BRANCHES | tr ',' ' '); do
+            branch=$(echo $branch | xargs)
+            echo ""
+            echo "🔍 Checking protection for branch: $branch"
+            
+            if gh api repos/${{ github.repository }}/branches/$branch/protection 2>/dev/null; then
+              echo "✅ Branch $branch is protected"
+            else
+              echo "⚠️ Branch $branch is not protected or doesn't exist"
+            fi
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
