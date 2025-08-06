@@ -12,10 +12,32 @@
         "esModuleInterop": true,
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
-        "resolveJsonModule": true
+        "resolveJsonModule": true,
+        // Performance optimizations
+        "incremental": true,
+        "tsBuildInfoFile": ".tsbuildinfo",
+        "composite": false,
+        "declaration": false,
+        "declarationMap": false,
+        // Faster compilation options
+        "noCheck": false,
+        "transpileOnly": false,
+        "isolatedModules": true
     },
     "exclude": [
         "node_modules",
-        ".vscode-test"
-    ]
+        ".vscode-test",
+        "out",
+        "*.vsix"
+    ],
+    "include": [
+        "src/**/*"
+    ],
+    // Performance settings
+    "ts-node": {
+        "transpileOnly": true,
+        "compilerOptions": {
+            "module": "CommonJS"
+        }
+    }
 }

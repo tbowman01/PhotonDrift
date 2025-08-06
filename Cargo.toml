@@ -132,23 +132,58 @@ name = "adrscan-lsp"
 path = "src/bin/lsp.rs"
 required-features = ["lsp"]
 
+# Development profile - optimized for fast compilation
+[profile.dev]
+opt-level = 0
+debug = true
+debug-assertions = true
+overflow-checks = true
+lto = false
+panic = "unwind"
+incremental = true
+codegen-units = 256  # Maximum parallelization for dev builds
+
+# Fast development profile with some optimizations  
+[profile.dev-opt]
+inherits = "dev"
+opt-level = 1
+debug = true
+lto = false
+codegen-units = 16
+
 [profile.release]
-lto = "fat"  # Fat LTO for maximum optimization
-codegen-units = 1
+# Balanced release profile - better compile time vs runtime performance trade-off
+lto = "thin"  # Changed from "fat" - much faster compilation, minimal performance impact
+codegen-units = 16  # Increased from 1 - allows more parallel compilation
 strip = "symbols"  # Strip all symbols for smaller size
-opt-level = "z"  # Aggressive size optimization (changed from "s")
+opt-level = "s"  # Changed from "z" - size optimization with better compile time
 panic = "abort"  # Reduce WASM size
 overflow-checks = false  # Disable for performance
 debug-assertions = false  # Disable for smaller builds
 rpath = false
 
+# Production profile - maximum optimization (use for final releases only)
+[profile.production]
+inherits = "release"
+lto = "fat"  # Maximum LTO for final builds
+codegen-units = 1  # Maximum runtime optimization
+opt-level = "z"  # Aggressive size optimization
+
 # WASM-specific optimizations
 [profile.release.package.adrscan]
 opt-level = "z"  # Aggressive size optimization for WASM
 
-# Optimize specific dependencies for size
+# Optimize specific dependencies for size (only for production builds)
 [profile.release.package."*"]
-opt-level = "z"  # Changed from "s" to "z" for aggressive optimization
+opt-level = "s"  # Balanced optimization for dependencies
+
+# Production-only aggressive optimization
+[profile.production.package."*"]
+opt-level = "z"  # Aggressive optimization only for production builds
+
+# Fast compilation for heavy dependencies in dev mode
+[profile.dev.package."*"]
+opt-level = 0
 
 # WASM-specific profile
 [profile.wasm-release]
